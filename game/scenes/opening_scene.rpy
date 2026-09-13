@@ -20,6 +20,7 @@ transform sophie_walk_to_park_position:
 label opening_scene:
     scene bg park_day
     with dissolve
+    play music "audio/chapter1/music/sophie_park_upbeat_loop.mp3" loop fadein 2.0 volume 0.20
 
     # Let the park establish itself before Sophie enters.
     pause 0.25
@@ -36,8 +37,11 @@ label opening_scene:
 
     show sophie casual at sophie_park_position
 
+    voice "audio/chapter1/scene1/sophie/hi_im_sophie.mp3"
     Sophie "Hi! I'm Sophie."
+    voice "audio/chapter1/scene1/sophie/nice_to_meet_you.mp3"
     Sophie "It's really nice to meet you."
+    voice "audio/chapter1/scene1/sophie/introduce_yourself.mp3"
     Sophie "Why don't you introduce yourself?"
 
     call screen introduction_controls
@@ -48,6 +52,8 @@ label type_introduction:
 
     if player_name:
         show sophie wave at sophie_park_position
+        if player_name == "Ella":
+            voice "audio/chapter1/scene1/sophie/nice_to_meet_you_ella.mp3"
         Sophie "Nice to meet you, [player_name]!"
         pause 0.75
         show sophie casual at sophie_park_position
@@ -61,12 +67,14 @@ label speak_introduction:
 
 
 label after_introduction:
+    voice "audio/chapter1/scene1/sophie/french_level_question.mp3"
     Sophie "First, how much French do you already know?"
     call screen onboarding_choice("Which level fits you best?", [("Beginner", "beginner"), ("Intermediate", "intermediate"), ("Expert", "expert")], "french_level")
     jump ask_learning_goal
 
 
 label ask_learning_goal:
+    voice "audio/chapter1/scene1/sophie/why_learn_french.mp3"
     Sophie "And why do you want to learn French?"
     call screen onboarding_choice("Which reason fits you best?", [("Education", "education"), ("Career", "career"), ("Tourism", "tourism"), ("Relationship", "relationship"), ("General Purpose", "general")], "learning_goal")
 
@@ -76,6 +84,7 @@ label ask_learning_goal:
 
 
 label ask_age_range:
+    voice "audio/chapter1/scene1/sophie/age_question.mp3"
     Sophie "One last thing — how old are you?"
     call screen onboarding_choice("Which age range fits you?", [("Under 18", "under_18"), ("18–24", "18_24"), ("25–34", "25_34"), ("35–44", "35_44"), ("45+", "45_plus")], "age_range")
     jump onboarding_questions_complete
@@ -83,5 +92,6 @@ label ask_age_range:
 
 label onboarding_questions_complete:
     # TODO: Sophie explains how the learning world works here.
-    # Next phase will add bilingual French/English dialogue and Sophie voice audio.
+    # Next phase will add bilingual French/English dialogue.
+    stop music fadeout 1.5
     return
