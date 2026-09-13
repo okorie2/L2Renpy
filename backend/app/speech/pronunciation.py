@@ -136,7 +136,7 @@ def evaluate_pronunciation(
 
     expected_phonemes = phonemize_audio(reference_audio_path)
     learner_phonemes = phonemize_audio(learner_audio_path)
-    transcript = transcribe_audio(learner_audio_path)
+    transcript = transcribe_audio(learner_audio_path, language="fr")
 
     text_similarity = similarity(
         normalize_text(reference_text),

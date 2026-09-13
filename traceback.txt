@@ -1,0 +1,28 @@
+﻿I'm sorry, but an uncaught exception occurred.
+
+While running game code:
+  File "game/systems/speech/input.rpy", line 3, in script
+    init python:
+  File "game/systems/speech/input.rpy", line 6, in <module>
+    from game.systems.speech.api import SpeechAPIError
+ModuleNotFoundError: No module named 'game.systems.speech.api'
+
+-- Full Traceback ------------------------------------------------------------
+
+Traceback (most recent call last):
+  File "game/systems/speech/input.rpy", line 3, in script
+    init python:
+  File "renpy/ast.py", line 1193, in execute
+    renpy.python.py_exec_bytecode(self.code.bytecode, self.hide, store=self.store)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "renpy/python.py", line 1276, in py_exec_bytecode
+    exec(bytecode, globals, locals)
+    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "game/systems/speech/input.rpy", line 6, in <module>
+    from game.systems.speech.api import SpeechAPIError
+ModuleNotFoundError: No module named 'game.systems.speech.api'
+
+macOS-26.2-arm64-arm-64bit arm64
+Ren'Py 8.5.3.26051504
+Language_app 1.0
+Sun Sep 13 23:01:19 2026

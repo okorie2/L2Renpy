@@ -8,7 +8,7 @@ from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 
 from .speech.audio import AudioError
 from .speech.pronunciation import evaluate_pronunciation
-
+from .speech.transcribe import normalize_language, transcribe_audio
 
 logger = logging.getLogger(__name__)
 app = FastAPI(title="Language App Speech Backend")
@@ -79,4 +79,42 @@ async def pronunciation(
         raise HTTPException(
             status_code=500,
             detail="Pronunciation inference failed.",
+        ) from exc
+
+
+@app.post("/speech/transcribe")
+async def transcribe(
+    learner_audio: UploadFile | None = File(None),
+    language: str = Form("en"),
+) -> dict[str, str]:
+    """Transcribe one learner recording with the already-loaded Whisper model."""
+
+    if learner_audio is None:
+        raise HTTPException(status_code=400, detail="learner_audio is required.")
+
+    try:
+        language_code, _ = normalize_language(language)
+        print(f"Transcribing audio with language code: {language_code}")
+
+        with TemporaryDirectory(prefix="speech-transcription-") as temp_dir:
+            audio_path = Path(temp_dir) / "learner_audio"
+            await _save_upload(learner_audio, audio_path)
+            transcript = transcribe_audio(
+                str(audio_path),
+                language=language_code,
+            )
+        print(f"Transcription result: {transcript}")
+        return {
+            "transcript": transcript,
+            "language": language_code,
+        }
+    except AudioError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except (OSError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Speech transcription failed")
+        raise HTTPException(
+            status_code=500,
+            detail="Speech transcription failed.",
         ) from exc

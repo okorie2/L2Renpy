@@ -50,6 +50,28 @@ label opening_scene:
 label type_introduction:
     $ player_name = renpy.input("What's your name?").strip()
 
+    jump introduction_name_complete
+
+
+label speak_introduction:
+    # Reuse the existing Speak button route with the generic speech component.
+    call screen speech_input(
+        mode="transcription",
+        language="en",
+        prompt="Say your name.",
+    )
+    $ speech_result = _return
+
+    if speech_result and speech_result.get("status") == "confirmed":
+        $ player_name = speech_result.get("transcript", "")
+
+    if not speech_result or speech_result.get("status") != "confirmed":
+        jump type_introduction
+
+    jump introduction_name_complete
+
+
+label introduction_name_complete:
     if player_name:
         show sophie wave at sophie_park_position
         if player_name == "Ella":
@@ -59,11 +81,6 @@ label type_introduction:
         show sophie casual at sophie_park_position
 
     jump after_introduction
-
-
-label speak_introduction:
-    Sophie "Speech input will be added here."
-    call screen introduction_controls
 
 
 label after_introduction:

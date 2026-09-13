@@ -1,0 +1,14 @@
+﻿I'm sorry, but errors were detected in your script. Please correct the
+errors listed below, and try again.
+
+
+File "game/systems/speech/input.rpy", line 2: expected statement.
+    import os
+             ^
+
+File "game/systems/speech/input.rpy", line 4: expected statement.
+    from game.systems.speech.api import SpeechAPIError
+             ^
+
+Ren'Py Version: Ren'Py 8.5.3.26051504
+Sun Sep 13 22:55:00 2026

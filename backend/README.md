@@ -38,6 +38,18 @@ curl -X POST http://127.0.0.1:8000/speech/pronunciation \
   -F "learner_audio=@backend/learner.wav"
 ```
 
+Standalone transcription test using the preserved learner WAV:
+
+```bash
+curl -X POST http://127.0.0.1:8000/speech/transcribe \
+  -F "language=en" \
+  -F "learner_audio=@backend/learner.wav"
+```
+
+The transcription endpoint reuses the Whisper instance already loaded for
+pronunciation evaluation. It returns a compact response containing
+`transcript` and the normalized language code.
+
 The original CLI remains available:
 
 ```bash
