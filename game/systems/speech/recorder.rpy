@@ -141,6 +141,21 @@ init -20 python:
                 message = stderr.decode("utf-8", "replace").strip()
                 self._remove_recording()
                 raise RecordingError(message or "No microphone audio was captured.")
+            
+            debug_path = os.path.expanduser(
+                "~/Desktop/renpy_mic_debug.wav"
+            )
+
+            shutil.copy2(
+                self.recording_path,
+                debug_path,
+            )
+
+            renpy.log(
+                "SpeechRecorder: debug recording saved to {}".format(
+                    debug_path
+                )
+            )
 
             return self.recording_path
 

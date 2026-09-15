@@ -97,13 +97,14 @@ label ask_learning_goal:
 
     # TODO: Use learning_goal with future onboarding answers to select a
     # learning world. For now, every choice follows the same General Purpose flow.
-    jump ask_age_range
+    jump ask_age
 
 
-label ask_age_range:
+label ask_age:
     voice "audio/chapter1/scene1/sophie/age_question.mp3"
     Sophie "One last thing — how old are you?"
-    call screen onboarding_choice("Which age range fits you?", [("Under 18", "under_18"), ("18–24", "18_24"), ("25–34", "25_34"), ("35–44", "35_44"), ("45+", "45_plus")], "age_range")
+    call screen onboarding_age_input
+    $ player_age = _return
     jump onboarding_questions_complete
 
 
