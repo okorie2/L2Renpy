@@ -109,7 +109,30 @@ label ask_age:
 
 
 label onboarding_questions_complete:
-    # TODO: Sophie explains how the learning world works here.
-    # Next phase will add bilingual French/English dialogue.
+    voice "audio/chapter1/scene1/sophie/great.mp3"
+    Sophie "Great."
+    voice "audio/chapter1/scene1/sophie/how_i_would_introduce_myself.mp3"
+    Sophie "With the details you've given me, this is how you could introduce yourself in French."
+
+    $ personalized_introduction = build_personalized_introduction(
+        player_name,
+        player_age,
+        learning_goal,
+        french_level,
+    )
+    $ french_tts_session = FrenchTTSSession(
+        personalized_introduction["french_text"]
+    )
+    $ french_tts_session.start()
+    call screen bilingual_introduction(
+        personalized_introduction["french_text"],
+        personalized_introduction["english_text"],
+        french_tts_session,
+    )
+    $ french_tts_session.dispose()
+
+    Sophie "I know, it's a mouthful!"
+    Sophie "So we'll take it bit by bit."
+
     stop music fadeout 1.5
     return

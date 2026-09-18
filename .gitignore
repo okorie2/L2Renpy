@@ -5,3 +5,7 @@ errors.txt
 game/saves/
 game/cache/
 *.rpyc
+backend/.env
+backend/app/__pycache__/
+backend/app/speech/__pycache__/
+

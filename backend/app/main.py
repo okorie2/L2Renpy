@@ -1,17 +1,27 @@
-"""FastAPI application for local pronunciation evaluation."""
+"""FastAPI application for local speech processing."""
 
 import logging
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi.responses import Response
+from pydantic import BaseModel
 
 from .speech.audio import AudioError
 from .speech.pronunciation import evaluate_pronunciation
 from .speech.transcribe import normalize_language, transcribe_audio
+from .speech.tts import TTSConfigurationError, TTSSynthesisError, synthesize_speech
 
 logger = logging.getLogger(__name__)
 app = FastAPI(title="Language App Speech Backend")
+
+
+class SynthesizeRequest(BaseModel):
+    """Provider-neutral request body for generated speech."""
+
+    text: str
+    language: str = "fr"
 
 
 @app.get("/health")
@@ -118,3 +128,50 @@ async def transcribe(
             status_code=500,
             detail="Speech transcription failed.",
         ) from exc
+
+
+@app.post("/speech/synthesize")
+async def synthesize(request: SynthesizeRequest) -> Response:
+    """Return generated speech audio for one text/language request.
+
+    The route deliberately returns audio bytes instead of a backend-local
+    filesystem path. Provider selection and synthesis stay behind the speech
+    service boundary.
+    """
+
+    if not request.text.strip():
+        raise HTTPException(status_code=400, detail="text is required.")
+
+    if not request.language.strip():
+        raise HTTPException(status_code=400, detail="language is required.")
+
+    try:
+        audio = synthesize_speech(
+            text=request.text,
+            language=request.language,
+        )
+
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except TTSConfigurationError as exc:
+        logger.warning("Speech synthesis is unavailable: %s", exc)
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except TTSSynthesisError as exc:
+        logger.error("Configured speech synthesis provider failed: %s", exc)
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Speech synthesis failed")
+        raise HTTPException(
+            status_code=500,
+            detail="Speech synthesis failed.",
+        ) from exc
+
+    return Response(
+        content=audio.content,
+        media_type=audio.media_type,
+        headers={
+            "Content-Disposition": (
+                'inline; filename="sophie-introduction{}"'.format(audio.file_extension)
+            )
+        },
+    )
