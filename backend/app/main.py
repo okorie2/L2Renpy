@@ -45,6 +45,7 @@ async def _save_upload(upload: UploadFile, destination: Path) -> None:
         raise AudioError("The uploaded audio file is empty.")
 
 
+# Converts speech to text and also evaluates pronunciation of the speech against a reference text and audio
 @app.post("/speech/pronunciation")
 async def pronunciation(
     reference_text: str = Form(...),
@@ -92,6 +93,7 @@ async def pronunciation(
         ) from exc
 
 
+# Transform speech to text from recorded audio
 @app.post("/speech/transcribe")
 async def transcribe(
     learner_audio: UploadFile | None = File(None),
@@ -130,6 +132,7 @@ async def transcribe(
         ) from exc
 
 
+# Text to speech synthesis with a POST request to /speech/synthesize with JSON body:
 @app.post("/speech/synthesize")
 async def synthesize(request: SynthesizeRequest) -> Response:
     """Return generated speech audio for one text/language request.

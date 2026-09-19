@@ -8,4 +8,5 @@ game/cache/
 backend/.env
 backend/app/__pycache__/
 backend/app/speech/__pycache__/
+app_debug.log
 

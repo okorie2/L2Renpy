@@ -133,7 +133,7 @@ def evaluate_pronunciation(
     learner_audio_path: str,
 ) -> dict:
     """Evaluate learner audio against the supplied reference audio/text."""
-
+    print("Evaluating pronunciation...")
     expected_phonemes = phonemize_audio(reference_audio_path)
     learner_phonemes = phonemize_audio(learner_audio_path)
     transcript = transcribe_audio(learner_audio_path, language="fr")
@@ -143,13 +143,18 @@ def evaluate_pronunciation(
         normalize_text(transcript),
     )
 
+    print(f"Reference text: {round(text_similarity, 3)}")
+
     expected = tokenize_phonemes(expected_phonemes)
     learner = tokenize_phonemes(learner_phonemes)
     alignment = align_sequences(expected, learner)
     differences = [item for item in alignment if item["type"] != "match"]
     matches = sum(1 for item in alignment if item["type"] == "match")
     pronunciation_similarity = matches / len(alignment) if alignment else 0
-
+    # log the output
+    print(f"Expected phonemes: {expected_phonemes}")
+    print(f"Learner phonemes: {learner_phonemes}")
+    print(f"Pronunciation similarity: {round(pronunciation_similarity, 3)}")
     return {
         "reference_text": reference_text,
         "transcript": transcript,

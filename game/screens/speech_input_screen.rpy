@@ -1,17 +1,31 @@
 # Reusable speech-input UI. Scene-specific code decides what to do with the
 # returned result; this screen never writes player_name or other story state.
 
-screen speech_input(mode="transcription", language="en", prompt=""):
+screen speech_input(
+    mode="transcription",
+    language="en",
+    prompt="",
+    reference_text="",
+    reference_audio_path=None,
+    reference_tts_session=None,
+    translation="",
+):
     default session = SpeechInputSession(
         mode=mode,
         language=language,
         prompt=prompt,
+        reference_text=reference_text,
+        reference_audio_path=reference_audio_path,
+        reference_tts_session=reference_tts_session,
     )
 
     modal True
     zorder 100
 
     on "hide" action Function(session.dispose)
+
+    if reference_tts_session is not None:
+        timer 0.1 repeat True action Function(reference_tts_session.tick)
 
     frame:
         # Keep the interaction panel on the same side as the existing
@@ -27,13 +41,62 @@ screen speech_input(mode="transcription", language="en", prompt=""):
             xalign 0.5
             spacing 18
 
-            if session.prompt:
+            if mode == "pronunciation":
+                if reference_tts_session is None or reference_tts_session.status == TTS_FINISHED:
+                    text "Now you try.":
+                        xalign 0.5
+                        text_align 0.5
+                        size 30
+                else:
+                    text "Listen, then repeat":
+                        xalign 0.5
+                        text_align 0.5
+                        size 30
+
+                text reference_text:
+                    xalign 0.5
+                    text_align 0.5
+                    size 28
+
+                if translation:
+                    text translation:
+                        xalign 0.5
+                        text_align 0.5
+                        size 23
+
+            elif session.prompt:
                 text session.prompt:
                     xalign 0.5
                     text_align 0.5
                     size 30
 
-            if session.status == SPEECH_IDLE:
+            if (
+                mode == "pronunciation"
+                and reference_tts_session is not None
+                and reference_tts_session.status != TTS_FINISHED
+            ):
+                if reference_tts_session.status == TTS_ERROR:
+                    text "Sophie could not demonstrate this line.":
+                        xalign 0.5
+                        text_align 0.5
+                        size 22
+                        color "#ffb3b3"
+
+                    textbutton "Continue":
+                        action Return("tts_error")
+                        xalign 0.5
+                        xminimum 300
+                        yminimum 68
+                elif reference_tts_session.status == TTS_PREPARING:
+                    text "Preparing Sophie's voice...":
+                        xalign 0.5
+                        size 22
+                elif reference_tts_session.status == TTS_PLAYING:
+                    text "Sophie is speaking...":
+                        xalign 0.5
+                        size 22
+
+            elif session.status == SPEECH_IDLE:
                 text "Tap to speak":
                     xalign 0.5
                     size 24
@@ -75,25 +138,45 @@ screen speech_input(mode="transcription", language="en", prompt=""):
                     text_align 0.5
                     size 28
 
-                hbox:
-                    xalign 0.5
-                    spacing 16
+                if mode == "pronunciation":
+                    if session.pronunciation_percent is not None:
+                        text "Pronunciation: [session.pronunciation_percent]%":
+                            xalign 0.5
+                            size 25
 
-                    textbutton "That's right":
-                        action Function(session.confirm_result)
-                        xminimum 210
-                        yminimum 68
+                    hbox:
+                        xalign 0.5
+                        spacing 16
 
-                    textbutton "Try again":
-                        action Function(session.retry)
-                        xminimum 210
-                        yminimum 68
+                        textbutton "Try Again":
+                            action Function(session.retry)
+                            xminimum 210
+                            yminimum 68
 
-                textbutton "Type instead":
-                    action Function(session.type_result)
-                    xalign 0.5
-                    xminimum 250
-                    yminimum 64
+                        textbutton "Continue":
+                            action Function(session.confirm_result)
+                            xminimum 210
+                            yminimum 68
+                else:
+                    hbox:
+                        xalign 0.5
+                        spacing 16
+
+                        textbutton "That's right":
+                            action Function(session.confirm_result)
+                            xminimum 210
+                            yminimum 68
+
+                        textbutton "Try again":
+                            action Function(session.retry)
+                            xminimum 210
+                            yminimum 68
+
+                    textbutton "Type instead":
+                        action Function(session.type_result)
+                        xalign 0.5
+                        xminimum 250
+                        yminimum 64
 
             elif session.status == SPEECH_ERROR:
                 text session.error:
@@ -101,16 +184,31 @@ screen speech_input(mode="transcription", language="en", prompt=""):
                     text_align 0.5
                     size 24
 
-                hbox:
-                    xalign 0.5
-                    spacing 16
+                if mode == "pronunciation":
+                    hbox:
+                        xalign 0.5
+                        spacing 16
 
-                    textbutton "Try again":
-                        action Function(session.retry)
-                        xminimum 210
-                        yminimum 68
+                        textbutton "Try Again":
+                            action Function(session.retry)
+                            xminimum 210
+                            yminimum 68
 
-                    textbutton "Type instead":
-                        action Function(session.type_result)
-                        xminimum 210
-                        yminimum 68
+                        textbutton "Continue":
+                            action Return("error")
+                            xminimum 210
+                            yminimum 68
+                else:
+                    hbox:
+                        xalign 0.5
+                        spacing 16
+
+                        textbutton "Try again":
+                            action Function(session.retry)
+                            xminimum 210
+                            yminimum 68
+
+                        textbutton "Type instead":
+                            action Function(session.type_result)
+                            xminimum 210
+                            yminimum 68

@@ -14,13 +14,26 @@ init python:
     class SpeechInputSession(object):
         """Connect a recorder to a speech processor without knowing the scene."""
 
-        def __init__(self, mode="transcription", language="en", prompt=""):
+        def __init__(
+            self,
+            mode="transcription",
+            language="en",
+            prompt="",
+            reference_text="",
+            reference_audio_path=None,
+            reference_tts_session=None,
+        ):
             self.mode = mode
             self.language = language
             self.prompt = prompt
+            self.reference_text = reference_text
+            self.reference_audio_path = reference_audio_path
+            self.reference_tts_session = reference_tts_session
             self.status = SPEECH_IDLE
             self.transcript = ""
             self.error = ""
+            self.evaluation = {}
+            self.pronunciation_percent = None
             self.recorder = create_speech_recorder()
             self.audio_path = None
 
@@ -77,6 +90,8 @@ init python:
             self.status = SPEECH_IDLE
             self.transcript = ""
             self.error = ""
+            self.evaluation = {}
+            self.pronunciation_percent = None
             self.audio_path = None
             renpy.restart_interaction()
 
@@ -89,6 +104,7 @@ init python:
                 "transcript": self.transcript,
                 "language": self.language,
                 "audio_path": self.audio_path,
+                "evaluation": self.evaluation,
             }
             self.dispose()
             return result
@@ -112,19 +128,45 @@ init python:
             try:
                 renpy.log("SpeechInput: processing thread started")
 
-                if self.mode != "transcription":
+                if self.mode == "transcription":
+                    renpy.log("SpeechInput: calling transcription API")
+
+                    result = transcribe_recording(
+                        audio_path,
+                        language=self.language,
+                    )
+                elif self.mode == "pronunciation":
+                    reference_audio_path = self.reference_audio_path
+                    if self.reference_tts_session is not None:
+                        reference_audio_path = (
+                            self.reference_tts_session.audio_path
+                            or reference_audio_path
+                        )
+
+                    if not self.reference_text:
+                        raise SpeechAPIError(
+                            "The pronunciation reference text is missing."
+                        )
+
+                    if not reference_audio_path:
+                        raise SpeechAPIError(
+                            "The pronunciation reference audio is missing."
+                        )
+
+                    renpy.log("SpeechInput: calling pronunciation API")
+
+                    result = evaluate_pronunciation_recording(
+                        reference_text=self.reference_text,
+                        reference_audio_path=reference_audio_path,
+                        learner_audio_path=audio_path,
+                        language=self.language,
+                    )
+                else:
                     raise SpeechAPIError(
                         "Speech mode '{}' is not configured yet.".format(
                             self.mode
                         )
                     )
-
-                renpy.log("SpeechInput: calling transcription API")
-
-                result = transcribe_recording(
-                    audio_path,
-                    language=self.language,
-                )
 
                 renpy.log(
                     "SpeechInput: API result = {!r}".format(result)
@@ -146,8 +188,19 @@ init python:
                 )
 
         def _set_result(self, result):
-            self.transcript = result.get("transcript", "")
+            self.evaluation = result or {}
+            self.transcript = self.evaluation.get("transcript", "")
             self.error = ""
+
+            pronunciation_similarity = self.evaluation.get(
+                "pronunciation_similarity"
+            )
+            try:
+                self.pronunciation_percent = round(
+                    float(pronunciation_similarity) * 100
+                )
+            except (TypeError, ValueError):
+                self.pronunciation_percent = None
 
             if self.transcript:
                 self.status = SPEECH_RESULT
@@ -163,4 +216,3 @@ init python:
             self.error = message or "Something went wrong. Please try again."
 
             renpy.restart_interaction()
-

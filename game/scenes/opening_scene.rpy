@@ -131,8 +131,24 @@ label onboarding_questions_complete:
     )
     $ french_tts_session.dispose()
 
+    voice "audio/chapter1/scene1/sophie/mouthful.mp3"
     Sophie "I know, it's a mouthful!"
+    voice "audio/chapter1/scene1/sophie/bit_by_bit.mp3"
     Sophie "So we'll take it bit by bit."
+
+    $ practice_target = personalized_introduction["french_lines"][0]
+    $ practice_translation = personalized_introduction["english_lines"][0]
+    $ practice_tts_session = FrenchTTSSession(practice_target)
+    $ practice_tts_session.start()
+    call screen speech_input(
+        mode="pronunciation",
+        language="fr",
+        reference_text=practice_target,
+        reference_tts_session=practice_tts_session,
+        translation=practice_translation,
+    )
+    $ practice_result = _return
+    $ practice_tts_session.dispose()
 
     stop music fadeout 1.5
     return
