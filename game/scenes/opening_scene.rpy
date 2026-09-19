@@ -136,8 +136,20 @@ label onboarding_questions_complete:
     voice "audio/chapter1/scene1/sophie/bit_by_bit.mp3"
     Sophie "So we'll take it bit by bit."
 
-    $ practice_target = personalized_introduction["french_lines"][0]
-    $ practice_translation = personalized_introduction["english_lines"][0]
+    $ practice_index = 0
+    $ practice_results = []
+    call pronunciation_practice_loop
+
+    stop music fadeout 1.5
+    return
+
+
+label pronunciation_practice_loop:
+    if practice_index >= len(personalized_introduction["french_lines"]):
+        return
+
+    $ practice_target = personalized_introduction["french_lines"][practice_index]
+    $ practice_translation = personalized_introduction["english_lines"][practice_index]
     $ practice_tts_session = FrenchTTSSession(practice_target)
     $ practice_tts_session.start()
     call screen speech_input(
@@ -150,5 +162,15 @@ label onboarding_questions_complete:
     $ practice_result = _return
     $ practice_tts_session.dispose()
 
-    stop music fadeout 1.5
+    if not practice_result or practice_result.get("status") != "confirmed":
+        return
+
+    $ practice_evaluation = practice_result.get("evaluation", {})
+    if pronunciation_similarity_is_perfect(practice_evaluation):
+        $ practice_results.append(practice_result)
+        $ practice_index += 1
+        jump pronunciation_practice_loop
+
+    # The pronunciation screen does not offer Continue for a non-perfect
+    # result. Keep this guard so an unexpected return cannot advance the index.
     return

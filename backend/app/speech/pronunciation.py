@@ -1,32 +1,8 @@
 """Pronunciation evaluation based on the working local prototype."""
 
-import re
 import unicodedata
-from difflib import SequenceMatcher
 
 from .phonemize import phonemize_audio
-from .transcribe import transcribe_audio
-
-
-def normalize_text(text: str) -> str:
-    text = text.lower().strip()
-
-    # Keep French letters/apostrophes, remove punctuation that should not
-    # affect sentence matching.
-    text = re.sub(r"[^\w\s'àâäéèêëîïôöùûüÿçœ-]", "", text)
-    text = re.sub(r"\s+", " ", text)
-
-    return text
-
-
-def normalize_phonemes(phonemes: str) -> str:
-    """Remove spaces for the prototype's character-level helper."""
-
-    return phonemes.replace(" ", "").strip()
-
-
-def similarity(a: str, b: str) -> float:
-    return SequenceMatcher(None, a, b).ratio()
 
 
 def tokenize_phonemes(phonemes: str) -> list[str]:
@@ -136,14 +112,7 @@ def evaluate_pronunciation(
     print("Evaluating pronunciation...")
     expected_phonemes = phonemize_audio(reference_audio_path)
     learner_phonemes = phonemize_audio(learner_audio_path)
-    transcript = transcribe_audio(learner_audio_path, language="fr")
-
-    text_similarity = similarity(
-        normalize_text(reference_text),
-        normalize_text(transcript),
-    )
-
-    print(f"Reference text: {round(text_similarity, 3)}")
+    print(f"Reference text: {reference_text}")
 
     expected = tokenize_phonemes(expected_phonemes)
     learner = tokenize_phonemes(learner_phonemes)
@@ -155,14 +124,13 @@ def evaluate_pronunciation(
     print(f"Expected phonemes: {expected_phonemes}")
     print(f"Learner phonemes: {learner_phonemes}")
     print(f"Pronunciation similarity: {round(pronunciation_similarity, 3)}")
+    print(f"Differences: {differences}")
     return {
         "reference_text": reference_text,
-        "transcript": transcript,
         "expected_phonemes": expected_phonemes,
         "learner_phonemes": learner_phonemes,
         # These are engineering similarity values for the prototype, not
         # validated language-learning scores.
         "pronunciation_similarity": round(pronunciation_similarity, 3),
-        "text_similarity": round(text_similarity, 3),
         "differences": differences,
     }

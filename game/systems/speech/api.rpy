@@ -174,6 +174,21 @@ init -10 python:
             )
 
         result = dict(payload)
+        required_fields = (
+            "reference_text",
+            "expected_phonemes",
+            "learner_phonemes",
+            "pronunciation_similarity",
+            "differences",
+        )
+        missing_fields = [
+            field for field in required_fields if field not in result
+        ]
+        if missing_fields:
+            raise SpeechAPIError(
+                "The speech backend returned an incomplete pronunciation result."
+            )
+
         result["status"] = "success"
         result["audio_path"] = learner_audio_path
         result["reference_audio_path"] = reference_audio_path

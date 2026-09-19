@@ -11,6 +11,17 @@ init python:
     SPEECH_ERROR = "error"
 
 
+    def pronunciation_similarity_is_perfect(evaluation):
+        """Return whether a pronunciation result passes this prototype gate."""
+
+        try:
+            return float(
+                (evaluation or {}).get("pronunciation_similarity")
+            ) >= 0.999
+        except (TypeError, ValueError):
+            return False
+
+
     class SpeechInputSession(object):
         """Connect a recorder to a speech processor without knowing the scene."""
 
@@ -96,16 +107,21 @@ init python:
             renpy.restart_interaction()
 
         def confirm_result(self):
-            if not self.transcript:
+            if self.mode == "pronunciation":
+                if not pronunciation_similarity_is_perfect(self.evaluation):
+                    return None
+            elif not self.transcript:
                 return None
 
             result = {
                 "status": "confirmed",
-                "transcript": self.transcript,
                 "language": self.language,
                 "audio_path": self.audio_path,
                 "evaluation": self.evaluation,
             }
+            if self.mode != "pronunciation":
+                result["transcript"] = self.transcript
+
             self.dispose()
             return result
 
@@ -154,6 +170,20 @@ init python:
                         )
 
                     renpy.log("SpeechInput: calling pronunciation API")
+                    # log payload
+                    renpy.log(
+                        "SpeechInput: pronunciation payload = {{"
+                        "reference_text={!r}, "
+                        "reference_audio_path={!r}, "
+                        "learner_audio_path={!r}, "
+                        "language={!r}"
+                        "}}".format(
+                            self.reference_text,
+                            reference_audio_path,
+                            audio_path,
+                            self.language,
+                        )
+                    )
 
                     result = evaluate_pronunciation_recording(
                         reference_text=self.reference_text,
@@ -189,7 +219,6 @@ init python:
 
         def _set_result(self, result):
             self.evaluation = result or {}
-            self.transcript = self.evaluation.get("transcript", "")
             self.error = ""
 
             pronunciation_similarity = self.evaluation.get(
@@ -202,11 +231,31 @@ init python:
             except (TypeError, ValueError):
                 self.pronunciation_percent = None
 
-            if self.transcript:
-                self.status = SPEECH_RESULT
+            if self.mode == "pronunciation":
+                self.transcript = ""
+                if "pronunciation_similarity" in self.evaluation:
+                    self.status = SPEECH_RESULT
+                else:
+                    self.status = SPEECH_ERROR
+                    self.error = (
+                        "The speech backend returned an incomplete "
+                        "pronunciation result."
+                    )
             else:
-                self.status = SPEECH_ERROR
-                self.error = "I couldn't hear a name. Please try again."
+                self.transcript = self.evaluation.get("transcript", "")
+                if self.transcript:
+                    self.status = SPEECH_RESULT
+                else:
+                    self.status = SPEECH_ERROR
+                    self.error = "I couldn't hear a name. Please try again."
+
+            if self.status == SPEECH_RESULT:
+                renpy.restart_interaction()
+                return
+
+            if self.status == SPEECH_ERROR:
+                renpy.restart_interaction()
+                return
 
             renpy.restart_interaction()
 

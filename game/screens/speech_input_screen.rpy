@@ -133,31 +133,38 @@ screen speech_input(
                     size 22
 
             elif session.status == SPEECH_RESULT:
-                text "I heard: [session.transcript]":
-                    xalign 0.5
-                    text_align 0.5
-                    size 28
-
                 if mode == "pronunciation":
                     if session.pronunciation_percent is not None:
                         text "Pronunciation: [session.pronunciation_percent]%":
                             xalign 0.5
                             size 25
 
-                    hbox:
-                        xalign 0.5
-                        spacing 16
+                    if pronunciation_similarity_is_perfect(session.evaluation):
+                        hbox:
+                            xalign 0.5
+                            spacing 16
 
+                            textbutton "Try Again":
+                                action Function(session.retry)
+                                xminimum 210
+                                yminimum 68
+
+                            textbutton "Continue":
+                                action Function(session.confirm_result)
+                                xminimum 210
+                                yminimum 68
+                    else:
                         textbutton "Try Again":
                             action Function(session.retry)
-                            xminimum 210
-                            yminimum 68
-
-                        textbutton "Continue":
-                            action Function(session.confirm_result)
-                            xminimum 210
+                            xalign 0.5
+                            xminimum 250
                             yminimum 68
                 else:
+                    text "I heard: [session.transcript]":
+                        xalign 0.5
+                        text_align 0.5
+                        size 28
+
                     hbox:
                         xalign 0.5
                         spacing 16

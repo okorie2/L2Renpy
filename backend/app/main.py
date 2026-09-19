@@ -45,7 +45,7 @@ async def _save_upload(upload: UploadFile, destination: Path) -> None:
         raise AudioError("The uploaded audio file is empty.")
 
 
-# Converts speech to text and also evaluates pronunciation of the speech against a reference text and audio
+# Evaluates pronunciation of learner speech against reference text and audio.
 @app.post("/speech/pronunciation")
 async def pronunciation(
     reference_text: str = Form(...),
