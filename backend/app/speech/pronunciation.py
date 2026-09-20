@@ -1,8 +1,27 @@
 """Pronunciation evaluation based on the working local prototype."""
 
+import re
 import unicodedata
 
 from .phonemize import phonemize_audio
+from .text_phonemize import phonemize_french_word
+
+
+REFERENCE_WORD_PATTERN = re.compile(
+    r"[^\W_]+(?:['’][^\W_]+)*(?:-[^\W_]+(?:['’][^\W_]+)*)*",
+    re.UNICODE,
+)
+
+
+def tokenize_reference_words(reference_text: str) -> list[dict]:
+    """Return learner-facing words without splitting apostrophes or hyphens."""
+
+    return [
+        {"index": index, "text": match.group(0)}
+        for index, match in enumerate(
+            REFERENCE_WORD_PATTERN.finditer(reference_text or "")
+        )
+    ]
 
 
 def tokenize_phonemes(phonemes: str) -> list[str]:
@@ -29,7 +48,23 @@ def tokenize_phonemes(phonemes: str) -> list[str]:
 
 
 def align_sequences(expected: list[str], actual: list[str]) -> list[dict]:
-    """Return a minimum-edit alignment for two IPA token sequences."""
+    """Return a minimum-edit alignment without internal index metadata."""
+
+    return [
+        {
+            "expected": item["expected"],
+            "actual": item["actual"],
+            "type": item["type"],
+        }
+        for item in _align_sequences_with_indices(expected, actual)
+    ]
+
+
+def _align_sequences_with_indices(
+    expected: list[str],
+    actual: list[str],
+) -> list[dict]:
+    """Return alignment operations while retaining source sequence indexes."""
 
     n = len(expected)
     m = len(actual)
@@ -66,6 +101,8 @@ def align_sequences(expected: list[str], actual: list[str]) -> list[dict]:
                     "expected": expected[i - 1],
                     "actual": actual[j - 1],
                     "type": "match",
+                    "expected_index": i - 1,
+                    "actual_index": j - 1,
                 }
             )
             i -= 1
@@ -76,6 +113,8 @@ def align_sequences(expected: list[str], actual: list[str]) -> list[dict]:
                     "expected": expected[i - 1],
                     "actual": actual[j - 1],
                     "type": "substitution",
+                    "expected_index": i - 1,
+                    "actual_index": j - 1,
                 }
             )
             i -= 1
@@ -86,6 +125,8 @@ def align_sequences(expected: list[str], actual: list[str]) -> list[dict]:
                     "expected": expected[i - 1],
                     "actual": None,
                     "type": "deletion",
+                    "expected_index": i - 1,
+                    "actual_index": None,
                 }
             )
             i -= 1
@@ -95,12 +136,141 @@ def align_sequences(expected: list[str], actual: list[str]) -> list[dict]:
                     "expected": None,
                     "actual": actual[j - 1],
                     "type": "insertion",
+                    "expected_index": None,
+                    "actual_index": j - 1,
                 }
             )
             j -= 1
 
     alignment.reverse()
     return alignment
+
+
+def build_expected_word_phonemes(reference_text: str) -> list[dict]:
+    """Build text-derived IPA for each learner-facing reference word."""
+
+    word_entries = tokenize_reference_words(reference_text)
+    return [
+        {
+            **entry,
+            "expected_phonemes": phonemize_french_word(entry["text"]),
+            "scorable": True,
+        }
+        for entry in word_entries
+    ]
+
+
+def _insertion_word_index(
+    alignment: list[dict],
+    alignment_position: int,
+    expected_word_indexes: list[int],
+) -> int | None:
+    """Assign an insertion to the nearest expected word deterministically.
+
+    The preceding expected word wins when both sides are equally near; this
+    keeps insertions at a boundary stable without pretending to know exact
+    acoustic word timing.
+    """
+
+    for position in range(alignment_position - 1, -1, -1):
+        expected_index = alignment[position]["expected_index"]
+        if expected_index is not None:
+            return expected_word_indexes[expected_index]
+
+    for position in range(alignment_position + 1, len(alignment)):
+        expected_index = alignment[position]["expected_index"]
+        if expected_index is not None:
+            return expected_word_indexes[expected_index]
+
+    return None
+
+
+def analyze_word_pronunciation(
+    reference_text: str,
+    learner_phonemes: str,
+) -> list[dict]:
+    """Score learner phonemes against text-derived, word-labelled IPA."""
+
+    expected_words = build_expected_word_phonemes(reference_text)
+    expected_tokens = []
+    expected_word_indexes = []
+
+    for word_index, word in enumerate(expected_words):
+        word_tokens = tokenize_phonemes(word["expected_phonemes"])
+        expected_tokens.extend(word_tokens)
+        expected_word_indexes.extend([word_index] * len(word_tokens))
+
+    learner_tokens = tokenize_phonemes(learner_phonemes)
+    alignment = _align_sequences_with_indices(expected_tokens, learner_tokens)
+    operations_by_word = [[] for _ in expected_words]
+
+    for position, operation in enumerate(alignment):
+        expected_index = operation["expected_index"]
+        if expected_index is None:
+            word_index = _insertion_word_index(
+                alignment,
+                position,
+                expected_word_indexes,
+            )
+        else:
+            word_index = expected_word_indexes[expected_index]
+
+        if word_index is not None:
+            operations_by_word[word_index].append(operation)
+
+    word_results = []
+    for word_index, (word, operations) in enumerate(
+        zip(expected_words, operations_by_word)
+    ):
+        matches = sum(1 for item in operations if item["type"] == "match")
+        score = matches / len(operations) if operations else 0
+        word_results.append(
+            {
+                "index": word_index,
+                "word": word["text"],
+                "expected_phonemes": word["expected_phonemes"],
+                "learner_phonemes": "".join(
+                    item["actual"]
+                    for item in operations
+                    if item["actual"] is not None
+                ),
+                "score": round(score, 3),
+                "differences": [
+                    {
+                        "expected": item["expected"],
+                        "actual": item["actual"],
+                        "type": item["type"],
+                    }
+                    for item in operations
+                    if item["type"] != "match"
+                ],
+                "scorable": word["scorable"],
+            }
+        )
+
+    return word_results
+
+
+def select_weakest_word(
+    word_results: list[dict],
+    pronunciation_similarity: float,
+) -> dict | None:
+    """Select the earliest lowest-scoring word only for an imperfect phrase."""
+
+    if pronunciation_similarity >= 0.999:
+        return None
+
+    candidates = [
+        result for result in word_results if result.get("scorable", True)
+    ]
+    if not candidates:
+        return None
+
+    weakest = min(
+        candidates,
+        key=lambda result: (result["score"], result["index"]),
+    )
+    return dict(weakest)
 
 
 def evaluate_pronunciation(
@@ -120,17 +290,30 @@ def evaluate_pronunciation(
     differences = [item for item in alignment if item["type"] != "match"]
     matches = sum(1 for item in alignment if item["type"] == "match")
     pronunciation_similarity = matches / len(alignment) if alignment else 0
+    pronunciation_similarity = round(pronunciation_similarity, 3)
+    word_results = analyze_word_pronunciation(
+        reference_text,
+        learner_phonemes,
+    )
+    weakest_word = select_weakest_word(
+        word_results,
+        pronunciation_similarity,
+    )
     # log the output
     print(f"Expected phonemes: {expected_phonemes}")
     print(f"Learner phonemes: {learner_phonemes}")
-    print(f"Pronunciation similarity: {round(pronunciation_similarity, 3)}")
+    print(f"Pronunciation similarity: {pronunciation_similarity}")
     print(f"Differences: {differences}")
+    print(f"Word results: {word_results}")
+    print(f"Weakest word: {weakest_word}")
     return {
         "reference_text": reference_text,
         "expected_phonemes": expected_phonemes,
         "learner_phonemes": learner_phonemes,
         # These are engineering similarity values for the prototype, not
         # validated language-learning scores.
-        "pronunciation_similarity": round(pronunciation_similarity, 3),
+        "pronunciation_similarity": pronunciation_similarity,
         "differences": differences,
+        "word_results": word_results,
+        "weakest_word": weakest_word,
     }

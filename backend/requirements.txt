@@ -3,6 +3,7 @@ uvicorn
 python-multipart
 torch
 transformers
+epitran
 librosa
 soundfile
 elevenlabs

@@ -20,7 +20,7 @@ transform sophie_walk_to_park_position:
 label opening_scene:
     scene bg park_day
     with dissolve
-    play music "audio/chapter1/music/sophie_park_upbeat_loop.mp3" loop fadein 2.0 volume 0.20
+    play music "audio/chapter1/music/audio_1.mp3" loop fadein 2.0 volume 0.20
 
     # Let the park establish itself before Sophie enters.
     pause 0.25
@@ -138,6 +138,9 @@ label onboarding_questions_complete:
 
     $ practice_index = 0
     $ practice_results = []
+    $ practice_mode = "phrase"
+    $ original_reference_text = ""
+    $ remediation_word = None
     call pronunciation_practice_loop
 
     stop music fadeout 1.5
@@ -145,11 +148,23 @@ label onboarding_questions_complete:
 
 
 label pronunciation_practice_loop:
-    if practice_index >= len(personalized_introduction["french_lines"]):
+    if practice_mode == "phrase":
+        if practice_index >= len(personalized_introduction["french_lines"]):
+            return
+
+        $ practice_target = personalized_introduction["french_lines"][practice_index]
+        $ practice_translation = personalized_introduction["english_lines"][practice_index]
+        $ original_reference_text = practice_target
+    elif practice_mode == "word":
+        if not remediation_word or not remediation_word.get("word"):
+            $ practice_mode = "phrase"
+            jump pronunciation_practice_loop
+
+        $ practice_target = remediation_word["word"]
+        $ practice_translation = ""
+    else:
         return
 
-    $ practice_target = personalized_introduction["french_lines"][practice_index]
-    $ practice_translation = personalized_introduction["english_lines"][practice_index]
     $ practice_tts_session = FrenchTTSSession(practice_target)
     $ practice_tts_session.start()
     call screen speech_input(
@@ -158,16 +173,45 @@ label pronunciation_practice_loop:
         reference_text=practice_target,
         reference_tts_session=practice_tts_session,
         translation=practice_translation,
+        practice_mode=practice_mode,
     )
     $ practice_result = _return
     $ practice_tts_session.dispose()
 
-    if not practice_result or practice_result.get("status") != "confirmed":
+    if practice_result == "retry":
+        jump pronunciation_practice_loop
+
+    if practice_result == "full_phrase":
+        $ practice_mode = "phrase"
+        $ remediation_word = None
+        jump pronunciation_practice_loop
+
+    if not practice_result or not isinstance(practice_result, dict):
         return
 
+    if practice_result.get("status") == "remediate":
+        $ remediation_word = practice_result.get("evaluation", {}).get(
+            "weakest_word"
+        )
+        if not remediation_word:
+            return
+        $ practice_mode = "word"
+        jump pronunciation_practice_loop
+
+    if practice_result.get("status") != "confirmed":
+        return
+
+    $ practice_results.append(practice_result)
     $ practice_evaluation = practice_result.get("evaluation", {})
+
+    if practice_mode == "word":
+        if pronunciation_similarity_is_perfect(practice_evaluation):
+            $ practice_mode = "phrase"
+            $ remediation_word = None
+            jump pronunciation_practice_loop
+        return
+
     if pronunciation_similarity_is_perfect(practice_evaluation):
-        $ practice_results.append(practice_result)
         $ practice_index += 1
         jump pronunciation_practice_loop
 

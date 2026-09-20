@@ -180,6 +180,7 @@ init -10 python:
             "learner_phonemes",
             "pronunciation_similarity",
             "differences",
+            "word_results",
         )
         missing_fields = [
             field for field in required_fields if field not in result

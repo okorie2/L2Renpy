@@ -33,6 +33,7 @@ init python:
             reference_text="",
             reference_audio_path=None,
             reference_tts_session=None,
+            practice_mode="phrase",
         ):
             self.mode = mode
             self.language = language
@@ -40,6 +41,7 @@ init python:
             self.reference_text = reference_text
             self.reference_audio_path = reference_audio_path
             self.reference_tts_session = reference_tts_session
+            self.practice_mode = practice_mode
             self.status = SPEECH_IDLE
             self.transcript = ""
             self.error = ""
@@ -121,9 +123,38 @@ init python:
             }
             if self.mode != "pronunciation":
                 result["transcript"] = self.transcript
+            else:
+                result["practice_mode"] = self.practice_mode
 
             self.dispose()
             return result
+
+        def remediation_result(self):
+            if self.mode != "pronunciation":
+                return None
+
+            if not self.evaluation.get("weakest_word"):
+                return None
+
+            result = {
+                "status": "remediate",
+                "language": self.language,
+                "audio_path": self.audio_path,
+                "evaluation": self.evaluation,
+                "practice_mode": self.practice_mode,
+            }
+            self.dispose()
+            return result
+
+        def confirm_result_and_close(self):
+            result = self.confirm_result()
+            if result is not None:
+                renpy.end_interaction(result)
+
+        def remediation_result_and_close(self):
+            result = self.remediation_result()
+            if result is not None:
+                renpy.end_interaction(result)
 
         def type_result(self):
             self.dispose()

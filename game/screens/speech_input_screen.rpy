@@ -9,6 +9,7 @@ screen speech_input(
     reference_audio_path=None,
     reference_tts_session=None,
     translation="",
+    practice_mode="phrase",
 ):
     default session = SpeechInputSession(
         mode=mode,
@@ -17,6 +18,7 @@ screen speech_input(
         reference_text=reference_text,
         reference_audio_path=reference_audio_path,
         reference_tts_session=reference_tts_session,
+        practice_mode=practice_mode,
     )
 
     modal True
@@ -43,10 +45,16 @@ screen speech_input(
 
             if mode == "pronunciation":
                 if reference_tts_session is None or reference_tts_session.status == TTS_FINISHED:
-                    text "Now you try.":
-                        xalign 0.5
-                        text_align 0.5
-                        size 30
+                    if practice_mode == "word":
+                        text "Let's practise this word.":
+                            xalign 0.5
+                            text_align 0.5
+                            size 30
+                    else:
+                        text "Now you try.":
+                            xalign 0.5
+                            text_align 0.5
+                            size 30
                 else:
                     text "Listen, then repeat":
                         xalign 0.5
@@ -145,20 +153,51 @@ screen speech_input(
                             spacing 16
 
                             textbutton "Try Again":
-                                action Function(session.retry)
+                                action Return("retry")
                                 xminimum 210
                                 yminimum 68
 
                             textbutton "Continue":
-                                action Function(session.confirm_result)
+                                action Function(session.confirm_result_and_close)
+                                xminimum 210
+                                yminimum 68
+                    elif practice_mode == "phrase" and session.evaluation.get("weakest_word"):
+                        text "Let's work on this part.":
+                            xalign 0.5
+                            text_align 0.5
+                            size 24
+
+                        text session.evaluation.get("weakest_word", {}).get("word", ""):
+                            xalign 0.5
+                            text_align 0.5
+                            size 30
+
+                        hbox:
+                            xalign 0.5
+                            spacing 16
+
+                            textbutton "Practice this word":
+                                action Function(session.remediation_result_and_close)
+                                xminimum 250
+                                yminimum 68
+
+                            textbutton "Try Again":
+                                action Return("retry")
                                 xminimum 210
                                 yminimum 68
                     else:
                         textbutton "Try Again":
-                            action Function(session.retry)
+                            action Return("retry")
                             xalign 0.5
                             xminimum 250
                             yminimum 68
+
+                        if practice_mode == "word":
+                            textbutton "Try Full Phrase":
+                                action Return("full_phrase")
+                                xalign 0.5
+                                xminimum 250
+                                yminimum 68
                 else:
                     text "I heard: [session.transcript]":
                         xalign 0.5
@@ -197,7 +236,7 @@ screen speech_input(
                         spacing 16
 
                         textbutton "Try Again":
-                            action Function(session.retry)
+                            action Return("retry")
                             xminimum 210
                             yminimum 68
 
