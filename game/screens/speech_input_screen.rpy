@@ -10,6 +10,7 @@ screen speech_input(
     reference_tts_session=None,
     translation="",
     practice_mode="phrase",
+    practice_state=None,
 ):
     default session = SpeechInputSession(
         mode=mode,
@@ -147,55 +148,151 @@ screen speech_input(
                             xalign 0.5
                             size 25
 
-                    if pronunciation_similarity_is_perfect(session.evaluation):
-                        hbox:
-                            xalign 0.5
-                            spacing 16
-
-                            textbutton "Try Again":
-                                action Return("retry")
-                                xminimum 210
-                                yminimum 68
+                    if practice_mode == "phrase":
+                        if phrase_pronunciation_passes(session.evaluation):
+                            text "Great!":
+                                xalign 0.5
+                                text_align 0.5
+                                size 28
 
                             textbutton "Continue":
                                 action Function(session.confirm_result_and_close)
-                                xminimum 210
+                                xalign 0.5
+                                xminimum 250
                                 yminimum 68
-                    elif practice_mode == "phrase" and session.evaluation.get("weakest_word"):
-                        text "Let's work on this part.":
+                        elif (
+                            practice_state is not None
+                            and practice_state.final_phrase_attempt
+                        ):
+                            text "Nice try. We'll come back to this one.":
+                                xalign 0.5
+                                text_align 0.5
+                                size 24
+
+                            textbutton "Continue":
+                                action Function(session.confirm_result_and_close)
+                                xalign 0.5
+                                xminimum 250
+                                yminimum 68
+                        elif session.evaluation.get("weakest_word"):
+                            text "Let's work on this part.":
+                                xalign 0.5
+                                text_align 0.5
+                                size 24
+
+                            text session.evaluation.get("weakest_word", {}).get("word", ""):
+                                xalign 0.5
+                                text_align 0.5
+                                size 30
+
+                            textbutton "Practice this word":
+                                action Function(session.remediation_result_and_close)
+                                xalign 0.5
+                                xminimum 250
+                                yminimum 68
+                        else:
+                            text "Let's keep going.":
+                                xalign 0.5
+                                text_align 0.5
+                                size 24
+
+                            textbutton "Continue":
+                                action Function(session.confirm_result_and_close)
+                                xalign 0.5
+                                xminimum 250
+                                yminimum 68
+                    elif word_pronunciation_passes(session.evaluation):
+                        if (
+                            practice_state is not None
+                            and practice_state.phonetic_guide_visible
+                            and practice_state.current_weakest_word
+                            and practice_state.current_weakest_word.get(
+                                "phonetic_guide"
+                            )
+                        ):
+                            text "Hint: [practice_state.current_weakest_word.get('phonetic_guide', '')]":
+                                xalign 0.5
+                                text_align 0.5
+                                size 23
+
+                        text "Much better. Let's try the whole sentence again.":
                             xalign 0.5
                             text_align 0.5
                             size 24
 
-                        text session.evaluation.get("weakest_word", {}).get("word", ""):
+                        textbutton "Continue":
+                            action Function(session.confirm_result_and_close)
+                            xalign 0.5
+                            xminimum 300
+                            yminimum 68
+                    elif (
+                        practice_state is not None
+                        and practice_state.word_attempts >= MAX_WORD_ATTEMPTS
+                    ):
+                        text "Let's try the whole sentence again.":
                             xalign 0.5
                             text_align 0.5
-                            size 30
+                            size 24
+
+                        if (
+                            practice_state.phonetic_guide_visible
+                            and practice_state.current_weakest_word
+                            and practice_state.current_weakest_word.get(
+                                "phonetic_guide"
+                            )
+                        ):
+                            text "Hint: [practice_state.current_weakest_word.get('phonetic_guide', '')]":
+                                xalign 0.5
+                                text_align 0.5
+                                size 23
+
+                        textbutton "Continue":
+                            action Function(session.confirm_result_and_close)
+                            xalign 0.5
+                            xminimum 300
+                            yminimum 68
+                    else:
+                        text "Let's try it once more.":
+                            xalign 0.5
+                            text_align 0.5
+                            size 24
+
+                        if (
+                            practice_state is not None
+                            and practice_state.phonetic_guide_visible
+                            and practice_state.current_weakest_word
+                            and practice_state.current_weakest_word.get(
+                                "phonetic_guide"
+                            )
+                        ):
+                            text "Hint: [practice_state.current_weakest_word.get('phonetic_guide', '')]":
+                                xalign 0.5
+                                text_align 0.5
+                                size 23
 
                         hbox:
                             xalign 0.5
                             spacing 16
 
-                            textbutton "Practice this word":
-                                action Function(session.remediation_result_and_close)
-                                xminimum 250
-                                yminimum 68
-
                             textbutton "Try Again":
-                                action Return("retry")
+                                action Function(
+                                    record_practice_evaluation_and_close,
+                                    practice_state,
+                                    practice_mode,
+                                    session.evaluation,
+                                    "retry",
+                                )
                                 xminimum 210
                                 yminimum 68
-                    else:
-                        textbutton "Try Again":
-                            action Return("retry")
-                            xalign 0.5
-                            xminimum 250
-                            yminimum 68
 
-                        if practice_mode == "word":
                             textbutton "Try Full Phrase":
-                                action Return("full_phrase")
-                                xalign 0.5
+                                action Function(
+                                    record_practice_evaluation_and_close,
+                                    practice_state,
+                                    practice_mode,
+                                    session.evaluation,
+                                    "full_phrase",
+                                )
                                 xminimum 250
                                 yminimum 68
                 else:

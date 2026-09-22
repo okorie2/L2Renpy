@@ -4,6 +4,7 @@ import re
 import unicodedata
 
 from .phonemize import phonemize_audio
+from .phonetic_guide import phonetic_guide_from_ipa
 from .text_phonemize import phonemize_french_word
 
 REFERENCE_WORD_PATTERN = re.compile(
@@ -149,14 +150,18 @@ def build_expected_word_phonemes(reference_text: str) -> list[dict]:
     """Build text-derived IPA for each learner-facing reference word."""
 
     word_entries = tokenize_reference_words(reference_text)
-    return [
-        {
-            **entry,
-            "expected_phonemes": phonemize_french_word(entry["text"]),
-            "scorable": True,
-        }
-        for entry in word_entries
-    ]
+    results = []
+    for entry in word_entries:
+        expected_phonemes = phonemize_french_word(entry["text"])
+        results.append(
+            {
+                **entry,
+                "expected_phonemes": expected_phonemes,
+                "phonetic_guide": phonetic_guide_from_ipa(expected_phonemes),
+                "scorable": True,
+            }
+        )
+    return results
 
 
 def _insertion_word_index(
@@ -228,6 +233,7 @@ def analyze_word_pronunciation(
                 "index": word_index,
                 "word": word["text"],
                 "expected_phonemes": word["expected_phonemes"],
+                "phonetic_guide": word["phonetic_guide"],
                 "learner_phonemes": "".join(
                     item["actual"] for item in operations if item["actual"] is not None
                 ),

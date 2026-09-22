@@ -138,6 +138,22 @@ class PronunciationEvaluationTests(unittest.TestCase):
 
         self.assertEqual(weakest["word"], "Je")
 
+    def test_word_results_include_expected_phonetic_guide(self):
+        result = self.evaluate(
+            "apprendre",
+            "apʀɑ̃dʀ",
+            ["apʀɑ̃dʀ"],
+        )
+
+        self.assertEqual(
+            result["word_results"][0]["phonetic_guide"],
+            "ah-prahn-dr",
+        )
+        self.assertEqual(
+            result["weakest_word"]["phonetic_guide"],
+            "ah-prahn-dr",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

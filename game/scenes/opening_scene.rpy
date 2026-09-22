@@ -141,6 +141,7 @@ label onboarding_questions_complete:
     $ practice_mode = "phrase"
     $ original_reference_text = ""
     $ remediation_word = None
+    $ practice_state = PronunciationPracticeState()
     $ practice_reference_cache = PronunciationReferenceCache()
     call pronunciation_practice_loop
 
@@ -157,13 +158,20 @@ label pronunciation_practice_loop:
         $ practice_target = personalized_introduction["french_lines"][practice_index]
         $ practice_translation = personalized_introduction["english_lines"][practice_index]
         $ original_reference_text = practice_target
+        $ practice_state.start_phrase_attempt(
+            final_phrase=practice_state.final_phrase_attempt
+        )
+        $ practice_mode = practice_state.practice_mode
     elif practice_mode == "word":
         if not remediation_word or not remediation_word.get("word"):
-            $ practice_mode = "phrase"
+            $ practice_state.prepare_final_phrase_attempt()
+            $ practice_mode = practice_state.practice_mode
             jump pronunciation_practice_loop
 
         $ practice_target = remediation_word["word"]
         $ practice_translation = ""
+        $ practice_state.start_word_attempt()
+        $ practice_mode = practice_state.practice_mode
     else:
         $ practice_reference_cache.dispose_all()
         return
@@ -179,6 +187,7 @@ label pronunciation_practice_loop:
         reference_tts_session=practice_tts_session,
         translation=practice_translation,
         practice_mode=practice_mode,
+        practice_state=practice_state,
     )
     $ practice_result = _return
 
@@ -187,6 +196,7 @@ label pronunciation_practice_loop:
 
     if practice_result == "full_phrase":
         $ practice_reference_cache.release(practice_target, "word")
+        $ practice_state.prepare_final_phrase_attempt()
         $ practice_mode = "phrase"
         $ remediation_word = None
         jump pronunciation_practice_loop
@@ -196,12 +206,22 @@ label pronunciation_practice_loop:
         return
 
     if practice_result.get("status") == "remediate":
+        $ practice_evaluation = practice_result.get("evaluation", {})
+        $ practice_state.record_evaluation("phrase", practice_evaluation)
         $ remediation_word = practice_result.get("evaluation", {}).get(
             "weakest_word"
         )
         if not remediation_word:
-            $ practice_reference_cache.dispose_all()
-            return
+            $ practice_result.update(
+                practice_state.phrase_outcome(practice_evaluation)
+            )
+            $ practice_results.append(practice_result)
+            $ practice_reference_cache.release(practice_target, "phrase")
+            $ practice_state.reset_for_new_phrase()
+            $ practice_mode = practice_state.practice_mode
+            $ practice_index += 1
+            jump pronunciation_practice_loop
+        $ practice_state.begin_word_remediation(remediation_word)
         $ practice_mode = "word"
         jump pronunciation_practice_loop
 
@@ -209,24 +229,57 @@ label pronunciation_practice_loop:
         $ practice_reference_cache.dispose_all()
         return
 
-    $ practice_results.append(practice_result)
     $ practice_evaluation = practice_result.get("evaluation", {})
+    $ practice_state.record_evaluation(practice_mode, practice_evaluation)
 
     if practice_mode == "word":
-        if pronunciation_similarity_is_perfect(practice_evaluation):
+        if (
+            word_pronunciation_passes(practice_evaluation)
+            or practice_state.word_attempts >= MAX_WORD_ATTEMPTS
+        ):
             $ practice_reference_cache.release(practice_target, "word")
+            $ practice_state.prepare_final_phrase_attempt()
             $ practice_mode = "phrase"
             $ remediation_word = None
             jump pronunciation_practice_loop
-        $ practice_reference_cache.dispose_all()
-        return
+        jump pronunciation_practice_loop
 
-    if pronunciation_similarity_is_perfect(practice_evaluation):
+    if phrase_pronunciation_passes(practice_evaluation):
+        $ practice_result.update(
+            practice_state.phrase_outcome(practice_evaluation)
+        )
+        $ practice_results.append(practice_result)
         $ practice_reference_cache.release(practice_target, "phrase")
+        $ practice_state.reset_for_new_phrase()
+        $ practice_mode = practice_state.practice_mode
+        $ remediation_word = None
         $ practice_index += 1
         jump pronunciation_practice_loop
 
-    # The pronunciation screen does not offer Continue for a non-perfect
-    # result. Keep this guard so an unexpected return cannot advance the index.
-    $ practice_reference_cache.dispose_all()
-    return
+    if practice_state.final_phrase_attempt:
+        $ practice_result.update(
+            practice_state.phrase_outcome(practice_evaluation)
+        )
+        $ practice_results.append(practice_result)
+        $ practice_reference_cache.release(practice_target, "phrase")
+        $ practice_state.reset_for_new_phrase()
+        $ practice_mode = practice_state.practice_mode
+        $ remediation_word = None
+        $ practice_index += 1
+        jump pronunciation_practice_loop
+
+    $ remediation_word = practice_evaluation.get("weakest_word")
+    if remediation_word:
+        $ practice_state.begin_word_remediation(remediation_word)
+        $ practice_mode = practice_state.practice_mode
+        jump pronunciation_practice_loop
+
+    $ practice_result.update(
+        practice_state.phrase_outcome(practice_evaluation)
+    )
+    $ practice_results.append(practice_result)
+    $ practice_reference_cache.release(practice_target, "phrase")
+    $ practice_state.reset_for_new_phrase()
+    $ practice_mode = practice_state.practice_mode
+    $ practice_index += 1
+    jump pronunciation_practice_loop

@@ -11,17 +11,6 @@ init python:
     SPEECH_ERROR = "error"
 
 
-    def pronunciation_similarity_is_perfect(evaluation):
-        """Return whether a pronunciation result passes this prototype gate."""
-
-        try:
-            return float(
-                (evaluation or {}).get("pronunciation_similarity")
-            ) >= 0.999
-        except (TypeError, ValueError):
-            return False
-
-
     class SpeechInputSession(object):
         """Connect a recorder to a speech processor without knowing the scene."""
 
@@ -110,7 +99,7 @@ init python:
 
         def confirm_result(self):
             if self.mode == "pronunciation":
-                if not pronunciation_similarity_is_perfect(self.evaluation):
+                if "pronunciation_similarity" not in self.evaluation:
                     return None
             elif not self.transcript:
                 return None
