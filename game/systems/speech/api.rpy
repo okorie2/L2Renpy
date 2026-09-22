@@ -111,7 +111,7 @@ init -10 python:
         url = speech_api_base_url.rstrip("/") + "/speech/pronunciation"
         renpy.log(
             "Speech API: POST {} for pronunciation".format(url)
-        )   
+        )
         reference_filename = os.path.basename(reference_audio_path)
         reference_content_type = (
             "audio/mpeg"
@@ -149,6 +149,13 @@ init -10 python:
                 "Could not connect to the local speech backend."
             ) from exc
 
+        renpy.log(
+            "Speech API: pronunciation response status={} content_type={} body={!r}".format(
+                response.status_code,
+                response.headers.get("content-type", ""),
+                response.text[:2000],
+            )
+        )
 
         if response.status_code >= 400:
             try:

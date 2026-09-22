@@ -201,6 +201,42 @@ init -10 python:
         def can_continue(self):
             return self.status in (TTS_FINISHED, TTS_ERROR)
 
+        def can_reuse_reference(self):
+            """Return whether this generated audio can remain a reference."""
+
+            if self._disposed or self.status == TTS_DISPOSED:
+                return False
+
+            if self.status in (TTS_PREPARING, TTS_PLAYING):
+                return True
+
+            return (
+                self.status in (TTS_READY, TTS_FINISHED)
+                and self.audio_path
+                and os.path.isfile(self.audio_path)
+            )
+
+        def replay(self):
+            """Replay saved audio without requesting a new synthesis."""
+
+            if self._disposed:
+                return False
+
+            if self.status in (TTS_PREPARING, TTS_PLAYING):
+                return True
+
+            if not (
+                self.status in (TTS_READY, TTS_FINISHED)
+                and self.audio_path
+                and os.path.isfile(self.audio_path)
+            ):
+                return False
+
+            self.error = ""
+            self.status = TTS_READY
+            renpy.restart_interaction()
+            return True
+
         def dispose(self):
             if self._disposed:
                 return
@@ -215,3 +251,57 @@ init -10 python:
             _remove_tts_file(self.audio_path)
             self.audio_path = None
             self.status = TTS_DISPOSED
+
+
+    class PronunciationReferenceCache(object):
+        """Keep one generated reference per active pronunciation target."""
+
+        def __init__(self):
+            self._references = {}
+
+        @staticmethod
+        def _key(text, mode):
+            return (mode or "phrase", text or "")
+
+        def get_or_create(self, text, mode):
+            """Return a stable reference session for one text/mode target."""
+
+            key = self._key(text, mode)
+            reference = self._references.get(key)
+
+            if reference is not None:
+                if reference.can_reuse_reference():
+                    renpy.log(
+                        "Pronunciation reference: reusing cached audio for "
+                        "mode={!r} target={!r}".format(mode, text)
+                    )
+                    reference.replay()
+                    return reference
+
+                reference.dispose()
+                self._references.pop(key, None)
+
+            renpy.log(
+                "Pronunciation reference: generating new audio for "
+                "mode={!r} target={!r}".format(mode, text)
+            )
+            reference = FrenchTTSSession(text)
+            self._references[key] = reference
+            reference.start()
+            return reference
+
+        def release(self, text, mode):
+            """Dispose a reference once its target is permanently left."""
+
+            key = self._key(text, mode)
+            reference = self._references.pop(key, None)
+            if reference is not None:
+                reference.dispose()
+
+        def dispose_all(self):
+            """Dispose all active phrase and word references."""
+
+            references = list(self._references.values())
+            self._references.clear()
+            for reference in references:
+                reference.dispose()

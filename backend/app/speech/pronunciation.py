@@ -6,7 +6,6 @@ import unicodedata
 from .phonemize import phonemize_audio
 from .text_phonemize import phonemize_french_word
 
-
 REFERENCE_WORD_PATTERN = re.compile(
     r"[^\W_]+(?:['’][^\W_]+)*(?:-[^\W_]+(?:['’][^\W_]+)*)*",
     re.UNICODE,
@@ -230,9 +229,7 @@ def analyze_word_pronunciation(
                 "word": word["text"],
                 "expected_phonemes": word["expected_phonemes"],
                 "learner_phonemes": "".join(
-                    item["actual"]
-                    for item in operations
-                    if item["actual"] is not None
+                    item["actual"] for item in operations if item["actual"] is not None
                 ),
                 "score": round(score, 3),
                 "differences": [
@@ -260,9 +257,7 @@ def select_weakest_word(
     if pronunciation_similarity >= 0.999:
         return None
 
-    candidates = [
-        result for result in word_results if result.get("scorable", True)
-    ]
+    candidates = [result for result in word_results if result.get("scorable", True)]
     if not candidates:
         return None
 
@@ -303,8 +298,6 @@ def evaluate_pronunciation(
     print(f"Expected phonemes: {expected_phonemes}")
     print(f"Learner phonemes: {learner_phonemes}")
     print(f"Pronunciation similarity: {pronunciation_similarity}")
-    print(f"Differences: {differences}")
-    print(f"Word results: {word_results}")
     print(f"Weakest word: {weakest_word}")
     return {
         "reference_text": reference_text,

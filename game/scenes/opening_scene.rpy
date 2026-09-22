@@ -141,6 +141,7 @@ label onboarding_questions_complete:
     $ practice_mode = "phrase"
     $ original_reference_text = ""
     $ remediation_word = None
+    $ practice_reference_cache = PronunciationReferenceCache()
     call pronunciation_practice_loop
 
     stop music fadeout 1.5
@@ -150,6 +151,7 @@ label onboarding_questions_complete:
 label pronunciation_practice_loop:
     if practice_mode == "phrase":
         if practice_index >= len(personalized_introduction["french_lines"]):
+            $ practice_reference_cache.dispose_all()
             return
 
         $ practice_target = personalized_introduction["french_lines"][practice_index]
@@ -163,10 +165,13 @@ label pronunciation_practice_loop:
         $ practice_target = remediation_word["word"]
         $ practice_translation = ""
     else:
+        $ practice_reference_cache.dispose_all()
         return
 
-    $ practice_tts_session = FrenchTTSSession(practice_target)
-    $ practice_tts_session.start()
+    $ practice_tts_session = practice_reference_cache.get_or_create(
+        practice_target,
+        practice_mode,
+    )
     call screen speech_input(
         mode="pronunciation",
         language="fr",
@@ -176,17 +181,18 @@ label pronunciation_practice_loop:
         practice_mode=practice_mode,
     )
     $ practice_result = _return
-    $ practice_tts_session.dispose()
 
     if practice_result == "retry":
         jump pronunciation_practice_loop
 
     if practice_result == "full_phrase":
+        $ practice_reference_cache.release(practice_target, "word")
         $ practice_mode = "phrase"
         $ remediation_word = None
         jump pronunciation_practice_loop
 
     if not practice_result or not isinstance(practice_result, dict):
+        $ practice_reference_cache.dispose_all()
         return
 
     if practice_result.get("status") == "remediate":
@@ -194,11 +200,13 @@ label pronunciation_practice_loop:
             "weakest_word"
         )
         if not remediation_word:
+            $ practice_reference_cache.dispose_all()
             return
         $ practice_mode = "word"
         jump pronunciation_practice_loop
 
     if practice_result.get("status") != "confirmed":
+        $ practice_reference_cache.dispose_all()
         return
 
     $ practice_results.append(practice_result)
@@ -206,15 +214,19 @@ label pronunciation_practice_loop:
 
     if practice_mode == "word":
         if pronunciation_similarity_is_perfect(practice_evaluation):
+            $ practice_reference_cache.release(practice_target, "word")
             $ practice_mode = "phrase"
             $ remediation_word = None
             jump pronunciation_practice_loop
+        $ practice_reference_cache.dispose_all()
         return
 
     if pronunciation_similarity_is_perfect(practice_evaluation):
+        $ practice_reference_cache.release(practice_target, "phrase")
         $ practice_index += 1
         jump pronunciation_practice_loop
 
     # The pronunciation screen does not offer Continue for a non-perfect
     # result. Keep this guard so an unexpected return cannot advance the index.
+    $ practice_reference_cache.dispose_all()
     return
