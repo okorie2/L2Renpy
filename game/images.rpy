@@ -1,7 +1,12 @@
 # Sophie uses complete standalone sprites in the opening scene. The experimental
 # layered assets remain in the project for future work.
 
-image bg park_day = "images/backgrounds/park/park_day.jpg"
+image bg park_day:
+    "images/backgrounds/park/park_day.jpg"
+    xysize layout_viewport
+    fit "cover"
+    align (0.5, 0.5)
+
 image sophie casual = "images/characters/sophie/casual.png"
 
 image sophie walk_a = "images/characters/sophie/walking/walking-frontpose-a.png"

@@ -1,20 +1,30 @@
 # Opening scene and onboarding story logic.
 
 
+# Keep the scene composition in normalized coordinates so future display-size
+# variants can adjust these values without rewriting the scene sequence.
+define sophie_park_xalign = 0.30
+define sophie_park_zoom = 0.45
+define sophie_ground_yalign = 0.94
+define sophie_walk_start_xalign = 0.40
+define sophie_walk_start_yalign = 0.62
+define sophie_walk_start_zoom = 0.18
+
+
 transform sophie_park_position:
     # Preserve the sprite's aspect ratio while keeping Sophie centre-left.
-    xalign 0.30
-    yalign 0.80
-    zoom 0.45
+    xalign sophie_park_xalign
+    yalign sophie_ground_yalign
+    zoom sophie_park_zoom
 
 
 transform sophie_walk_to_park_position:
     # Sophie approaches along the park path: mostly toward the camera, with
     # only a small horizontal correction into her conversation position.
-    xalign 0.40
-    yalign 0.55
-    zoom 0.18
-    linear 1.80 xalign 0.30 yalign 0.80 zoom 0.45
+    xalign sophie_walk_start_xalign
+    yalign sophie_walk_start_yalign
+    zoom sophie_walk_start_zoom
+    linear 1.80 xalign sophie_park_xalign yalign sophie_ground_yalign zoom sophie_park_zoom
 
 
 label opening_scene:

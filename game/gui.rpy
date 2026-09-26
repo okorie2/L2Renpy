@@ -9,7 +9,15 @@ init offset = -2
 ## Calling gui.init resets the styles to sensible default values, and sets the
 ## width and height of the game.
 init python:
-    gui.init(1920, 1080)
+    gui.init(1080, 1920)
+
+
+## Shared layout values. Derive these from the active Ren'Py design viewport so
+## the same screens can be reused by future phone, tablet, and desktop variants.
+define layout_viewport = (config.screen_width, config.screen_height)
+define layout_safe_margin_ratio = 1.0 / 15.0
+define layout_safe_margin = int(layout_viewport[0] * layout_safe_margin_ratio)
+define layout_content_width = layout_viewport[0] - (layout_safe_margin * 2)
 
 ## Enable checks for invalid or unstable properties in screens or transforms
 define config.check_conflicting_properties = True
@@ -106,7 +114,7 @@ define gui.textbox_yalign = 1.0
 
 ## The placement of the speaking character's name, relative to the textbox.
 ## These can be a whole number of pixels from the left or top, or 0.5 to center.
-define gui.name_xpos = 360
+define gui.name_xpos = layout_safe_margin
 define gui.name_ypos = 0
 
 ## The horizontal alignment of the character's name. This can be 0.0 for left-
@@ -130,11 +138,11 @@ define gui.namebox_tile = False
 ## The placement of dialogue relative to the textbox. These can be a whole
 ## number of pixels relative to the left or top side of the textbox, or 0.5 to
 ## center.
-define gui.dialogue_xpos = 402
+define gui.dialogue_xpos = layout_safe_margin
 define gui.dialogue_ypos = 75
 
 ## The maximum width of dialogue text, in pixels.
-define gui.dialogue_width = 1116
+define gui.dialogue_width = layout_content_width
 
 ## The horizontal alignment of the dialogue text. This can be 0.0 for left-
 ## aligned, 0.5 for centered, and 1.0 for right-aligned.
@@ -441,9 +449,9 @@ init python:
 
         ## Adjust the location of the textbox.
         gui.textbox_height = 360
-        gui.name_xpos = 120
-        gui.dialogue_xpos = 135
-        gui.dialogue_width = 1650
+        gui.name_xpos = layout_safe_margin
+        gui.dialogue_xpos = layout_safe_margin
+        gui.dialogue_width = layout_content_width
 
         ## Change the size and spacing of various things.
         gui.slider_size = 54
