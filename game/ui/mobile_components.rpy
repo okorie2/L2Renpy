@@ -307,12 +307,14 @@ screen mobile_dialogue_card(
             frame:
                 style "mobile_dialogue_speaker_frame"
                 xalign 1.0
-                xoffset dialogue_speaker_outset_x
-                yoffset -dialogue_speaker_overlap_y
+                xoffset dialogue_speaker_size // 2
+                yoffset -(dialogue_speaker_size // 2)
 
                 add "gui/mobile/speaker.svg":
-                    xalign 0.5
-                    yalign 0.5
+                    xpos 0.5
+                    xanchor 0.5
+                    ypos 0.5
+                    yanchor 0.5
                     xsize ui_px(32)
                     ysize ui_px(32)
 
@@ -321,12 +323,14 @@ screen mobile_dialogue_card(
                 style "mobile_dialogue_next_frame"
                 xalign 1.0
                 yalign 1.0
-                xoffset dialogue_next_outset_x
-                yoffset dialogue_next_overlap_y
+                xoffset dialogue_next_size // 2
+                yoffset dialogue_next_size // 2
 
                 add "gui/mobile/arrow_right.svg":
-                    xalign 0.5
-                    yalign 0.5
+                    xpos 0.5
+                    xanchor 0.5
+                    ypos 0.5
+                    yanchor 0.5
                     xsize ui_px(30)
                     ysize ui_px(30)
 
