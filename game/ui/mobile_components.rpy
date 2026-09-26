@@ -16,7 +16,74 @@ style mobile_sheet_frame is mobile_card_frame:
 
 
 style mobile_dialogue_frame is mobile_card_frame:
-    ypadding ui_px(48)
+    xpadding 0
+    ypadding 0
+    left_padding dialogue_card_padding_left
+    right_padding dialogue_card_padding_right
+    top_padding dialogue_card_padding_top
+    bottom_padding dialogue_card_padding_bottom
+    background Frame(
+        "gui/mobile/card.svg",
+        Borders(
+            dialogue_card_radius,
+            dialogue_card_radius,
+            dialogue_card_radius,
+            dialogue_card_radius,
+        ),
+        tile=False,
+    )
+
+
+style mobile_dialogue_name_chip_frame is default:
+    ysize dialogue_name_chip_height
+    xpadding dialogue_name_chip_padding_x
+    background Frame(
+        "gui/mobile/name_chip.svg",
+        Borders(
+            dialogue_name_chip_height / 2,
+            dialogue_name_chip_height / 2,
+            dialogue_name_chip_height / 2,
+            dialogue_name_chip_height / 2,
+        ),
+        tile=False,
+    )
+
+
+style mobile_dialogue_name_chip_text is default:
+    xalign 0.5
+    yalign 0.5
+    color ui_navy
+    size ui_px(25)
+    bold True
+
+
+style mobile_dialogue_primary_text is default:
+    xfill True
+    xmaximum dialogue_card_text_width
+    color ui_navy
+    size dialogue_primary_size
+    bold True
+    text_align 0.0
+
+
+style mobile_dialogue_secondary_text is default:
+    xfill True
+    xmaximum dialogue_card_text_width
+    color ui_secondary_text
+    size dialogue_secondary_size
+    text_align 0.0
+
+
+style mobile_dialogue_speaker_frame is default:
+    xsize dialogue_speaker_size
+    ysize dialogue_speaker_size
+    background "gui/mobile/dialogue_speaker_circle.svg"
+
+
+style mobile_dialogue_next_frame is default:
+    xsize dialogue_next_size
+    ysize dialogue_next_size
+    background "gui/mobile/dialogue_next_circle.svg"
 
 
 style mobile_pronunciation_frame is mobile_card_frame:
@@ -220,16 +287,76 @@ screen mobile_input_sheet(placement=UI_LAYOUT_BOTTOM_SHEET):
         transclude
 
 
-screen mobile_dialogue_card(placement=UI_LAYOUT_BOTTOM):
-    frame:
-        id "window"
-        style "mobile_dialogue_frame"
-        xmaximum ui_layout_width(placement)
-        at mobile_panel_position(
-            ui_layout_xalign(placement),
-            ui_layout_yalign(placement),
-        )
-        transclude
+transform mobile_dialogue_position:
+    xalign 0.5
+    yalign 1.0
+    yoffset -dialogue_card_bottom_margin
+
+
+screen mobile_dialogue_card(
+    speaker,
+    primary_text,
+    secondary_text=None,
+    show_speaker=True,
+    show_next=True,
+):
+    fixed:
+        fit_first True
+        xsize min(dialogue_card_width, layout_content_width)
+        at mobile_dialogue_position
+
+        frame:
+            id "window"
+            style "window"
+            xfill True
+
+            vbox:
+                xfill True
+                spacing dialogue_line_gap
+
+                text primary_text:
+                    id "what"
+                    style "say_dialogue"
+
+                if secondary_text is not None and secondary_text:
+                    text secondary_text:
+                        style "mobile_dialogue_secondary_text"
+
+        if speaker is not None:
+            frame:
+                style "mobile_dialogue_name_chip_frame"
+                xpos dialogue_name_chip_left_inset
+                yoffset -dialogue_name_chip_overlap_y
+                text speaker:
+                    id "who"
+                    style "say_label"
+
+        if show_speaker:
+            frame:
+                style "mobile_dialogue_speaker_frame"
+                xalign 1.0
+                xoffset -dialogue_speaker_overlap_x
+                yoffset -dialogue_speaker_overlap_y
+
+                add "gui/mobile/speaker.svg":
+                    xalign 0.5
+                    yalign 0.5
+                    xsize ui_px(42)
+                    ysize ui_px(42)
+
+        if show_next:
+            frame:
+                style "mobile_dialogue_next_frame"
+                xalign 1.0
+                yalign 1.0
+                xoffset -dialogue_next_overlap_x
+                yoffset dialogue_next_overlap_y
+
+                add "gui/mobile/arrow_right.svg":
+                    xalign 0.5
+                    yalign 0.5
+                    xsize ui_px(38)
+                    ysize ui_px(38)
 
 
 screen mobile_pronunciation_card(

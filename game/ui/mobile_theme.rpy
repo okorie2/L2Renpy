@@ -78,6 +78,36 @@ define ui_button_min_width = ui_px(240)
 define ui_mic_size = ui_px(190)
 
 
+# Standard mobile dialogue card tokens. These are intentionally separate from
+# the generic card/sheet tokens so this component can be tuned independently.
+define dialogue_card_width = ui_px(920)
+define dialogue_card_padding_left = ui_px(48)
+define dialogue_card_padding_right = ui_px(48)
+define dialogue_card_padding_top = ui_px(58)
+define dialogue_card_padding_bottom = ui_px(38)
+define dialogue_card_radius = ui_px(38)
+define dialogue_card_bottom_margin = ui_px(105)
+define dialogue_name_chip_height = ui_px(58)
+define dialogue_name_chip_padding_x = ui_px(25)
+define dialogue_name_chip_overlap_y = ui_px(28)
+define dialogue_name_chip_left_inset = ui_px(30)
+define dialogue_speaker_size = ui_px(76)
+define dialogue_speaker_overlap_x = ui_px(22)
+define dialogue_speaker_overlap_y = ui_px(23)
+define dialogue_next_size = ui_px(74)
+define dialogue_next_overlap_x = ui_px(20)
+define dialogue_next_overlap_y = ui_px(26)
+define dialogue_primary_size = ui_px(34)
+define dialogue_secondary_size = ui_px(26)
+define dialogue_line_gap = ui_px(14)
+define dialogue_card_text_width = min(
+    dialogue_card_width
+    - dialogue_card_padding_left
+    - dialogue_card_padding_right,
+    layout_content_width,
+)
+
+
 # Compatibility names for the first mobile UI pass. New screens should use the
 # UI_* and ui_* tokens above so theme changes remain centralized.
 define APP_LAYOUT_BOTTOM = UI_LAYOUT_BOTTOM

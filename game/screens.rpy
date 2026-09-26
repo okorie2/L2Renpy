@@ -98,21 +98,12 @@ style frame:
 screen say(who, what):
 
     if renpy.variant("small"):
-        use mobile_dialogue_card(placement=UI_LAYOUT_BOTTOM):
-            vbox:
-                xfill True
-                spacing ui_card_gap_small
-
-                if who is not None:
-                    frame:
-                        id "namebox"
-                        style "mobile_name_chip_frame"
-                        xalign 0.0
-                        text who id "who" style "mobile_name_chip_text"
-
-                text what:
-                    id "what"
-                    style "mobile_say_dialogue"
+        use mobile_dialogue_card(
+            speaker=who,
+            primary_text=what,
+            show_speaker=who is not None,
+            show_next=True,
+        )
 
     else:
         window:
@@ -1563,7 +1554,57 @@ screen quick_menu():
 
 style window:
     variant "small"
-    background None
+    xalign 0.0
+    yalign 0.0
+    xpos 0
+    ypos 0
+    xanchor 0.0
+    yanchor 0.0
+    xfill True
+    xsize None
+    ysize None
+    xmaximum dialogue_card_width
+    left_padding dialogue_card_padding_left
+    right_padding dialogue_card_padding_right
+    top_padding dialogue_card_padding_top
+    bottom_padding dialogue_card_padding_bottom
+    background Frame(
+        "gui/mobile/card.svg",
+        Borders(
+            dialogue_card_radius,
+            dialogue_card_radius,
+            dialogue_card_radius,
+            dialogue_card_radius,
+        ),
+        tile=False,
+    )
+
+style say_dialogue:
+    variant "small"
+    xpos 0
+    ypos 0
+    xanchor 0.0
+    yanchor 0.0
+    xalign 0.0
+    yalign 0.0
+    xsize dialogue_card_text_width
+    xmaximum dialogue_card_text_width
+    color ui_navy
+    size dialogue_primary_size
+    bold True
+    text_align 0.0
+
+style say_label:
+    variant "small"
+    xpos 0
+    ypos 0
+    xanchor 0.0
+    yanchor 0.0
+    xalign 0.0
+    yalign 0.5
+    color ui_navy
+    size ui_px(25)
+    bold True
 
 style radio_button:
     variant "small"
