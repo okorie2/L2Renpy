@@ -19,7 +19,13 @@ style mobile_dialogue_name_chip_frame is default:
     ysize dialogue_name_chip_height
     left_padding dialogue_name_chip_padding_x
     right_padding dialogue_name_chip_padding_x
-    background "gui/mobile/name_chip.svg"
+    top_padding 0
+    bottom_padding 0
+    background Frame(
+        "gui/mobile/name_chip.svg",
+        Borders(23, 0, 23, 0),
+        tile=False,
+    )
 
 
 style mobile_dialogue_name_chip_text is default:
@@ -294,6 +300,8 @@ screen mobile_dialogue_card(
                 text speaker:
                     id "who"
                     style "mobile_dialogue_name_chip_text"
+                    xalign 0.5
+                    yalign 0.5
 
         if show_speaker:
             frame:
