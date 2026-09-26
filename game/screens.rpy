@@ -97,17 +97,35 @@ style frame:
 
 screen say(who, what):
 
-    window:
-        id "window"
+    if renpy.variant("small"):
+        use mobile_dialogue_card(placement=UI_LAYOUT_BOTTOM):
+            vbox:
+                xfill True
+                spacing ui_card_gap_small
 
-        if who is not None:
+                if who is not None:
+                    frame:
+                        id "namebox"
+                        style "mobile_name_chip_frame"
+                        xalign 0.0
+                        text who id "who" style "mobile_name_chip_text"
 
-            window:
-                id "namebox"
-                style "namebox"
-                text who id "who"
+                text what:
+                    id "what"
+                    style "mobile_say_dialogue"
 
-        text what id "what"
+    else:
+        window:
+            id "window"
+
+            if who is not None:
+
+                window:
+                    id "namebox"
+                    style "namebox"
+                    text who id "who"
+
+            text what id "what"
 
 
     ## If there's a side image, display it above the text. Do not display on the
@@ -174,16 +192,32 @@ style say_dialogue:
 screen input(prompt):
     style_prefix "input"
 
-    window:
+    if renpy.variant("small"):
+        use mobile_input_sheet:
+            vbox:
+                xfill True
+                spacing ui_card_gap
 
-        vbox:
-            xanchor gui.dialogue_text_xalign
-            xpos gui.dialogue_xpos
-            xsize gui.dialogue_width
-            ypos gui.dialogue_ypos
+                use mobile_name_chip(label="Sophie")
 
-            text prompt style "input_prompt"
-            input id "input"
+                text prompt:
+                    style "mobile_question_text"
+
+                input:
+                    id "input"
+                    style "mobile_input"
+
+    else:
+        window:
+
+            vbox:
+                xanchor gui.dialogue_text_xalign
+                xpos gui.dialogue_xpos
+                xsize gui.dialogue_width
+                ypos gui.dialogue_ypos
+
+                text prompt style "input_prompt"
+                input id "input"
 
 style input_prompt is default
 
@@ -1529,7 +1563,7 @@ screen quick_menu():
 
 style window:
     variant "small"
-    background "gui/phone/textbox.png"
+    background None
 
 style radio_button:
     variant "small"

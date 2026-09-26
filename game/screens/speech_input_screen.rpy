@@ -24,60 +24,43 @@ screen speech_input(
 
     modal True
     zorder 100
+    style_prefix "mobile_speech"
 
     on "hide" action Function(session.dispose)
 
     if reference_tts_session is not None:
         timer 0.1 repeat True action Function(reference_tts_session.tick)
 
-    frame:
-        # Keep the interaction panel on the same side as the existing
-        # onboarding choices so it does not cover Sophie on the left.
-        xalign 0.70
-        yalign 0.72
-        xmaximum 1100
-        xpadding 36
-        ypadding 28
-        background Solid("#14241dec")
-
+    use mobile_pronunciation_card(
+        placement=UI_LAYOUT_BOTTOM,
+        show_speaker=mode == "pronunciation",
+    ):
         vbox:
-            xalign 0.5
-            spacing 18
+            xfill True
+            spacing ui_card_gap
 
             if mode == "pronunciation":
                 if reference_tts_session is None or reference_tts_session.status == TTS_FINISHED:
                     if practice_mode == "word":
                         text "Let's practise this word.":
-                            xalign 0.5
-                            text_align 0.5
-                            size 30
+                            style "mobile_question_text"
                     else:
                         text "Now you try.":
-                            xalign 0.5
-                            text_align 0.5
-                            size 30
+                            style "mobile_question_text"
                 else:
                     text "Listen, then repeat":
-                        xalign 0.5
-                        text_align 0.5
-                        size 30
+                        style "mobile_question_text"
 
                 text reference_text:
-                    xalign 0.5
-                    text_align 0.5
-                    size 28
+                    style "mobile_french_text"
 
                 if translation:
                     text translation:
-                        xalign 0.5
-                        text_align 0.5
-                        size 23
+                        style "mobile_english_text"
 
             elif session.prompt:
                 text session.prompt:
-                    xalign 0.5
-                    text_align 0.5
-                    size 30
+                    style "mobile_question_text"
 
             if (
                 mode == "pronunciation"
@@ -86,121 +69,102 @@ screen speech_input(
             ):
                 if reference_tts_session.status == TTS_ERROR:
                     text "Sophie could not demonstrate this line.":
-                        xalign 0.5
-                        text_align 0.5
-                        size 22
-                        color "#ffb3b3"
+                        style "mobile_center_status_text"
+                        color ui_error
 
                     textbutton "Continue":
+                        style "mobile_primary_button"
                         action Return("tts_error")
-                        xalign 0.5
-                        xminimum 300
-                        yminimum 68
                 elif reference_tts_session.status == TTS_PREPARING:
                     text "Preparing Sophie's voice...":
-                        xalign 0.5
-                        size 22
+                        style "mobile_center_status_text"
                 elif reference_tts_session.status == TTS_PLAYING:
                     text "Sophie is speaking...":
-                        xalign 0.5
-                        size 22
+                        style "mobile_center_status_text"
 
             elif session.status == SPEECH_IDLE:
                 text "Tap to speak":
-                    xalign 0.5
-                    size 24
+                    style "mobile_center_status_text"
 
-                textbutton "MIC":
-                    action Function(session.start)
-                    xalign 0.5
-                    xminimum 280
-                    yminimum 112
-                    text_size 38
+                use mobile_microphone_button(Function(session.start))
 
             elif session.status == SPEECH_RECORDING:
                 text "Listening...":
-                    xalign 0.5
-                    size 28
+                    style "mobile_center_status_text"
 
-                textbutton "STOP":
-                    action Function(session.stop)
-                    xalign 0.5
-                    xminimum 280
-                    yminimum 112
-                    text_size 38
+                use mobile_microphone_button(
+                    Function(session.stop),
+                    recording=True,
+                )
 
                 text "Tap again when you are finished.":
-                    xalign 0.5
-                    size 22
+                    style "mobile_center_status_text"
 
             elif session.status == SPEECH_PROCESSING:
                 text "Processing...":
-                    xalign 0.5
-                    size 28
+                    style "mobile_center_status_text"
                 text "Please wait.":
-                    xalign 0.5
-                    size 22
+                    style "mobile_center_status_text"
 
             elif session.status == SPEECH_RESULT:
                 if mode == "pronunciation":
                     if session.pronunciation_percent is not None:
                         text "Pronunciation: [session.pronunciation_percent]%":
+                            style "mobile_center_status_text"
                             xalign 0.5
-                            size 25
+                            size ui_px(22)
 
                     if practice_mode == "phrase":
                         if phrase_pronunciation_passes(session.evaluation):
                             text "Great!":
+                                style "mobile_center_status_text"
                                 xalign 0.5
                                 text_align 0.5
-                                size 28
+                                size ui_px(32)
+                                color ui_success
 
                             textbutton "Continue":
+                                style "mobile_primary_button"
                                 action Function(session.confirm_result_and_close)
-                                xalign 0.5
-                                xminimum 250
-                                yminimum 68
                         elif (
                             practice_state is not None
                             and practice_state.final_phrase_attempt
                         ):
                             text "Nice try. We'll come back to this one.":
+                                style "mobile_center_status_text"
                                 xalign 0.5
                                 text_align 0.5
-                                size 24
+                                size ui_px(24)
 
                             textbutton "Continue":
+                                style "mobile_primary_button"
                                 action Function(session.confirm_result_and_close)
-                                xalign 0.5
-                                xminimum 250
-                                yminimum 68
                         elif session.evaluation.get("weakest_word"):
                             text "Let's work on this part.":
+                                style "mobile_center_status_text"
                                 xalign 0.5
                                 text_align 0.5
-                                size 24
+                                size ui_px(24)
 
                             text session.evaluation.get("weakest_word", {}).get("word", ""):
+                                style "mobile_french_text"
                                 xalign 0.5
                                 text_align 0.5
-                                size 30
+                                size ui_px(32)
 
                             textbutton "Practice this word":
+                                style "mobile_primary_button"
                                 action Function(session.remediation_result_and_close)
-                                xalign 0.5
-                                xminimum 250
-                                yminimum 68
                         else:
                             text "Let's keep going.":
+                                style "mobile_center_status_text"
                                 xalign 0.5
                                 text_align 0.5
-                                size 24
+                                size ui_px(24)
 
                             textbutton "Continue":
+                                style "mobile_primary_button"
                                 action Function(session.confirm_result_and_close)
-                                xalign 0.5
-                                xminimum 250
-                                yminimum 68
                     elif word_pronunciation_passes(session.evaluation):
                         if (
                             practice_state is not None
@@ -211,28 +175,29 @@ screen speech_input(
                             )
                         ):
                             text "Hint: [practice_state.current_weakest_word.get('phonetic_guide', '')]":
+                                style "mobile_center_status_text"
                                 xalign 0.5
                                 text_align 0.5
-                                size 23
+                                size ui_px(23)
 
                         text "Much better. Let's try the whole sentence again.":
+                            style "mobile_center_status_text"
                             xalign 0.5
                             text_align 0.5
-                            size 24
+                            size ui_px(24)
 
                         textbutton "Continue":
+                            style "mobile_primary_button"
                             action Function(session.confirm_result_and_close)
-                            xalign 0.5
-                            xminimum 300
-                            yminimum 68
                     elif (
                         practice_state is not None
                         and practice_state.word_attempts >= MAX_WORD_ATTEMPTS
                     ):
                         text "Let's try the whole sentence again.":
+                            style "mobile_center_status_text"
                             xalign 0.5
                             text_align 0.5
-                            size 24
+                            size ui_px(24)
 
                         if (
                             practice_state.phonetic_guide_visible
@@ -242,20 +207,20 @@ screen speech_input(
                             )
                         ):
                             text "Hint: [practice_state.current_weakest_word.get('phonetic_guide', '')]":
+                                style "mobile_center_status_text"
                                 xalign 0.5
                                 text_align 0.5
-                                size 23
+                                size ui_px(23)
 
                         textbutton "Continue":
+                            style "mobile_primary_button"
                             action Function(session.confirm_result_and_close)
-                            xalign 0.5
-                            xminimum 300
-                            yminimum 68
                     else:
                         text "Let's try it once more.":
+                            style "mobile_center_status_text"
                             xalign 0.5
                             text_align 0.5
-                            size 24
+                            size ui_px(24)
 
                         if (
                             practice_state is not None
@@ -266,15 +231,17 @@ screen speech_input(
                             )
                         ):
                             text "Hint: [practice_state.current_weakest_word.get('phonetic_guide', '')]":
+                                style "mobile_center_status_text"
                                 xalign 0.5
                                 text_align 0.5
-                                size 23
+                                size ui_px(23)
 
                         hbox:
                             xalign 0.5
-                            spacing 16
+                            spacing ui_card_gap_small
 
                             textbutton "Try Again":
+                                style "mobile_secondary_button"
                                 action Function(
                                     record_practice_evaluation_and_close,
                                     practice_state,
@@ -282,10 +249,10 @@ screen speech_input(
                                     session.evaluation,
                                     "retry",
                                 )
-                                xminimum 210
-                                yminimum 68
+                                xminimum ui_button_min_width
 
                             textbutton "Try Full Phrase":
+                                style "mobile_primary_button"
                                 action Function(
                                     record_practice_evaluation_and_close,
                                     practice_state,
@@ -293,65 +260,67 @@ screen speech_input(
                                     session.evaluation,
                                     "full_phrase",
                                 )
-                                xminimum 250
-                                yminimum 68
+                                xminimum ui_button_min_width
                 else:
                     text "I heard: [session.transcript]":
+                        style "mobile_center_status_text"
                         xalign 0.5
                         text_align 0.5
-                        size 28
+                        size ui_px(28)
 
                     hbox:
                         xalign 0.5
-                        spacing 16
+                        spacing ui_card_gap_small
 
                         textbutton "That's right":
+                            style "mobile_primary_button"
                             action Function(session.confirm_result)
-                            xminimum 210
-                            yminimum 68
+                            xminimum ui_button_min_width
 
                         textbutton "Try again":
+                            style "mobile_secondary_button"
                             action Function(session.retry)
-                            xminimum 210
-                            yminimum 68
+                            xminimum ui_button_min_width
 
                     textbutton "Type instead":
+                        style "mobile_secondary_button"
                         action Function(session.type_result)
                         xalign 0.5
-                        xminimum 250
-                        yminimum 64
+                        xminimum ui_button_min_width
 
             elif session.status == SPEECH_ERROR:
                 text session.error:
+                    style "mobile_center_status_text"
                     xalign 0.5
                     text_align 0.5
-                    size 24
+                    size ui_px(24)
+                    color ui_error
 
                 if mode == "pronunciation":
                     hbox:
                         xalign 0.5
-                        spacing 16
+                        spacing ui_card_gap_small
 
                         textbutton "Try Again":
+                            style "mobile_secondary_button"
                             action Return("retry")
-                            xminimum 210
-                            yminimum 68
+                            xminimum ui_button_min_width
 
                         textbutton "Continue":
+                            style "mobile_primary_button"
                             action Return("error")
-                            xminimum 210
-                            yminimum 68
+                            xminimum ui_button_min_width
                 else:
                     hbox:
                         xalign 0.5
-                        spacing 16
+                        spacing ui_card_gap_small
 
                         textbutton "Try again":
+                            style "mobile_secondary_button"
                             action Function(session.retry)
-                            xminimum 210
-                            yminimum 68
+                            xminimum ui_button_min_width
 
                         textbutton "Type instead":
+                            style "mobile_secondary_button"
                             action Function(session.type_result)
-                            xminimum 210
-                            yminimum 68
+                            xminimum ui_button_min_width

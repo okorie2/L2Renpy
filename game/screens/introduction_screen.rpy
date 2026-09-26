@@ -1,31 +1,29 @@
 # Minimal controls for introducing the player.
 
 screen introduction_controls():
-    frame:
-        xalign 0.5
-        yalign 0.86
-        xpadding 36
-        ypadding 18
-        background Solid("#14241dcc")
+    modal True
+    zorder 90
 
+    use mobile_bottom_sheet:
         vbox:
-            xalign 0.5
-            spacing 14
+            xfill True
+            spacing ui_card_gap
+
+            use mobile_name_chip(label="Sophie")
 
             text "Introduce yourself":
-                xalign 0.5
-                size 30
+                style "mobile_question_text"
 
             hbox:
-                xalign 0.5
-                spacing 18
+                xfill True
+                spacing ui_card_gap_small
 
                 textbutton "Speak":
+                    style "mobile_primary_button"
                     action [Hide("introduction_controls"), Jump("speak_introduction")]
-                    xminimum 180
-                    yminimum 64
+                    xminimum ui_button_min_width
 
                 textbutton "Type":
+                    style "mobile_secondary_button"
                     action [Hide("introduction_controls"), Jump("type_introduction")]
-                    xminimum 180
-                    yminimum 64
+                    xminimum ui_button_min_width

@@ -27,23 +27,25 @@ screen onboarding_choice(question, options, result_variable):
     modal True
     zorder 90
 
-    use app_bottom_sheet:
+    use mobile_choice_sheet:
         vbox:
             xfill True
-            spacing 18
+            spacing ui_card_gap
+
+            use mobile_name_chip(label="Sophie")
 
             text question:
-                style "app_question_text"
+                style "mobile_question_text"
 
             vbox:
                 xfill True
-                spacing 12
+                spacing ui_card_gap_small
 
                 for option_label, option_value in options:
-                    textbutton option_label:
-                        style "app_choice_button"
-                        action [SetVariable(result_variable, option_value), Return()]
-                        xfill True
+                    use mobile_choice_button(
+                        option_label,
+                        [SetVariable(result_variable, option_value), Return()],
+                    )
 
 
 screen onboarding_age_input():
@@ -53,30 +55,32 @@ screen onboarding_age_input():
     modal True
     zorder 90
 
-    use app_bottom_sheet:
+    use mobile_input_sheet:
         vbox:
             xfill True
-            spacing 18
+            spacing ui_card_gap
+
+            use mobile_name_chip(label="Sophie")
 
             text "Enter your age":
-                style "app_question_text"
+                style "mobile_question_text"
 
             input:
-                style "app_input"
+                style "mobile_input"
                 value ScreenVariableInputValue("age_text")
                 length 3
-                pixel_width 260
+                pixel_width ui_px(260)
 
             text "Numbers only (1–120).":
                 xalign 0.5
-                style "app_status_text"
+                style "mobile_center_status_text"
 
             if age_error:
                 text age_error:
-                    style "app_status_text"
-                    color "#ffb3b3"
+                    style "mobile_center_status_text"
+                    color ui_error
 
-            textbutton "Continue":
-                style "app_primary_button"
-                action Function(_validate_age_input, age_text)
-                xalign 0.5
+            use mobile_primary_button(
+                "Continue",
+                Function(_validate_age_input, age_text),
+            )
