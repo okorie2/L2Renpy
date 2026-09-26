@@ -240,7 +240,7 @@ screen quick_menu():
     ## Ensure this appears on top of other screens.
     zorder 100
 
-    if quick_menu:
+    if quick_menu and not renpy.variant("small"):
 
         hbox:
             style_prefix "quick"
@@ -1522,18 +1522,9 @@ style pref_vbox:
 screen quick_menu():
     variant "touch"
 
-    zorder 100
-
-    if quick_menu:
-
-        hbox:
-            style "quick_menu"
-            style_prefix "quick"
-
-            textbutton _("Back") action Rollback()
-            textbutton _("Skip") action Skip() alternate Skip(fast=True, confirm=True)
-            textbutton _("Auto") action Preference("auto-forward", "toggle")
-            textbutton _("Menu") action ShowMenu()
+    # The mobile learning UI owns the visible interaction surface. The base
+    # quick-menu actions remain available on desktop and through Ren'Py's
+    # underlying navigation mechanisms.
 
 
 style window:

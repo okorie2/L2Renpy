@@ -8,59 +8,44 @@ screen bilingual_introduction(french_text, english_text, tts_session=None):
         timer 0.1 repeat True action Function(tts_session.tick)
         on "hide" action Function(tts_session.dispose)
 
-    frame:
-        xalign 0.70
-        yalign 0.46
-        xmaximum 1000
-        xpadding 36
-        ypadding 28
-        background Solid("#14241dec")
-
+    use app_card(layout=APP_LAYOUT_CENTER_FOCUS):
         vbox:
-            xalign 0.5
+            xfill True
             spacing 18
 
+            frame:
+                style "app_name_pill_frame"
+                xalign 0.0
+                text "Sophie" style "app_name_pill_frame_text"
+
             text "FRANÇAIS":
-                xalign 0.5
-                size 28
+                style "app_section_label"
 
             text french_text:
-                xalign 0.5
-                xmaximum 780
-                text_align 0.5
-                size 25
+                style "app_french_text"
 
             null height 8
 
             text "ENGLISH":
-                xalign 0.5
-                size 28
+                style "app_section_label"
 
             text english_text:
-                xalign 0.5
-                xmaximum 780
-                text_align 0.5
-                size 23
+                style "app_english_text"
 
             if tts_session is not None:
                 if tts_session.status == TTS_PREPARING:
                     text "Preparing Sophie's voice...":
-                        xalign 0.5
-                        size 21
+                        style "app_status_text"
                 elif tts_session.status == TTS_PLAYING:
                     text "Sophie is speaking...":
-                        xalign 0.5
-                        size 21
+                        style "app_status_text"
                 elif tts_session.status == TTS_ERROR:
                     text "Voice unavailable — the text is still available.":
-                        xalign 0.5
-                        text_align 0.5
-                        size 21
+                        style "app_status_text"
                         color "#ffb3b3"
 
             textbutton "Continue":
+                style "app_primary_button"
                 action Return()
                 xalign 0.5
-                xminimum 300
-                yminimum 68
                 sensitive tts_session is None or tts_session.can_continue()
