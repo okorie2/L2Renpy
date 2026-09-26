@@ -23,47 +23,33 @@ init python:
 
         return age
 
-screen onboarding_choice(question, options, result_variable):
+# options: (label, value) or (label, value, icon_path).
+screen onboarding_choice(question, options, result_variable, voice=None):
     modal True
     zorder 90
 
-    use mobile_choice_sheet:
-        vbox:
-            xfill True
-            spacing ui_card_gap
-
-            use mobile_name_chip(label="Sophie")
-
-            text question:
-                style "mobile_question_text"
-
-            vbox:
-                xfill True
-                spacing ui_card_gap_small
-
-                for option_label, option_value in options:
-                    use mobile_choice_button(
-                        option_label,
-                        [SetVariable(result_variable, option_value), Return()],
-                    )
+    use mobile_choice_sheet(title=question, voice=voice):
+        use mobile_choice_list([
+            (
+                option[0],
+                [SetVariable(result_variable, option[1]), Return()],
+                option[2] if len(option) > 2 else None,
+            )
+            for option in options
+        ])
 
 
-screen onboarding_age_input():
+screen onboarding_age_input(question="Enter your age", voice=None):
     default age_text = ""
     default age_error = ""
 
     modal True
     zorder 90
 
-    use mobile_input_sheet:
+    use mobile_input_sheet(title=question, voice=voice):
         vbox:
             xfill True
             spacing ui_card_gap
-
-            use mobile_name_chip(label="Sophie")
-
-            text "Enter your age":
-                style "mobile_question_text"
 
             input:
                 style "mobile_input"

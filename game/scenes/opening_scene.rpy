@@ -3,12 +3,27 @@
 
 # Keep the scene composition in normalized coordinates so future display-size
 # variants can adjust these values without rewriting the scene sequence.
+#
+# Sophie's size is expressed as a share of the screen height rather than a raw
+# zoom, so it stays correct if the design viewport changes (landscape, tablet
+# variants). Zoom is derived from it and the sprite canvas height.
+#
+# At 0.68 her chin sits ~790px down a 1920px screen, above the tallest bottom
+# sheet (~820px) and the dialogue card. Keep it <= 0.80: above that the
+# 1536px sprites are upscaled and start to look soft.
+define sophie_sprite_height = 1536  # all Sophie sprites share this canvas
+define sophie_screen_height = 0.68
+define sophie_park_zoom = (
+    sophie_screen_height * layout_viewport[1] / float(sophie_sprite_height)
+)
 define sophie_park_xalign = 0.30
-define sophie_park_zoom = 0.45
 define sophie_ground_yalign = 0.94
+
+# The walk-in starts further down the path at 40% of her final size (the same
+# proportion as before), so the entrance keeps its feel at any final size.
 define sophie_walk_start_xalign = 0.40
 define sophie_walk_start_yalign = 0.62
-define sophie_walk_start_zoom = 0.18
+define sophie_walk_start_zoom = sophie_park_zoom * 0.40
 
 
 transform sophie_park_position:
@@ -51,9 +66,12 @@ label opening_scene:
     Sophie "Hi! I'm Sophie."
     voice "audio/chapter1/scene1/sophie/nice_to_meet_you.mp3"
     Sophie "It's really nice to meet you."
+    # Sophie's question is shown inside the sheet itself (inspo #2), so it is
+    # queued here instead of on a separate dialogue line. Use `voice`, not
+    # `play voice`: Ren'Py's voice system stops the voice channel when a new
+    # interaction (the `call screen`) starts unless the line was queued with
+    # `voice`, which would cut the audio off after the first word.
     voice "audio/chapter1/scene1/sophie/introduce_yourself.mp3"
-    Sophie "Why don't you introduce yourself?"
-
     call screen introduction_controls
 
 
@@ -95,15 +113,33 @@ label introduction_name_complete:
 
 label after_introduction:
     voice "audio/chapter1/scene1/sophie/french_level_question.mp3"
-    Sophie "First, how much French do you already know?"
-    call screen onboarding_choice("Which level fits you best?", [("Beginner", "beginner"), ("Intermediate", "intermediate"), ("Expert", "expert")], "french_level")
+    call screen onboarding_choice(
+        "First, how much French do you already know?",
+        [
+            ("Beginner", "beginner", "gui/mobile/icon_level_1.svg"),
+            ("Intermediate", "intermediate", "gui/mobile/icon_level_2.svg"),
+            ("Expert", "expert", "gui/mobile/icon_level_3.svg"),
+        ],
+        "french_level",
+        voice="audio/chapter1/scene1/sophie/french_level_question.mp3",
+    )
     jump ask_learning_goal
 
 
 label ask_learning_goal:
     voice "audio/chapter1/scene1/sophie/why_learn_french.mp3"
-    Sophie "And why do you want to learn French?"
-    call screen onboarding_choice("Which reason fits you best?", [("Education", "education"), ("Career", "career"), ("Tourism", "tourism"), ("Relationship", "relationship"), ("General Purpose", "general")], "learning_goal")
+    call screen onboarding_choice(
+        "And why do you want to learn French?",
+        [
+            ("Education", "education", "gui/mobile/icon_education.svg"),
+            ("Career", "career", "gui/mobile/icon_career.svg"),
+            ("Tourism", "tourism", "gui/mobile/icon_tourism.svg"),
+            ("Relationship", "relationship", "gui/mobile/icon_relationship.svg"),
+            ("General purpose", "general", "gui/mobile/icon_general.svg"),
+        ],
+        "learning_goal",
+        voice="audio/chapter1/scene1/sophie/why_learn_french.mp3",
+    )
 
     # TODO: Use learning_goal with future onboarding answers to select a
     # learning world. For now, every choice follows the same General Purpose flow.
@@ -112,8 +148,10 @@ label ask_learning_goal:
 
 label ask_age:
     voice "audio/chapter1/scene1/sophie/age_question.mp3"
-    Sophie "One last thing — how old are you?"
-    call screen onboarding_age_input
+    call screen onboarding_age_input(
+        "One last thing — how old are you?",
+        voice="audio/chapter1/scene1/sophie/age_question.mp3",
+    )
     $ player_age = _return
     jump onboarding_questions_complete
 

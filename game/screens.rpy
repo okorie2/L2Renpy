@@ -95,12 +95,15 @@ style frame:
 ##
 ## https://www.renpy.org/doc/html/screen_special.html#say
 
-screen say(who, what):
+## On phones, an English line can be shown under the French one with:
+##     Sophie "Bonjour ! Je m'appelle Sophie." (show_translation="Hi! My name is Sophie.")
+screen say(who, what, translation=None):
 
     if renpy.variant("small"):
         use mobile_dialogue_card(
             speaker=who,
             primary_text=what,
+            secondary_text=translation,
             show_speaker=who is not None,
             show_next=True,
         )
@@ -184,15 +187,10 @@ screen input(prompt):
     style_prefix "input"
 
     if renpy.variant("small"):
-        use mobile_input_sheet:
+        use mobile_input_sheet(title=prompt):
             vbox:
                 xfill True
                 spacing ui_card_gap
-
-                use mobile_name_chip(label="Sophie")
-
-                text prompt:
-                    style "mobile_question_text"
 
                 input:
                     id "input"
@@ -1563,19 +1561,14 @@ style window:
     xfill True
     xsize None
     ysize None
-    xmaximum dialogue_card_width
-    left_padding dialogue_card_padding_left
-    right_padding dialogue_card_padding_right
-    top_padding dialogue_card_padding_top
-    bottom_padding dialogue_card_padding_bottom
+    xmaximum dialogue_card_outer_width
+    left_padding dialogue_card_shadow_x + dialogue_card_padding_left
+    right_padding dialogue_card_shadow_x + dialogue_card_padding_right
+    top_padding dialogue_card_shadow_top + dialogue_card_padding_top
+    bottom_padding dialogue_card_shadow_bottom + dialogue_card_padding_bottom
     background Frame(
-        "gui/mobile/card.svg",
-        Borders(
-            dialogue_card_radius,
-            dialogue_card_radius,
-            dialogue_card_radius,
-            dialogue_card_radius,
-        ),
+        "gui/mobile/dialogue_card.svg",
+        dialogue_card_borders,
         tile=False,
     )
 
@@ -1592,6 +1585,7 @@ style say_dialogue:
     color ui_navy
     size dialogue_primary_size
     bold True
+    line_spacing ui_px(4)
     text_align 0.0
 
 style say_label:
@@ -1603,7 +1597,7 @@ style say_label:
     xalign 0.0
     yalign 0.5
     color ui_navy
-    size ui_px(22)
+    size dialogue_name_chip_text_size
     bold True
 
 style radio_button:
