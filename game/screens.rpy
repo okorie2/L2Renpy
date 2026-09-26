@@ -1603,7 +1603,7 @@ style say_label:
     xalign 0.0
     yalign 0.5
     color ui_navy
-    size ui_px(25)
+    size ui_px(22)
     bold True
 
 style radio_button:
