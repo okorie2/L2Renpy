@@ -6,8 +6,8 @@ From the repository root:
 uv pip install --python backend/.venv/bin/python -r backend/requirements.txt
 ```
 
-The speech models are downloaded by Transformers the first time the backend
-starts, then reused for every request in that process.
+The local pronunciation model is downloaded by Transformers the first time the
+backend starts, then reused for every pronunciation request in that process.
 
 The backend loads `backend/.env` at startup. Keep that file local and never
 commit its secrets.
@@ -49,8 +49,8 @@ curl -X POST http://127.0.0.1:8000/speech/transcribe \
   -F "learner_audio=@backend/learner.wav"
 ```
 
-The transcription endpoint reuses the Whisper instance already loaded for
-pronunciation evaluation. It returns a compact response containing
+The transcription endpoint sends the uploaded recording to ElevenLabs Scribe
+v2 using `ELEVENLABS_API_KEY`. It returns a compact response containing
 `transcript` and the normalized language code.
 
 ## Text-to-speech boundary

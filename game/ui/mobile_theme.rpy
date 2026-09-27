@@ -58,6 +58,12 @@ define ui_error = "#E85D68"
 define ui_white = "#FFFFFF"
 
 
+# Device safe areas (notch / Dynamic Island at the top, home indicator at the
+# bottom). iPhones reserve ~59pt and ~34pt, which is ~165px and ~94px on a
+# 1080px-wide layout. Only important UI needs to respect these.
+define ui_safe_top = ui_px(170)
+define ui_safe_bottom = ui_px(96)
+
 define ui_card_padding = ui_px(44)
 define ui_card_vertical_padding = ui_px(38)
 define ui_card_gap_large = ui_px(28)
@@ -156,7 +162,7 @@ define sheet_borders = Borders(
 define sheet_padding_x = layout_safe_margin
 define sheet_padding_top = ui_px(76)
 # Keeps controls clear of the home indicator / gesture area on phones.
-define sheet_padding_bottom = ui_px(84)
+define sheet_padding_bottom = ui_safe_bottom + ui_px(16)
 define sheet_content_gap = ui_px(30)
 define sheet_handle_width = ui_px(80)
 define sheet_handle_height = ui_px(10)

@@ -8,11 +8,12 @@
 # zoom, so it stays correct if the design viewport changes (landscape, tablet
 # variants). Zoom is derived from it and the sprite canvas height.
 #
-# At 0.68 her chin sits ~790px down a 1920px screen, above the tallest bottom
-# sheet (~820px) and the dialogue card. Keep it <= 0.80: above that the
-# 1536px sprites are upscaled and start to look soft.
+# At 0.60 of a 2340px screen she is ~1400px tall and her chin sits ~1100px
+# down, above the tallest bottom sheet (~850px) and the dialogue card. Keep her
+# rendered height <= the 1536px sprite canvas (0.65 here): above that the
+# sprites are upscaled and start to look soft.
 define sophie_sprite_height = 1536  # all Sophie sprites share this canvas
-define sophie_screen_height = 0.68
+define sophie_screen_height = 0.60
 define sophie_park_zoom = (
     sophie_screen_height * layout_viewport[1] / float(sophie_sprite_height)
 )

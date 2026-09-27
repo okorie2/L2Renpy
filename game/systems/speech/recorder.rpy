@@ -274,7 +274,7 @@ init -20 python:
                 self._raise_if_permission_denied()
 
                 if not self.audio_session.setCategory_error_(
-                    objc_str("record"),
+                    objc_str("AVAudioSessionCategoryRecord"),
                     None,
                 ):
                     raise RecordingError(
@@ -285,6 +285,7 @@ init -20 python:
                     raise RecordingError(
                         "The iOS audio session could not become active."
                     )
+                renpy.log("SpeechRecorder: iOS audio session activated")
 
                 self.temp_dir = tempfile.mkdtemp(
                     prefix="language-app-speech-"
@@ -319,6 +320,7 @@ init -20 python:
                     raise RecordingError(
                         "The iOS microphone recorder could not be created."
                     )
+                renpy.log("SpeechRecorder: iOS recorder created")
 
                 if not self.native_recorder.prepareToRecord():
                     raise RecordingError(
@@ -334,6 +336,7 @@ init -20 python:
                         "Microphone recording was unavailable. Check microphone "
                         "permission in the iPhone Settings app."
                     )
+                renpy.log("SpeechRecorder: iOS recording started")
 
             except RecordingError:
                 self._cancel_native_recording()
@@ -406,7 +409,12 @@ init -20 python:
             if self.audio_session is None:
                 return
 
-            permission = self.audio_session.recordPermission()
+            permission = self.audio_session.recordPermission
+            renpy.log(
+                "SpeechRecorder: iOS microphone permission={}".format(
+                    permission,
+                )
+            )
             try:
                 permission = int(permission)
             except (TypeError, ValueError):
@@ -425,7 +433,7 @@ init -20 python:
             native_recorder = self.native_recorder
             self.native_recorder = None
             try:
-                if native_recorder.isRecording():
+                if native_recorder.isRecording:
                     native_recorder.stop()
             except Exception:
                 pass

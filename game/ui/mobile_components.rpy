@@ -20,6 +20,10 @@ style mobile_sheet_frame is default:
     background Frame("gui/mobile/bottom_sheet.svg", sheet_borders, tile=False)
 
 
+# Floating card variant of the sheet (dock="top"): same card as the dialogue.
+style mobile_top_card_frame is mobile_pronunciation_frame
+
+
 style mobile_sheet_title is default:
     xmaximum sheet_title_width
     color ui_navy
@@ -255,6 +259,12 @@ transform mobile_sheet_position:
     yalign 1.0
 
 
+transform mobile_top_card_position:
+    xalign 0.5
+    yanchor 0.0
+    ypos ui_safe_top + dialogue_name_chip_overlap_y
+
+
 # Shared bottom sheet (inspo #2): full-width white sheet anchored to the bottom
 # edge with a grab handle, the speaker's name chip on the top-left edge, an
 # optional replay button on the top-right edge, an optional title (usually the
@@ -263,14 +273,19 @@ transform mobile_sheet_position:
 # voice: audio file for the question. The caller queues it with the `voice`
 # statement just before `call screen` (not `play voice`, which Ren'Py's voice
 # system cuts off); the replay button plays it again.
-screen mobile_sheet(title=None, speaker="Sophie", voice=None):
+#
+# dock: "bottom" (default) or "top". Text-input screens use "top" on phones so
+# the on-screen keyboard, which Ren'Py does not move the game for, never
+# covers the question or the field. Docked at the top it becomes a floating
+# card below the notch / Dynamic Island.
+screen mobile_sheet(title=None, speaker="Sophie", voice=None, dock="bottom"):
     fixed:
         fit_first True
-        xsize layout_viewport[0]
-        at mobile_sheet_position
+        xsize (dialogue_card_outer_width if dock == "top" else layout_viewport[0])
+        at (mobile_top_card_position if dock == "top" else mobile_sheet_position)
 
         frame:
-            style "mobile_sheet_frame"
+            style ("mobile_top_card_frame" if dock == "top" else "mobile_sheet_frame")
 
             vbox:
                 xfill True
@@ -282,17 +297,26 @@ screen mobile_sheet(title=None, speaker="Sophie", voice=None):
 
                 transclude
 
-        add "gui/mobile/sheet_handle.svg":
-            xalign 0.5
-            ypos sheet_shadow_top + sheet_handle_top
-            xsize sheet_handle_width
-            ysize sheet_handle_height
+        if dock == "top":
+            $ edge_x = dialogue_card_shadow_x + dialogue_name_chip_left_inset
+            $ edge_y = dialogue_card_shadow_top
+            $ button_x = dialogue_card_shadow_x + dialogue_speaker_right_inset
+        else:
+            $ edge_x = sheet_padding_x
+            $ edge_y = sheet_shadow_top
+            $ button_x = sheet_padding_x
+
+            add "gui/mobile/sheet_handle.svg":
+                xalign 0.5
+                ypos sheet_shadow_top + sheet_handle_top
+                xsize sheet_handle_width
+                ysize sheet_handle_height
 
         if speaker:
             frame:
                 style "mobile_dialogue_name_chip_frame"
-                xpos sheet_padding_x
-                ypos sheet_shadow_top - dialogue_name_chip_overlap_y
+                xpos edge_x
+                ypos edge_y - dialogue_name_chip_overlap_y
                 text speaker:
                     style "mobile_dialogue_name_chip_text"
 
@@ -300,8 +324,8 @@ screen mobile_sheet(title=None, speaker="Sophie", voice=None):
             button:
                 style "mobile_dialogue_speaker_button"
                 xalign 1.0
-                xoffset -sheet_padding_x
-                ypos sheet_shadow_top - (dialogue_speaker_size // 2)
+                xoffset -button_x
+                ypos edge_y - (dialogue_speaker_size // 2)
                 action Play("voice", voice)
                 alt "Replay audio"
 
@@ -324,8 +348,14 @@ screen mobile_choice_sheet(placement=UI_LAYOUT_BOTTOM_SHEET, title=None, speaker
         transclude
 
 
+# On phones, input sheets dock to the top so the keyboard can't cover them.
 screen mobile_input_sheet(placement=UI_LAYOUT_BOTTOM_SHEET, title=None, speaker="Sophie", voice=None):
-    use mobile_sheet(title=title, speaker=speaker, voice=voice):
+    use mobile_sheet(
+        title=title,
+        speaker=speaker,
+        voice=voice,
+        dock=("top" if renpy.variant("mobile") else "bottom"),
+    ):
         transclude
 
 

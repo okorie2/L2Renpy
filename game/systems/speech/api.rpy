@@ -3,8 +3,8 @@
 define speech_api_environment = "development"
 define speech_api_desktop_base_url = "http://127.0.0.1:8000"
 
-# Set this to the Mac's LAN URL when running on a physical iPhone, for example
-# "http://192.168.x.x:8000". It is intentionally empty until configured.
+# Leave empty by default. A physical iPhone can receive the Mac LAN URL at
+# runtime through SPEECH_API_BASE_URL in the Xcode Run scheme.
 define speech_api_ios_base_url = ""
 
 # For a production build, set speech_api_environment to "production" and set
@@ -23,6 +23,11 @@ init -10 python:
 
 
     def _speech_api_base_url():
+        runtime_url = os.environ.get("SPEECH_API_BASE_URL", "").strip()
+        if runtime_url:
+            renpy.log("Speech API: using runtime environment URL")
+            return runtime_url.rstrip("/")
+
         if speech_api_environment == "production":
             base_url = speech_api_production_base_url
             if not base_url:
@@ -33,15 +38,19 @@ init -10 python:
                 raise SpeechAPIError(
                     "The production speech backend must use HTTPS."
                 )
+            renpy.log("Speech API: using production URL")
         elif getattr(renpy, "ios", False) and not _is_ios_simulator():
             base_url = speech_api_ios_base_url
             if not base_url:
                 raise SpeechAPIError(
                     "The iPhone speech backend URL is not configured. Set "
-                    "speech_api_ios_base_url to the Mac LAN URL."
+                    "SPEECH_API_BASE_URL in the Xcode Run scheme or configure "
+                    "speech_api_ios_base_url."
                 )
+            renpy.log("Speech API: using iOS configured URL")
         else:
             base_url = speech_api_desktop_base_url
+            renpy.log("Speech API: using desktop development URL")
 
         return base_url.rstrip("/")
 

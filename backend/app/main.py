@@ -10,7 +10,13 @@ from pydantic import BaseModel
 
 from .speech.audio import AudioError
 from .speech.pronunciation import evaluate_pronunciation
-from .speech.transcribe import normalize_language, transcribe_audio
+from .speech.transcribe import (
+    STTConfigurationError,
+    STTProviderError,
+    STTTranscriptionError,
+    normalize_language,
+    transcribe_audio,
+)
 from .speech.tts import TTSConfigurationError, TTSSynthesisError, synthesize_speech
 
 logger = logging.getLogger(__name__)
@@ -93,20 +99,20 @@ async def pronunciation(
         ) from exc
 
 
-# Transform speech to text from recorded audio
+# Transform speech to text from a recorded learner audio file.
 @app.post("/speech/transcribe")
 async def transcribe(
     learner_audio: UploadFile | None = File(None),
     language: str = Form("en"),
 ) -> dict[str, str]:
-    """Transcribe one learner recording with the already-loaded Whisper model."""
+    """Transcribe one learner recording through the configured STT provider."""
 
     if learner_audio is None:
         raise HTTPException(status_code=400, detail="learner_audio is required.")
 
     try:
-        language_code, _ = normalize_language(language)
-        print(f"Transcribing audio with language code: {language_code}")
+        language_code = normalize_language(language)
+        logger.info("Transcribing audio with language code: %s", language_code)
 
         with TemporaryDirectory(prefix="speech-transcription-") as temp_dir:
             audio_path = Path(temp_dir) / "learner_audio"
@@ -115,13 +121,21 @@ async def transcribe(
                 str(audio_path),
                 language=language_code,
             )
-        print(f"Transcription result: {transcript}")
+        logger.info("Transcription completed")
         return {
             "transcript": transcript,
             "language": language_code,
         }
     except AudioError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except STTTranscriptionError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except STTConfigurationError as exc:
+        logger.warning("Speech transcription is unavailable: %s", exc)
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except STTProviderError as exc:
+        logger.error("Configured speech transcription provider failed: %s", exc)
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
     except (OSError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
