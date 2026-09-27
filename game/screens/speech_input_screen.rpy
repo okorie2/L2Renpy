@@ -31,9 +31,18 @@ screen speech_input(
     if reference_tts_session is not None:
         timer 0.1 repeat True action Function(reference_tts_session.tick)
 
+    # Replay Sophie's reference audio, only while waiting for the player to
+    # speak (never while recording, so the mic doesn't pick it up).
+    $ replay_action = (
+        Function(reference_tts_session.replay)
+        if reference_tts_session is not None and session.status == SPEECH_IDLE
+        else None
+    )
+
     use mobile_pronunciation_card(
         placement=UI_LAYOUT_BOTTOM,
         show_speaker=mode == "pronunciation",
+        speaker_action=replay_action,
     ):
         vbox:
             xfill True
@@ -236,31 +245,30 @@ screen speech_input(
                                 text_align 0.5
                                 size ui_px(23)
 
-                        hbox:
-                            xalign 0.5
-                            spacing ui_card_gap_small
-
-                            textbutton "Try Again":
-                                style "mobile_secondary_button"
-                                action Function(
+                        use mobile_button_row([
+                            (
+                                "Try Again",
+                                Function(
                                     record_practice_evaluation_and_close,
                                     practice_state,
                                     practice_mode,
                                     session.evaluation,
                                     "retry",
-                                )
-                                xminimum ui_button_min_width
-
-                            textbutton "Try Full Phrase":
-                                style "mobile_primary_button"
-                                action Function(
+                                ),
+                                "secondary",
+                            ),
+                            (
+                                "Try Full Phrase",
+                                Function(
                                     record_practice_evaluation_and_close,
                                     practice_state,
                                     practice_mode,
                                     session.evaluation,
                                     "full_phrase",
-                                )
-                                xminimum ui_button_min_width
+                                ),
+                                "primary",
+                            ),
+                        ])
                 else:
                     text "I heard: [session.transcript]":
                         style "mobile_center_status_text"
@@ -268,25 +276,14 @@ screen speech_input(
                         text_align 0.5
                         size ui_px(28)
 
-                    hbox:
-                        xalign 0.5
-                        spacing ui_card_gap_small
-
-                        textbutton "That's right":
-                            style "mobile_primary_button"
-                            action Function(session.confirm_result)
-                            xminimum ui_button_min_width
-
-                        textbutton "Try again":
-                            style "mobile_secondary_button"
-                            action Function(session.retry)
-                            xminimum ui_button_min_width
+                    use mobile_button_row([
+                        ("Try again", Function(session.retry), "secondary"),
+                        ("That's right", Function(session.confirm_result), "primary"),
+                    ])
 
                     textbutton "Type instead":
                         style "mobile_secondary_button"
                         action Function(session.type_result)
-                        xalign 0.5
-                        xminimum ui_button_min_width
 
             elif session.status == SPEECH_ERROR:
                 text session.error:
@@ -297,30 +294,12 @@ screen speech_input(
                     color ui_error
 
                 if mode == "pronunciation":
-                    hbox:
-                        xalign 0.5
-                        spacing ui_card_gap_small
-
-                        textbutton "Try Again":
-                            style "mobile_secondary_button"
-                            action Return("retry")
-                            xminimum ui_button_min_width
-
-                        textbutton "Continue":
-                            style "mobile_primary_button"
-                            action Return("error")
-                            xminimum ui_button_min_width
+                    use mobile_button_row([
+                        ("Try Again", Return("retry"), "secondary"),
+                        ("Continue", Return("error"), "primary"),
+                    ])
                 else:
-                    hbox:
-                        xalign 0.5
-                        spacing ui_card_gap_small
-
-                        textbutton "Try again":
-                            style "mobile_secondary_button"
-                            action Function(session.retry)
-                            xminimum ui_button_min_width
-
-                        textbutton "Type instead":
-                            style "mobile_secondary_button"
-                            action Function(session.type_result)
-                            xminimum ui_button_min_width
+                    use mobile_button_row([
+                        ("Try again", Function(session.retry), "secondary"),
+                        ("Type instead", Function(session.type_result), "secondary"),
+                    ])

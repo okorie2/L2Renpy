@@ -75,8 +75,15 @@ style mobile_dialogue_next_button is button:
     hover_background At("gui/mobile/dialogue_next_button.svg", mobile_dialogue_button_pressed)
 
 
-style mobile_pronunciation_frame is mobile_card_frame:
-    ypadding ui_px(40)
+# Same white shadow card and inner spacing as the dialogue card, but with
+# symmetric side padding so centred content (mic, status, buttons) is centred.
+style mobile_pronunciation_frame is default:
+    xfill True
+    left_padding dialogue_card_shadow_x + dialogue_card_padding_left
+    right_padding dialogue_card_shadow_x + dialogue_card_padding_left
+    top_padding dialogue_card_shadow_top + dialogue_card_padding_top
+    bottom_padding dialogue_card_shadow_bottom + dialogue_card_padding_bottom
+    background Frame("gui/mobile/dialogue_card.svg", dialogue_card_borders, tile=False)
 
 
 style mobile_name_chip_frame is default:
@@ -148,50 +155,40 @@ style mobile_center_status_text is mobile_status_text:
 style mobile_primary_button is button:
     xfill True
     yminimum ui_primary_height
-    xpadding ui_px(24)
+    xpadding ui_px(28)
     ypadding ui_px(16)
-    background Frame("gui/mobile/primary_button.svg", ui_control_borders, tile=False)
-    hover_background Frame(
-        "gui/mobile/primary_button_pressed.svg",
-        ui_control_borders,
-        tile=False,
-    )
-    selected_background Frame(
-        "gui/mobile/primary_button_pressed.svg",
-        ui_control_borders,
-        tile=False,
-    )
-    insensitive_background Frame(
-        "gui/mobile/primary_button_disabled.svg",
-        ui_control_borders,
-        tile=False,
-    )
+    background Frame("gui/mobile/button_primary.svg", ui_button_borders, tile=False)
+    hover_background Frame("gui/mobile/button_primary_pressed.svg", ui_button_borders, tile=False)
+    selected_background Frame("gui/mobile/button_primary_pressed.svg", ui_button_borders, tile=False)
+    insensitive_background Frame("gui/mobile/button_primary_disabled.svg", ui_button_borders, tile=False)
 
 
 style mobile_primary_button_text is button_text:
     xalign 0.5
+    yalign 0.5
     color ui_white
     hover_color ui_white
     insensitive_color ui_white
-    size ui_px(31)
+    size ui_button_text_size
     bold True
 
 
 style mobile_secondary_button is button:
     xfill True
-    yminimum ui_choice_height
-    xpadding ui_px(24)
-    ypadding ui_px(14)
-    background Frame("gui/mobile/secondary_button.svg", ui_control_borders, tile=False)
-    hover_background Frame("gui/mobile/choice_hover.svg", ui_control_borders, tile=False)
-    selected_background Frame("gui/mobile/choice_pressed.svg", ui_control_borders, tile=False)
+    yminimum ui_primary_height
+    xpadding ui_px(28)
+    ypadding ui_px(16)
+    background Frame("gui/mobile/button_secondary.svg", ui_button_borders, tile=False)
+    hover_background Frame("gui/mobile/button_secondary_pressed.svg", ui_button_borders, tile=False)
+    selected_background Frame("gui/mobile/button_secondary_pressed.svg", ui_button_borders, tile=False)
 
 
 style mobile_secondary_button_text is button_text:
     xalign 0.5
+    yalign 0.5
     color ui_navy
     hover_color ui_navy
-    size ui_px(29)
+    size ui_button_text_size
     bold True
 
 
@@ -433,37 +430,60 @@ screen mobile_dialogue_card(
                     ysize dialogue_next_icon_size
 
 
+# Pronunciation / speech card (inspo #4). Shares the dialogue card's look:
+# white shadow card, name chip on the top-left edge and a replay button on the
+# top-right edge. `placement` is accepted for compatibility; the card docks
+# above the bottom edge like the dialogue card.
 screen mobile_pronunciation_card(
     placement=UI_LAYOUT_BOTTOM,
     speaker_name="Sophie",
     show_speaker=True,
+    speaker_action=None,
 ):
-    frame:
-        style "mobile_pronunciation_frame"
-        xmaximum ui_layout_width(placement)
-        at mobile_panel_position(
-            ui_layout_xalign(placement),
-            ui_layout_yalign(placement),
-        )
+    fixed:
+        fit_first True
+        xsize dialogue_card_outer_width
+        at mobile_dialogue_position
 
-        vbox:
-            xfill True
-            spacing ui_card_gap
-
-            fixed:
-                xfill True
-                ysize ui_px(56)
-
-                use mobile_name_chip(label=speaker_name)
-
-                if show_speaker:
-                    add "gui/mobile/speaker.svg":
-                        xalign 1.0
-                        yalign 0.5
-                        xsize ui_px(42)
-                        ysize ui_px(42)
-
+        frame:
+            style "mobile_pronunciation_frame"
             transclude
+
+        if speaker_name:
+            frame:
+                style "mobile_dialogue_name_chip_frame"
+                xpos dialogue_card_shadow_x + dialogue_name_chip_left_inset
+                ypos dialogue_card_shadow_top - dialogue_name_chip_overlap_y
+                text speaker_name:
+                    style "mobile_dialogue_name_chip_text"
+
+        if show_speaker:
+            button:
+                style "mobile_dialogue_speaker_button"
+                xalign 1.0
+                xoffset -(dialogue_card_shadow_x + dialogue_speaker_right_inset)
+                ypos dialogue_card_shadow_top - (dialogue_speaker_size // 2)
+                action speaker_action
+                alt "Replay audio"
+
+                add "gui/mobile/dialogue_speaker_icon.svg":
+                    xalign 0.5
+                    yalign 0.5
+                    xsize dialogue_speaker_icon_size
+                    ysize dialogue_speaker_icon_size
+
+
+# A row of equal-width, equal-height buttons that fills the card's width.
+# buttons: list of (label, action, kind) where kind is "primary" or "secondary".
+screen mobile_button_row(buttons):
+    grid len(buttons) 1:
+        xfill True
+        spacing ui_card_gap_small
+
+        for label, action, kind in buttons:
+            textbutton label:
+                style ("mobile_primary_button" if kind == "primary" else "mobile_secondary_button")
+                action action
 
 
 screen mobile_name_chip(label="Sophie"):

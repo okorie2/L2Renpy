@@ -73,6 +73,9 @@ define ui_text_width = min(
 )
 define ui_choice_height = ui_px(88)
 define ui_primary_height = ui_px(92)
+define ui_button_text_size = ui_px(30)
+# Pill buttons: button_*.svg are 92px tall with r=46 (SVG pixels).
+define ui_button_borders = Borders(46, 46, 46, 46)
 define ui_touch_minimum = ui_px(76)
 define ui_button_min_width = ui_px(240)
 define ui_mic_size = ui_px(190)
