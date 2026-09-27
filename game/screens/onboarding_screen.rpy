@@ -23,74 +23,50 @@ init python:
 
         return age
 
-screen onboarding_choice(question, options, result_variable):
-    frame:
-        xalign 0.70
-        yalign 0.46
-        xpadding 36
-        ypadding 28
-        background Solid("#14241dcc")
+# options: (label, value) or (label, value, icon_path).
+screen onboarding_choice(question, options, result_variable, voice=None):
+    modal True
+    zorder 90
 
-        vbox:
-            xalign 0.5
-            spacing 20
-
-            text question:
-                xalign 0.5
-                text_align 0.5
-                size 30
-
-            vbox:
-                xalign 0.5
-                spacing 14
-
-                for option_label, option_value in options:
-                    textbutton option_label:
-                        action [SetVariable(result_variable, option_value), Return()]
-                        xalign 0.5
-                        xminimum 360
-                        yminimum 68
+    use mobile_choice_sheet(title=question, voice=voice):
+        use mobile_choice_list([
+            (
+                option[0],
+                [SetVariable(result_variable, option[1]), Return()],
+                option[2] if len(option) > 2 else None,
+            )
+            for option in options
+        ])
 
 
-screen onboarding_age_input():
+screen onboarding_age_input(question="Enter your age", voice=None):
     default age_text = ""
     default age_error = ""
 
-    frame:
-        xalign 0.70
-        yalign 0.46
-        xpadding 36
-        ypadding 28
-        background Solid("#14241dcc")
+    modal True
+    zorder 90
 
+    use mobile_input_sheet(title=question, voice=voice):
         vbox:
-            xalign 0.5
-            spacing 18
-
-            text "Enter your age":
-                xalign 0.5
-                text_align 0.5
-                size 30
+            xfill True
+            spacing ui_card_gap
 
             input:
+                style "mobile_input"
                 value ScreenVariableInputValue("age_text")
                 length 3
-                pixel_width 260
-                xalign 0.5
+                pixel_width ui_px(260)
 
             text "Numbers only (1–120).":
                 xalign 0.5
-                size 22
+                style "mobile_center_status_text"
 
             if age_error:
                 text age_error:
-                    xalign 0.5
-                    text_align 0.5
-                    size 22
-                    color "#ffb3b3"
+                    style "mobile_center_status_text"
+                    color ui_error
 
-            textbutton "Continue":
-                action Function(_validate_age_input, age_text)
-                xalign 0.5
-                xminimum 300
-                yminimum 68
+            use mobile_primary_button(
+                "Continue",
+                Function(_validate_age_input, age_text),
+            )

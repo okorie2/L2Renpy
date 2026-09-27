@@ -95,19 +95,31 @@ style frame:
 ##
 ## https://www.renpy.org/doc/html/screen_special.html#say
 
-screen say(who, what):
+## On phones, an English line can be shown under the French one with:
+##     Sophie "Bonjour ! Je m'appelle Sophie." (show_translation="Hi! My name is Sophie.")
+screen say(who, what, translation=None):
 
-    window:
-        id "window"
+    if renpy.variant("small"):
+        use mobile_dialogue_card(
+            speaker=who,
+            primary_text=what,
+            secondary_text=translation,
+            show_speaker=who is not None,
+            show_next=True,
+        )
 
-        if who is not None:
+    else:
+        window:
+            id "window"
 
-            window:
-                id "namebox"
-                style "namebox"
-                text who id "who"
+            if who is not None:
 
-        text what id "what"
+                window:
+                    id "namebox"
+                    style "namebox"
+                    text who id "who"
+
+            text what id "what"
 
 
     ## If there's a side image, display it above the text. Do not display on the
@@ -174,16 +186,27 @@ style say_dialogue:
 screen input(prompt):
     style_prefix "input"
 
-    window:
+    if renpy.variant("small"):
+        use mobile_input_sheet(title=prompt):
+            vbox:
+                xfill True
+                spacing ui_card_gap
 
-        vbox:
-            xanchor gui.dialogue_text_xalign
-            xpos gui.dialogue_xpos
-            xsize gui.dialogue_width
-            ypos gui.dialogue_ypos
+                input:
+                    id "input"
+                    style "mobile_input"
 
-            text prompt style "input_prompt"
-            input id "input"
+    else:
+        window:
+
+            vbox:
+                xanchor gui.dialogue_text_xalign
+                xpos gui.dialogue_xpos
+                xsize gui.dialogue_width
+                ypos gui.dialogue_ypos
+
+                text prompt style "input_prompt"
+                input id "input"
 
 style input_prompt is default
 
@@ -240,7 +263,7 @@ screen quick_menu():
     ## Ensure this appears on top of other screens.
     zorder 100
 
-    if quick_menu:
+    if quick_menu and not renpy.variant("small"):
 
         hbox:
             style_prefix "quick"
@@ -1522,23 +1545,60 @@ style pref_vbox:
 screen quick_menu():
     variant "touch"
 
-    zorder 100
-
-    if quick_menu:
-
-        hbox:
-            style "quick_menu"
-            style_prefix "quick"
-
-            textbutton _("Back") action Rollback()
-            textbutton _("Skip") action Skip() alternate Skip(fast=True, confirm=True)
-            textbutton _("Auto") action Preference("auto-forward", "toggle")
-            textbutton _("Menu") action ShowMenu()
+    # The mobile learning UI owns the visible interaction surface. The base
+    # quick-menu actions remain available on desktop and through Ren'Py's
+    # underlying navigation mechanisms.
 
 
 style window:
     variant "small"
-    background "gui/phone/textbox.png"
+    xalign 0.0
+    yalign 0.0
+    xpos 0
+    ypos 0
+    xanchor 0.0
+    yanchor 0.0
+    xfill True
+    xsize None
+    ysize None
+    xmaximum dialogue_card_outer_width
+    left_padding dialogue_card_shadow_x + dialogue_card_padding_left
+    right_padding dialogue_card_shadow_x + dialogue_card_padding_right
+    top_padding dialogue_card_shadow_top + dialogue_card_padding_top
+    bottom_padding dialogue_card_shadow_bottom + dialogue_card_padding_bottom
+    background Frame(
+        "gui/mobile/dialogue_card.svg",
+        dialogue_card_borders,
+        tile=False,
+    )
+
+style say_dialogue:
+    variant "small"
+    xpos 0
+    ypos 0
+    xanchor 0.0
+    yanchor 0.0
+    xalign 0.0
+    yalign 0.0
+    xsize dialogue_card_text_width
+    xmaximum dialogue_card_text_width
+    color ui_navy
+    size dialogue_primary_size
+    bold True
+    line_spacing ui_px(4)
+    text_align 0.0
+
+style say_label:
+    variant "small"
+    xpos 0
+    ypos 0
+    xanchor 0.0
+    yanchor 0.0
+    xalign 0.0
+    yalign 0.5
+    color ui_navy
+    size dialogue_name_chip_text_size
+    bold True
 
 style radio_button:
     variant "small"

@@ -132,7 +132,7 @@ async def transcribe(
         ) from exc
 
 
-# Text to speech synthesis with a POST request to /speech/synthesize with JSON body:
+# Text to speech synthesis
 @app.post("/speech/synthesize")
 async def synthesize(request: SynthesizeRequest) -> Response:
     """Return generated speech audio for one text/language request.

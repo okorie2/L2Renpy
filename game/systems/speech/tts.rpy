@@ -66,7 +66,7 @@ init -10 python:
         if not request_text.strip():
             raise TTSError("There is no text to synthesize.")
 
-        url = speech_api_base_url.rstrip("/") + "/speech/synthesize"
+        url = _speech_api_base_url() + "/speech/synthesize"
         renpy.log("Speech API: POST {}".format(url))
 
         try:

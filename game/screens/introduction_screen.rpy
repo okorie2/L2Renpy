@@ -1,31 +1,14 @@
-# Minimal controls for introducing the player.
+# Sophie asks the player to introduce themselves; they choose to speak or type.
 
-screen introduction_controls():
-    frame:
-        xalign 0.5
-        yalign 0.86
-        xpadding 36
-        ypadding 18
-        background Solid("#14241dcc")
+screen introduction_controls(
+    question="Why don't you introduce yourself?",
+    voice="audio/chapter1/scene1/sophie/introduce_yourself.mp3",
+):
+    modal True
+    zorder 90
 
-        vbox:
-            xalign 0.5
-            spacing 14
-
-            text "Introduce yourself":
-                xalign 0.5
-                size 30
-
-            hbox:
-                xalign 0.5
-                spacing 18
-
-                textbutton "Speak":
-                    action [Hide("introduction_controls"), Jump("speak_introduction")]
-                    xminimum 180
-                    yminimum 64
-
-                textbutton "Type":
-                    action [Hide("introduction_controls"), Jump("type_introduction")]
-                    xminimum 180
-                    yminimum 64
+    use mobile_sheet(title=question, voice=voice):
+        use mobile_choice_list([
+            ("Speak", [Hide("introduction_controls"), Jump("speak_introduction")], "gui/mobile/icon_speak.svg"),
+            ("Type", [Hide("introduction_controls"), Jump("type_introduction")], "gui/mobile/icon_type.svg"),
+        ])
