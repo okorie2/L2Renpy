@@ -1,4 +1,31 @@
 # Reusable presentation components for the mobile learning UI.
+
+
+init python:
+    class MobileFieldValue(ScreenVariableInputValue):
+        """A screen-variable input whose keyboard Return key submits.
+
+        on_submit(text) is called with the current text; if it returns a
+        non-None value the screen closes and returns it (like a Continue
+        button), otherwise the field stays open (e.g. validation failed).
+        """
+
+        def __init__(self, variable, on_submit=None):
+            super(MobileFieldValue, self).__init__(variable, returnable=False)
+            self.on_submit = on_submit
+
+        def enter(self):
+            if self.on_submit is None:
+                return None
+            return self.on_submit(self.get_text())
+
+
+    def mobile_submit_text(text):
+        """Return stripped text, or None (stay open) when it is empty."""
+
+        text = (text or "").strip()
+        return text or None
+
 #
 # These screens render content supplied by their callers. They do not own story
 # state, speech state, API calls, or navigation decisions.
@@ -217,14 +244,24 @@ style mobile_choice_button_text is button_text:
     size choice_text_size
 
 
-style mobile_input is input:
-    xalign 0.5
-    xmaximum ui_px(360)
-    xpadding ui_px(22)
-    ypadding ui_px(14)
+# Full-width text field: a framed box containing an `input`.
+style mobile_text_field is default:
+    xfill True
+    ysize text_field_height
+    left_padding text_field_padding_x
+    right_padding text_field_padding_x
+    background Frame("gui/mobile/text_field.svg", text_field_borders, tile=False)
+
+
+style mobile_text_field_input is input:
+    xfill True
+    yalign 0.5
     color ui_navy
-    size ui_px(29)
-    background Frame("gui/mobile/secondary_button.svg", ui_control_borders, tile=False)
+    size text_field_text_size
+
+
+# Kept for older callers; new screens use mobile_text_field + _input.
+style mobile_input is mobile_text_field_input
 
 
 style mobile_mic_button is button:
@@ -503,6 +540,42 @@ screen mobile_pronunciation_card(
                     ysize dialogue_speaker_icon_size
 
 
+# A single text field in a Sophie sheet/card with Back and Continue. The
+# keyboard's Return key also submits. Returns the stripped text, or None when
+# the player taps Back. Continue is disabled until something is typed.
+screen mobile_text_input(question, voice=None, length=30):
+    default text_value = ""
+
+    modal True
+    zorder 90
+
+    use mobile_input_sheet(title=question, voice=voice):
+        vbox:
+            xfill True
+            spacing ui_card_gap_large
+
+            frame:
+                style "mobile_text_field"
+
+                input:
+                    style "mobile_text_field_input"
+                    value MobileFieldValue("text_value", on_submit=mobile_submit_text)
+                    length length
+
+            use mobile_button_row([
+                ("Back", Return(None), "secondary"),
+                (
+                    "Continue",
+                    If(
+                        text_value.strip(),
+                        Function(mobile_submit_text, text_value),
+                        None,
+                    ),
+                    "primary",
+                ),
+            ])
+
+
 # A row of equal-width, equal-height buttons that fills the card's width.
 # buttons: list of (label, action, kind) where kind is "primary" or "secondary".
 screen mobile_button_row(buttons):
@@ -629,16 +702,21 @@ screen mobile_bilingual_card(
             )
 
             if tts_session is not None:
-                if tts_session.status == TTS_PREPARING:
-                    text "Preparing Sophie's voice...":
-                        style "mobile_status_text"
-                elif tts_session.status == TTS_PLAYING:
-                    text "Sophie is speaking...":
-                        style "mobile_status_text"
-                elif tts_session.status == TTS_ERROR:
-                    text "Voice unavailable — the text is still available.":
-                        style "mobile_status_text"
-                        color ui_error
+                # Always keep exactly one status line so the card never changes
+                # height between states (it used to vanish for a tick between
+                # "preparing" and "playing", making the whole card jump twice).
+                # TTS_READY is the brief moment before playback starts.
+                $ tts_status = tts_session.status
+                $ tts_status_text = {
+                    TTS_PREPARING: "Preparing Sophie's voice...",
+                    TTS_READY: "Sophie is speaking...",
+                    TTS_PLAYING: "Sophie is speaking...",
+                    TTS_ERROR: "Voice unavailable — the text is still available.",
+                }.get(tts_status, "")
+
+                text (tts_status_text or " "):
+                    style "mobile_status_text"
+                    color (ui_error if tts_status == TTS_ERROR else ui_secondary_text)
 
             use mobile_primary_button(
                 "Continue",

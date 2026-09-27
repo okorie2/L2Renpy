@@ -172,6 +172,12 @@ define sheet_title_size = ui_px(40)
 # title can use the full content width.
 define sheet_title_width = layout_viewport[0] - (sheet_padding_x * 2)
 
+# Text fields (name, age...). text_field.svg is 104px tall with r=26.
+define text_field_height = ui_px(104)
+define text_field_borders = Borders(28, 28, 28, 28)
+define text_field_padding_x = ui_px(36)
+define text_field_text_size = ui_px(42)
+
 # Choice pills inside sheets.
 define choice_pill_height = ui_px(96)
 define choice_pill_borders = Borders(48, 48, 48, 48)

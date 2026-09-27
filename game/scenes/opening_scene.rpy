@@ -67,6 +67,9 @@ label opening_scene:
     Sophie "Hi! I'm Sophie."
     voice "audio/chapter1/scene1/sophie/nice_to_meet_you.mp3"
     Sophie "It's really nice to meet you."
+
+
+label ask_introduction:
     # Sophie's question is shown inside the sheet itself (inspo #2), so it is
     # queued here instead of on a separate dialogue line. Use `voice`, not
     # `play voice`: Ren'Py's voice system stops the voice channel when a new
@@ -77,7 +80,13 @@ label opening_scene:
 
 
 label type_introduction:
-    $ player_name = renpy.input("What's your name?").strip()
+    call screen mobile_text_input("What's your name?", length=30)
+
+    # Back returns None: go back to the Speak / Type choice.
+    if _return is None:
+        jump ask_introduction
+
+    $ player_name = _return
 
     jump introduction_name_complete
 

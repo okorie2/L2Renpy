@@ -51,11 +51,14 @@ screen onboarding_age_input(question="Enter your age", voice=None):
             xfill True
             spacing ui_card_gap
 
-            input:
-                style "mobile_input"
-                value ScreenVariableInputValue("age_text")
-                length 3
-                pixel_width ui_px(260)
+            frame:
+                style "mobile_text_field"
+
+                input:
+                    style "mobile_text_field_input"
+                    value MobileFieldValue("age_text", on_submit=_validate_age_input)
+                    length 3
+                    allow "0123456789"
 
             text "Numbers only (1–120).":
                 xalign 0.5

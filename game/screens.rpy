@@ -100,13 +100,20 @@ style frame:
 screen say(who, what, translation=None):
 
     if renpy.variant("small"):
-        use mobile_dialogue_card(
-            speaker=who,
-            primary_text=what,
-            secondary_text=translation,
-            show_speaker=who is not None,
-            show_next=True,
-        )
+        # With config.window "auto", Ren'Py redraws this screen with empty text
+        # during pauses/transitions between lines (the "empty window"). Skip
+        # the card then, so no blank card flashes before a sheet or pause.
+        if what:
+            use mobile_dialogue_card(
+                speaker=who,
+                primary_text=what,
+                secondary_text=translation,
+                show_speaker=who is not None,
+                show_next=True,
+            )
+        else:
+            # Ren'Py still requires a Text with id "what"; empty, it draws nothing.
+            text what id "what"
 
     else:
         window:
@@ -192,9 +199,12 @@ screen input(prompt):
                 xfill True
                 spacing ui_card_gap
 
-                input:
-                    id "input"
-                    style "mobile_input"
+                frame:
+                    style "mobile_text_field"
+
+                    input:
+                        id "input"
+                        style "mobile_text_field_input"
 
     else:
         window:
