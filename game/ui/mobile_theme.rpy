@@ -79,12 +79,24 @@ define ui_text_width = min(
 )
 define ui_choice_height = ui_px(88)
 define ui_primary_height = ui_px(92)
-define ui_button_text_size = ui_px(30)
+define ui_button_text_size = ui_px(32)
 # Pill buttons: button_*.svg are 92px tall with r=46 (SVG pixels).
 define ui_button_borders = Borders(46, 46, 46, 46)
 define ui_touch_minimum = ui_px(76)
 define ui_button_min_width = ui_px(240)
 define ui_mic_size = ui_px(190)
+
+# Card text sizes (question, French, English/translation, hints & feedback).
+define ui_text_title_size = ui_px(42)
+define ui_text_french_size = ui_px(40)
+define ui_text_english_size = ui_px(35)
+define ui_text_body_size = ui_px(33)
+define ui_text_status_size = ui_px(31)
+define ui_text_label_size = ui_px(26)
+
+# Speech card: minimum height of the mic / feedback area, so the card keeps a
+# steady size across listening, recording and result states.
+define speech_action_min_height = ui_px(280)
 
 
 # Standard mobile dialogue card tokens. These are intentionally separate from
@@ -99,7 +111,7 @@ define ui_mic_size = ui_px(190)
 define dialogue_card_shadow_x = 18
 define dialogue_card_shadow_top = 10
 define dialogue_card_shadow_bottom = 28
-define dialogue_card_corner_radius = 40
+define dialogue_card_corner_radius = 60
 define dialogue_card_borders = Borders(
     dialogue_card_shadow_x + dialogue_card_corner_radius,
     dialogue_card_shadow_top + dialogue_card_corner_radius,
@@ -120,7 +132,7 @@ define dialogue_card_bottom_margin = ui_px(150)
 define dialogue_name_chip_height = ui_px(56)
 define dialogue_name_chip_padding_x = ui_px(28)
 define dialogue_name_chip_overlap_y = ui_px(28)
-define dialogue_name_chip_left_inset = ui_px(34)
+define dialogue_name_chip_left_inset = ui_px(46)
 define dialogue_name_chip_text_size = ui_px(28)
 
 # Round controls: speaker straddles the top-right edge, next straddles the
@@ -133,8 +145,8 @@ define dialogue_next_icon_size = ui_px(40)
 define dialogue_next_right_inset = ui_px(26)
 
 # Text: French (primary) bold navy, English (secondary) regular grey.
-define dialogue_primary_size = ui_px(40)
-define dialogue_secondary_size = ui_px(33)
+define dialogue_primary_size = ui_px(42)
+define dialogue_secondary_size = ui_px(37)
 define dialogue_line_gap = ui_px(16)
 # Longest text area before the card scrolls, as a share of screen height, so a
 # long line can never push the card up over Sophie's face on any viewport.
@@ -146,13 +158,23 @@ define dialogue_card_text_width = (
 )
 
 
+# Dialogue auto-advance. Lines move on by themselves: after Sophie's voice
+# finishes (or straight away if the line has no voice), wait the longer of
+# the base delay and a reading time based on the line's length. Tapping still
+# advances immediately. A single line can opt out with:
+#     Sophie "..." (show_auto_advance=False)
+define dialogue_auto_advance = True
+define dialogue_auto_advance_delay = 1.2
+define dialogue_auto_advance_per_char = 0.045
+
+
 # Bottom sheet tokens (inspo #2). The sheet spans the full screen width and is
 # anchored to the bottom edge; only its top corners are rounded.
 #
 # bottom_sheet.svg geometry (SVG pixels, not ui_px - see dialogue card notes):
-# a soft upward shadow in the top margin, then a white sheet with r=56 corners.
+# a soft upward shadow in the top margin, then a white sheet with r=76 corners.
 define sheet_shadow_top = 24
-define sheet_corner_radius = 56
+define sheet_corner_radius = 76
 define sheet_borders = Borders(
     sheet_corner_radius,
     sheet_shadow_top + sheet_corner_radius,
@@ -167,16 +189,27 @@ define sheet_content_gap = ui_px(30)
 define sheet_handle_width = ui_px(80)
 define sheet_handle_height = ui_px(10)
 define sheet_handle_top = ui_px(20)
-define sheet_title_size = ui_px(40)
+define sheet_title_size = ui_px(42)
 # The replay button sits on the sheet's top edge, above the title, so the
 # title can use the full content width.
 define sheet_title_width = layout_viewport[0] - (sheet_padding_x * 2)
 
-# Text fields (name, age...). text_field.svg is 104px tall with r=26.
+# Text fields (name, age...). text_field.svg is 104px tall with r=36.
 define text_field_height = ui_px(104)
-define text_field_borders = Borders(28, 28, 28, 28)
+define text_field_borders = Borders(38, 38, 38, 38)
 define text_field_padding_x = ui_px(36)
 define text_field_text_size = ui_px(42)
+
+# Bilingual card (inspo #3): a flag beside each language.
+define bilingual_flag_width = ui_px(48)
+define bilingual_flag_height = ui_px(32)
+define bilingual_flag_gap = ui_px(24)
+define bilingual_text_width = (
+    dialogue_card_width
+    - (dialogue_card_padding_left * 2)
+    - bilingual_flag_width
+    - bilingual_flag_gap
+)
 
 # Choice pills inside sheets.
 define choice_pill_height = ui_px(96)
@@ -185,7 +218,7 @@ define choice_pill_padding_x = ui_px(36)
 define choice_pill_gap = ui_px(18)
 define choice_icon_size = ui_px(40)
 define choice_icon_gap = ui_px(24)
-define choice_text_size = ui_px(31)
+define choice_text_size = ui_px(34)
 
 
 # Compatibility names for the first mobile UI pass. New screens should use the

@@ -20,6 +20,25 @@ init python:
             return self.on_submit(self.get_text())
 
 
+    def mobile_auto_advance_check_voice(what):
+        """Timer callback for the say screen: note when the voice has ended.
+
+        State is keyed by the line's text so it can never carry over from
+        the previous line, whether or not Ren'Py reuses the screen.
+        """
+
+        if not renpy.music.is_playing(channel="voice"):
+            renpy.set_screen_variable("auto_voice_done_for", what)
+            renpy.restart_interaction()
+
+
+    def mobile_auto_advance_wait(what):
+        return max(
+            dialogue_auto_advance_delay,
+            len(what or "") * dialogue_auto_advance_per_char,
+        )
+
+
     def mobile_submit_text(text):
         """Return stripped text, or None (stay open) when it is empty."""
 
@@ -133,21 +152,21 @@ style mobile_name_chip_text is default:
 style mobile_question_text is default:
     xmaximum ui_text_width
     color ui_navy
-    size ui_px(38)
+    size ui_text_title_size
     bold True
     text_align 0.0
 
 
 style mobile_section_label is default:
     color ui_primary_blue
-    size ui_px(23)
+    size ui_text_label_size
     bold True
 
 
 style mobile_french_text is default:
     xmaximum ui_text_width
     color ui_navy
-    size ui_px(34)
+    size ui_text_french_size
     bold True
     text_align 0.0
 
@@ -155,14 +174,29 @@ style mobile_french_text is default:
 style mobile_english_text is default:
     xmaximum ui_text_width
     color ui_secondary_text
-    size ui_px(27)
+    size ui_text_english_size
     text_align 0.0
+
+
+style mobile_bilingual_french is default:
+    xmaximum bilingual_text_width
+    color ui_navy
+    size ui_text_title_size
+    bold True
+    line_spacing ui_px(6)
+    text_align 0.0
+
+
+style mobile_bilingual_english is mobile_bilingual_french:
+    color ui_secondary_text
+    size ui_text_english_size
+    bold False
 
 
 style mobile_body_text is default:
     xmaximum ui_text_width
     color ui_navy
-    size ui_px(28)
+    size ui_text_body_size
     text_align 0.0
 
 
@@ -174,7 +208,7 @@ style mobile_say_dialogue is mobile_body_text:
 style mobile_status_text is default:
     xmaximum ui_text_width
     color ui_secondary_text
-    size ui_px(23)
+    size ui_text_status_size
     text_align 0.0
 
 
@@ -673,56 +707,59 @@ screen mobile_speaker_header(label="Sophie", show_speaker=False):
                 ysize ui_px(42)
 
 
+# Bilingual card (inspo #3): same white card as the dialogue, with a flag
+# beside each language - French (bold, primary) then English (grey). The
+# replay button reads the French again once Sophie has finished.
 screen mobile_bilingual_card(
     french_text,
     english_text,
     tts_session=None,
     placement=UI_LAYOUT_BOTTOM,
 ):
-    use mobile_card(placement=placement):
+    $ replay_action = (
+        Function(tts_session.replay)
+        if tts_session is not None and tts_session.status == TTS_FINISHED
+        else None
+    )
+
+    use mobile_pronunciation_card(
+        placement=placement,
+        show_speaker=tts_session is not None,
+        speaker_action=replay_action,
+    ):
         vbox:
             xfill True
-            spacing ui_card_gap
+            spacing ui_card_gap_large
 
-            use mobile_speaker_header(
-                label="Sophie",
-                show_speaker=tts_session is not None,
-            )
+            use mobile_flag_line("gui/mobile/flag_fr.svg", french_text, "mobile_bilingual_french")
+            use mobile_flag_line("gui/mobile/flag_gb.svg", english_text, "mobile_bilingual_english")
 
-            use mobile_language_block(
-                "FRANÇAIS",
-                french_text,
-                primary=True,
-            )
+            # No Continue when dialogue auto-advances: the screen moves on by
+            # itself once Sophie has read the French (see bilingual_introduction).
+            if not dialogue_auto_advance:
+                use mobile_primary_button(
+                    "Continue",
+                    Return(),
+                    sensitive=tts_session is None or tts_session.can_continue(),
+                )
 
-            use mobile_language_block(
-                "ENGLISH",
-                english_text,
-                primary=False,
-            )
 
-            if tts_session is not None:
-                # Always keep exactly one status line so the card never changes
-                # height between states (it used to vanish for a tick between
-                # "preparing" and "playing", making the whole card jump twice).
-                # TTS_READY is the brief moment before playback starts.
-                $ tts_status = tts_session.status
-                $ tts_status_text = {
-                    TTS_PREPARING: "Preparing Sophie's voice...",
-                    TTS_READY: "Sophie is speaking...",
-                    TTS_PLAYING: "Sophie is speaking...",
-                    TTS_ERROR: "Voice unavailable — the text is still available.",
-                }.get(tts_status, "")
+# A flag beside a (possibly multi-line) text, aligned to its first line.
+screen mobile_flag_line(flag, content, text_style):
+    hbox:
+        spacing bilingual_flag_gap
 
-                text (tts_status_text or " "):
-                    style "mobile_status_text"
-                    color (ui_error if tts_status == TTS_ERROR else ui_secondary_text)
+        add flag:
+            xsize bilingual_flag_width
+            ysize bilingual_flag_height
+            yoffset ui_px(8)
 
-            use mobile_primary_button(
-                "Continue",
-                Return(),
-                sensitive=tts_session is None or tts_session.can_continue(),
-            )
+        text content:
+            style text_style
+
+
+transform mobile_mic_state(enabled=True):
+    alpha (1.0 if enabled else 0.4)
 
 
 screen mobile_microphone_button(action, recording=False, sensitive=True):
@@ -730,6 +767,8 @@ screen mobile_microphone_button(action, recording=False, sensitive=True):
         style "mobile_mic_button"
         action action
         sensitive sensitive
+        # Dimmed while unavailable (e.g. while Sophie is speaking).
+        at mobile_mic_state(sensitive)
 
         if recording:
             add "gui/mobile/mic_circle_recording.svg":

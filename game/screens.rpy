@@ -97,20 +97,47 @@ style frame:
 
 ## On phones, an English line can be shown under the French one with:
 ##     Sophie "Bonjour ! Je m'appelle Sophie." (show_translation="Hi! My name is Sophie.")
-screen say(who, what, translation=None):
+screen say(who, what, translation=None, auto_advance=None):
+    # Auto-advance state, keyed by the line's text (see mobile_components).
+    default auto_armed_for = None
+    default auto_voice_done_for = None
 
     if renpy.variant("small"):
         # With config.window "auto", Ren'Py redraws this screen with empty text
         # during pauses/transitions between lines (the "empty window"). Skip
         # the card then, so no blank card flashes before a sheet or pause.
         if what:
+            $ auto_on = (dialogue_auto_advance if auto_advance is None else auto_advance)
+
+            # No next arrow on auto-advancing lines: they move on by themselves
+            # and taps don't skip them. The arrow only appears on a line that
+            # opts out of auto-advance, as the way to continue.
             use mobile_dialogue_card(
                 speaker=who,
                 primary_text=what,
                 secondary_text=translation,
                 show_speaker=who is not None,
-                show_next=True,
+                show_next=not auto_on,
+                # Replaying restarts the auto-advance wait so the line doesn't
+                # move on mid-replay.
+                speaker_action=[
+                    VoiceReplay(),
+                    SetScreenVariable("auto_armed_for", None),
+                    SetScreenVariable("auto_voice_done_for", None),
+                ],
             )
+
+            if auto_on:
+                # Give the voice a moment to start before polling it.
+                if auto_armed_for != what:
+                    timer 0.4 action SetScreenVariable("auto_armed_for", what)
+                elif auto_voice_done_for != what:
+                    timer 0.1 repeat True action Function(
+                        mobile_auto_advance_check_voice,
+                        what,
+                    )
+                else:
+                    timer mobile_auto_advance_wait(what) action Return(True)
         else:
             # Ren'Py still requires a Text with id "what"; empty, it draws nothing.
             text what id "what"

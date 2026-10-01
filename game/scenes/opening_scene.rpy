@@ -27,6 +27,12 @@ define sophie_walk_start_yalign = 0.62
 define sophie_walk_start_zoom = sophie_park_zoom * 0.40
 
 
+# A calm beat between onboarding questions: the answered panel fades out, a
+# short pause, then the next question fades in as Sophie starts speaking.
+define onboarding_step_transition = Dissolve(0.25)
+define onboarding_step_pause = 0.15
+
+
 transform sophie_park_position:
     # Preserve the sprite's aspect ratio while keeping Sophie centre-left.
     xalign sophie_park_xalign
@@ -43,24 +49,23 @@ transform sophie_walk_to_park_position:
     linear 1.80 xalign sophie_park_xalign yalign sophie_ground_yalign zoom sophie_park_zoom
 
 
+# Timed pauses below use renpy.pause(..., hard=True) so a tap can't cut them
+# short (e.g. skipping Sophie's walk-in).
 label opening_scene:
     scene bg park_day
     with dissolve
     play music "audio/chapter1/music/audio_1.mp3" loop fadein 2.0 volume 0.20
 
     # Let the park establish itself before Sophie enters.
-    pause 0.25
-
+    $ renpy.pause(0.25, hard=True)
     # The animated walk cycle loops while this transform makes Sophie approach
     # the camera by growing and moving downward along the path.
     show sophie walk at sophie_walk_to_park_position
-    pause 1.80
-
+    $ renpy.pause(1.80, hard=True)
     # All three states use the same canvas, anchors, and scale. Replacing the
     # tagged sprite directly avoids a dissolve or a position jump.
     show sophie wave at sophie_park_position
-    pause 0.90
-
+    $ renpy.pause(0.90, hard=True)
     show sophie casual at sophie_park_position
 
     voice "audio/chapter1/scene1/sophie/hi_im_sophie.mp3"
@@ -115,7 +120,7 @@ label introduction_name_complete:
         if player_name == "Ella":
             voice "audio/chapter1/scene1/sophie/nice_to_meet_you_ella.mp3"
         Sophie "Nice to meet you, [player_name]!"
-        pause 0.75
+        $ renpy.pause(0.75, hard=True)
         show sophie casual at sophie_park_position
 
     jump after_introduction
@@ -123,6 +128,7 @@ label introduction_name_complete:
 
 label after_introduction:
     voice "audio/chapter1/scene1/sophie/french_level_question.mp3"
+    $ renpy.transition(onboarding_step_transition)
     call screen onboarding_choice(
         "First, how much French do you already know?",
         [
@@ -137,7 +143,12 @@ label after_introduction:
 
 
 label ask_learning_goal:
+    # Beat after the previous answer. Keep this before `voice`: the voice line
+    # must be queued directly before `call screen` or Ren'Py cuts it off.
+    with onboarding_step_transition
+    $ renpy.pause(onboarding_step_pause, hard=True)
     voice "audio/chapter1/scene1/sophie/why_learn_french.mp3"
+    $ renpy.transition(onboarding_step_transition)
     call screen onboarding_choice(
         "And why do you want to learn French?",
         [
@@ -157,7 +168,12 @@ label ask_learning_goal:
 
 
 label ask_age:
+    # Beat after the previous answer. Keep this before `voice`: the voice line
+    # must be queued directly before `call screen` or Ren'Py cuts it off.
+    with onboarding_step_transition
+    $ renpy.pause(onboarding_step_pause, hard=True)
     voice "audio/chapter1/scene1/sophie/age_question.mp3"
+    $ renpy.transition(onboarding_step_transition)
     call screen onboarding_age_input(
         "One last thing — how old are you?",
         voice="audio/chapter1/scene1/sophie/age_question.mp3",
