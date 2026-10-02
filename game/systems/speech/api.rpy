@@ -5,7 +5,7 @@ define speech_api_desktop_base_url = "http://127.0.0.1:8000"
 
 # Leave empty by default. A physical iPhone can receive the Mac LAN URL at
 # runtime through SPEECH_API_BASE_URL in the Xcode Run scheme.
-define speech_api_ios_base_url = ""
+define speech_api_ios_base_url = "http://192.168.178.136:8000"
 
 # For a production build, set speech_api_environment to "production" and set
 # this to the HTTPS backend URL.

@@ -9,4 +9,6 @@ backend/.env
 backend/app/__pycache__/
 backend/app/speech/__pycache__/
 app_debug.log
-
+backend/tts_service/.venv/
+__pycache__/
+backend/.tts_cache/

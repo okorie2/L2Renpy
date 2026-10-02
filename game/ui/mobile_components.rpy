@@ -15,9 +15,15 @@ init python:
             self.on_submit = on_submit
 
         def enter(self):
-            if self.on_submit is None:
-                return None
-            return self.on_submit(self.get_text())
+            result = None
+            if self.on_submit is not None:
+                result = self.on_submit(self.get_text())
+
+            if result is None:
+                # Keep the Return key here: otherwise Ren'Py passes it on to
+                # other handlers, which can end the screen with a stray value.
+                raise renpy.IgnoreEvent()
+            return result
 
 
     def mobile_auto_advance_check_voice(what):

@@ -1,6 +1,8 @@
 """FastAPI application for local speech processing."""
 
 import logging
+import threading
+from contextlib import asynccontextmanager
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -15,12 +17,28 @@ from .speech.transcribe import (
     STTProviderError,
     STTTranscriptionError,
     normalize_language,
+    preload_stt_model,
     transcribe_audio,
 )
 from .speech.tts import TTSConfigurationError, TTSSynthesisError, synthesize_speech
+from .text.names import extract_person_name
 
 logger = logging.getLogger(__name__)
-app = FastAPI(title="Language App Speech Backend")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Load the local speech-to-text model in the background at startup, so
+    # the first recording isn't slowed down by loading it.
+    threading.Thread(target=preload_stt_model, daemon=True).start()
+    yield
+
+
+app = FastAPI(title="Language App Speech Backend", lifespan=lifespan)
+
+
+class ExtractNameRequest(BaseModel):
+    """An answer to "What's your name?", typed or transcribed."""
+
+    text: str
 
 
 class SynthesizeRequest(BaseModel):
@@ -192,3 +210,21 @@ async def synthesize(request: SynthesizeRequest) -> Response:
             )
         },
     )
+
+
+# Fallback for the app's own name rules: find a person's name in free text.
+@app.post("/text/extract-name")
+def extract_name(request: ExtractNameRequest) -> dict[str, str | None]:
+    """Return {"name": "<name>"} or {"name": null} when none is found."""
+
+    if not request.text.strip():
+        raise HTTPException(status_code=400, detail="text is required.")
+
+    try:
+        return {"name": extract_person_name(request.text)}
+    except Exception as exc:
+        logger.exception("Name extraction failed")
+        raise HTTPException(
+            status_code=500,
+            detail="Name extraction failed.",
+        ) from exc

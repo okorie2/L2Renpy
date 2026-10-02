@@ -32,6 +32,15 @@ define sophie_walk_start_zoom = sophie_park_zoom * 0.40
 define onboarding_step_transition = Dissolve(0.25)
 define onboarding_step_pause = 0.15
 
+# Sophie's recorded "What's your name?" question (generated once with the
+# backend TTS). If the file is missing the question is shown without voice.
+define whats_your_name_voice = "audio/chapter1/scene1/sophie/whats_your_name.wav"
+
+# Longest wait for a generated (text-to-speech) line before showing it
+# without voice, and for the backend name model.
+define generated_voice_timeout = 8.0
+define name_lookup_timeout = 8.0
+
 
 transform sophie_park_position:
     # Preserve the sprite's aspect ratio while keeping Sophie centre-left.
@@ -80,8 +89,11 @@ label ask_introduction:
     # `play voice`: Ren'Py's voice system stops the voice channel when a new
     # interaction (the `call screen`) starts unless the line was queued with
     # `voice`, which would cut the audio off after the first word.
-    voice "audio/chapter1/scene1/sophie/introduce_yourself.mp3"
-    call screen introduction_controls
+    if renpy.loadable(whats_your_name_voice):
+        $ voice(whats_your_name_voice)
+        call screen introduction_controls(voice=whats_your_name_voice)
+    else:
+        call screen introduction_controls
 
 
 label type_introduction:
@@ -91,9 +103,13 @@ label type_introduction:
     if _return is None:
         jump ask_introduction
 
-    $ player_name = _return
+    # Anything that isn't text (shouldn't happen) means: ask again.
+    if not isinstance(_return, str):
+        jump type_introduction
 
-    jump introduction_name_complete
+    $ player_name_answer = _return
+
+    jump resolve_player_name
 
 
 label speak_introduction:
@@ -105,11 +121,25 @@ label speak_introduction:
     )
     $ speech_result = _return
 
-    if speech_result and speech_result.get("status") == "confirmed":
-        $ player_name = speech_result.get("transcript", "")
-
     if not speech_result or speech_result.get("status") != "confirmed":
         jump type_introduction
+
+    $ player_name_answer = speech_result.get("transcript", "")
+    jump resolve_player_name
+
+
+label resolve_player_name:
+    # Pull the name out of answers like "my name is Ella" (rules first, then
+    # the backend name model only if the rules aren't sure).
+    if not isinstance(player_name_answer, str) or not player_name_answer.strip():
+        jump type_introduction
+
+    $ name_lookup = PlayerNameLookup(player_name_answer)
+    $ name_lookup_waited = 0.0
+    while name_lookup.pending and name_lookup_waited < name_lookup_timeout:
+        $ renpy.pause(0.1, hard=True)
+        $ name_lookup_waited += 0.1
+    $ player_name = name_lookup.name
 
     jump introduction_name_complete
 
@@ -117,9 +147,11 @@ label speak_introduction:
 label introduction_name_complete:
     if player_name:
         show sophie wave at sophie_park_position
-        if player_name == "Ella":
-            voice "audio/chapter1/scene1/sophie/nice_to_meet_you_ella.mp3"
+        # Sophie says the player's name with the backend text-to-speech.
+        call queue_generated_voice("Nice to meet you, {}!".format(player_name))
+        $ name_line_voice = _return
         Sophie "Nice to meet you, [player_name]!"
+        $ name_line_voice.dispose()
         $ renpy.pause(0.75, hard=True)
         show sophie casual at sophie_park_position
 
@@ -357,3 +389,22 @@ label pronunciation_practice_loop:
     $ practice_mode = practice_state.practice_mode
     $ practice_index += 1
     jump pronunciation_practice_loop
+
+
+# Generate a Sophie line with text-to-speech and queue it as the voice of the
+# next dialogue line. Waits (a hard pause, so the scene holds still) until the
+# audio is ready or `timeout` passes; if it isn't ready the line is shown
+# without voice. Returns the TTS session: dispose() it after the line.
+label queue_generated_voice(text, language="en", timeout=generated_voice_timeout):
+    $ generated_voice = FrenchTTSSession(text, language=language)
+    $ generated_voice.start()
+    $ generated_voice_waited = 0.0
+    while generated_voice.status == TTS_PREPARING and generated_voice_waited < timeout:
+        $ renpy.pause(0.1, hard=True)
+        $ generated_voice_waited += 0.1
+
+    if generated_voice.status == TTS_READY and generated_voice.audio_path:
+        $ _register_tts_directory(generated_voice.audio_path)
+        $ voice(os.path.basename(generated_voice.audio_path))
+
+    return generated_voice

@@ -15,7 +15,11 @@ from app.speech.transcribe import (
 )
 
 
-ENVIRONMENT = {"ELEVENLABS_API_KEY": "test-api-key"}
+ENVIRONMENT = {
+    "ELEVENLABS_API_KEY": "test-api-key",
+    # Pin the provider: backend/.env may select faster-whisper.
+    "LANGUAGE_APP_STT_PROVIDER": "elevenlabs",
+}
 
 
 class ElevenLabsSTTTests(unittest.TestCase):
