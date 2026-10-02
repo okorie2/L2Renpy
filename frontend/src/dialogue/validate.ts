@@ -42,6 +42,8 @@ export function validateDialogue(dialogue: Dialogue, references: DialogueReferen
     const expression = node.presentation?.expression;
     if (expression && !CHARACTER_EXPRESSIONS.includes(expression)) problems.push(`${at(key)}: unknown expression "${expression}"`);
 
+    if (node.language === "interface" && node.translation) problems.push(`${at(key)}: a line in the learner's language has no translation`);
+
     const response = node.response;
     if (!response) continue;
     if (response.kind === "choice") {
@@ -52,6 +54,14 @@ export function validateDialogue(dialogue: Dialogue, references: DialogueReferen
     }
     if ((response.kind === "say" || response.kind === "act") && response.repairNodeId && !hasNode(response.repairNodeId)) {
       problems.push(`${at(key)}: repair node "${response.repairNodeId}" is missing`);
+    }
+    if (response.kind === "practice") {
+      if (!response.lines.length) problems.push(`${at(key)}: practice needs at least one line`);
+      for (const line of response.lines) {
+        for (const slot of [...templateSlots(line.text), ...templateSlots(line.translation ?? "")]) {
+          if (!slotNames.includes(slot)) problems.push(`${at(key)}: undefined slot "{${slot}}" in practice`);
+        }
+      }
     }
     if (response.kind === "act" && response.options.filter((option) => option.correct).length !== 1) {
       problems.push(`${at(key)}: an action needs exactly one correct option`);

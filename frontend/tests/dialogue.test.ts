@@ -83,8 +83,8 @@ test("personal values stay in the profile; canonical French stays in the pack", 
 
   const values = buildSlotValues(french.slots, { displayName: "Samuel", motivation: "travel" });
   const example = resolveDialogueLine(french.dialogues.meetSophie.nodes.example, values);
-  assert.equal(example.target.text, "Je m'appelle Samuel. J'apprends le français pour voyager.");
-  assert.equal(example.translation?.text, "My name is Samuel. I'm learning French to travel.");
+  assert.equal(example.target.text, "Je m'appelle Samuel.\nJe voudrais apprendre à parler français pour voyager.\nMon niveau actuel en français est débutant.");
+  assert.equal(example.translation?.text, "My name is Samuel.\nI would like to learn French for travel.\nMy current French level is beginner.");
   const turn = resolveDialogueLine(french.dialogues.meetSophie.nodes.yourTurn, values);
   assert.equal(turn.target.text, "Je m'appelle Samuel.");
   assert.deepEqual(turn.target.spans.filter((span) => !span.scored).map((span) => span.slot), ["playerName"]);

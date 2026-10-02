@@ -238,31 +238,64 @@ export const french: LanguagePack = {
         people: { target: "pour parler avec mes proches", translation: "to talk with the people close to me" },
         curiosity: { target: "pour le plaisir", translation: "for fun" }
       }
+    },
+    // Sophie's model introduction, as in the Ren'Py prototype.
+    motivationSentence: {
+      source: "profile-lookup",
+      field: "motivation",
+      fallbackOption: "curiosity",
+      options: {
+        study: { target: "Je voudrais apprendre à parler français pour mes études.", translation: "I would like to learn French for my studies." },
+        work: { target: "Je voudrais apprendre à parler français pour ma carrière.", translation: "I would like to learn French for my career." },
+        travel: { target: "Je voudrais apprendre à parler français pour voyager.", translation: "I would like to learn French for travel." },
+        people: { target: "Je voudrais apprendre à parler français pour communiquer avec une personne qui compte pour moi.", translation: "I would like to learn French to communicate with someone important to me." },
+        curiosity: { target: "Je voudrais apprendre à parler français pour communiquer au quotidien.", translation: "I would like to learn French for everyday communication." }
+      }
+    },
+    levelSentence: {
+      source: "profile-lookup",
+      field: "targetLanguageExperience",
+      fallbackOption: "new",
+      options: {
+        new: { target: "Mon niveau actuel en français est débutant.", translation: "My current French level is beginner." },
+        some: { target: "Mon niveau actuel en français est intermédiaire.", translation: "My current French level is intermediate." },
+        conversational: { target: "Mon niveau actuel en français est avancé.", translation: "My current French level is advanced." }
+      }
     }
   },
   dialogues: {
     meetSophie: {
       id: "meetSophie",
       startNodeId: "hello",
+      // Sophie welcomes the player in English, with her recorded voice, as in the
+      // Ren'Py prototype; she switches to French to teach the introduction.
       nodes: {
         hello: {
           id: "hello",
           speakerId: "sophie",
-          targetText: "Salut ! Je m'appelle Sophie.",
-          translation: "Hi! My name is Sophie.",
-          nextNodeId: "askName",
-          conceptIds: [CONCEPT_IDS.GREETING, CONCEPT_IDS.INTRODUCE_SELF],
+          language: "interface",
+          targetText: "Hi! I'm Sophie.",
+          nextNodeId: "niceToMeetYou",
+          conceptIds: [],
           presentation: { expression: "neutral" }
+        },
+        niceToMeetYou: {
+          id: "niceToMeetYou",
+          speakerId: "sophie",
+          language: "interface",
+          targetText: "It's really nice to meet you.",
+          nextNodeId: "askName",
+          conceptIds: [],
+          presentation: { expression: "encouraging" }
         },
         askName: {
           id: "askName",
           speakerId: "sophie",
-          targetText: "Et toi, comment tu t'appelles ?",
-          translation: "And you, what's your name?",
-          nextNodeId: "niceToMeet",
-          conceptIds: [CONCEPT_IDS.INTRODUCE_SELF, CONCEPT_IDS.BASIC_QUESTION],
+          language: "interface",
+          targetText: "What's your name?",
+          nextNodeId: "greetName",
+          conceptIds: [],
           presentation: { expression: "question" },
-          hint: "Je m'appelle ____.",
           response: {
             kind: "text",
             saveTo: "displayName",
@@ -270,77 +303,67 @@ export const french: LanguagePack = {
             note: "A nickname is fine. It stays on this device."
           }
         },
-        niceToMeet: {
-          id: "niceToMeet",
+        greetName: {
+          id: "greetName",
           speakerId: "sophie",
-          targetText: "Enchantée, {playerName} !",
-          translation: "Nice to meet you, {playerName}!",
+          language: "interface",
+          targetText: "Nice to meet you, {playerName}!",
           nextNodeId: "askExperience",
-          conceptIds: [CONCEPT_IDS.GREETING],
+          conceptIds: [],
           presentation: { expression: "happy" }
         },
         askExperience: {
           id: "askExperience",
           speakerId: "sophie",
-          targetText: "Tu parles déjà un peu français ?",
-          translation: "Do you already speak a little French?",
-          nextNodeId: "paceTogether",
-          branches: [{ when: [{ type: "PROFILE_EQUALS", field: "targetLanguageExperience", value: "new" }], nextNodeId: "paceGentle" }],
-          conceptIds: [CONCEPT_IDS.BASIC_QUESTION, CONCEPT_IDS.YES_NO],
+          language: "interface",
+          targetText: "First, how much French do you already know?",
+          nextNodeId: "askMotivation",
+          conceptIds: [],
           presentation: { expression: "question" },
           response: {
             kind: "choice",
             saveTo: "targetLanguageExperience",
             options: [
-              { value: "new", label: "Not yet, I'm starting from zero", icon: "level-1" },
-              { value: "some", label: "A few words and phrases", icon: "level-2" },
-              { value: "conversational", label: "I can manage a simple conversation", icon: "level-3" }
+              { value: "new", label: "Beginner", icon: "level-1" },
+              { value: "some", label: "Intermediate", icon: "level-2" },
+              { value: "conversational", label: "Expert", icon: "level-3" }
             ]
           }
-        },
-        paceGentle: {
-          id: "paceGentle",
-          speakerId: "sophie",
-          targetText: "Pas de problème. On y va doucement.",
-          translation: "No problem. We'll take it slowly.",
-          nextNodeId: "askMotivation",
-          conceptIds: [],
-          presentation: { expression: "encouraging" }
-        },
-        paceTogether: {
-          id: "paceTogether",
-          speakerId: "sophie",
-          targetText: "Super ! On va pratiquer ensemble.",
-          translation: "Great! We'll practise together.",
-          nextNodeId: "askMotivation",
-          conceptIds: [],
-          presentation: { expression: "happy" }
         },
         askMotivation: {
           id: "askMotivation",
           speakerId: "sophie",
-          targetText: "Et pourquoi tu apprends le français ?",
-          translation: "And why are you learning French?",
-          nextNodeId: "model",
-          conceptIds: [CONCEPT_IDS.BASIC_QUESTION],
+          language: "interface",
+          targetText: "And why do you want to learn French?",
+          nextNodeId: "great",
+          conceptIds: [],
           presentation: { expression: "question" },
           response: {
             kind: "choice",
             saveTo: "motivation",
             options: [
-              { value: "travel", label: "To travel", icon: "travel" },
-              { value: "work", label: "For work", icon: "work" },
-              { value: "study", label: "For my studies", icon: "study" },
-              { value: "people", label: "For family, friends or a partner", icon: "people" },
-              { value: "curiosity", label: "For the pleasure of it", icon: "curiosity" }
+              { value: "study", label: "Education", icon: "study" },
+              { value: "work", label: "Career", icon: "work" },
+              { value: "travel", label: "Tourism", icon: "travel" },
+              { value: "people", label: "Relationship", icon: "people" },
+              { value: "curiosity", label: "General purpose", icon: "curiosity" }
             ]
           }
+        },
+        great: {
+          id: "great",
+          speakerId: "sophie",
+          language: "interface",
+          targetText: "Great.",
+          nextNodeId: "model",
+          conceptIds: [],
+          presentation: { expression: "encouraging" }
         },
         model: {
           id: "model",
           speakerId: "sophie",
-          targetText: "Voilà comment te présenter en français.",
-          translation: "Here's how to introduce yourself in French.",
+          language: "interface",
+          targetText: "With the details you've given me, this is how you could introduce yourself in French.",
           nextNodeId: "example",
           conceptIds: [],
           presentation: { expression: "explaining" }
@@ -348,18 +371,63 @@ export const french: LanguagePack = {
         example: {
           id: "example",
           speakerId: "sophie",
-          targetText: "Je m'appelle {playerName}. J'apprends le français {motivationPhrase}.",
-          translation: "My name is {playerName}. I'm learning French {motivationPhrase}.",
-          nextNodeId: "yourTurn",
+          targetText: "Je m'appelle {playerName}.\n{motivationSentence}\n{levelSentence}",
+          translation: "My name is {playerName}.\n{motivationSentence}\n{levelSentence}",
+          nextNodeId: "mouthful",
           conceptIds: [CONCEPT_IDS.INTRODUCE_SELF],
           presentation: { expression: "explaining" }
+        },
+        mouthful: {
+          id: "mouthful",
+          speakerId: "sophie",
+          language: "interface",
+          targetText: "I know, it's a mouthful!",
+          nextNodeId: "bitByBit",
+          conceptIds: [],
+          presentation: { expression: "encouraging" }
+        },
+        bitByBit: {
+          id: "bitByBit",
+          speakerId: "sophie",
+          language: "interface",
+          targetText: "So we'll take it bit by bit.",
+          nextNodeId: "practice",
+          conceptIds: [],
+          presentation: { expression: "explaining" }
+        },
+        practice: {
+          id: "practice",
+          speakerId: PLAYER_SPEAKER_ID,
+          targetText: "Je m'appelle {playerName}.\n{motivationSentence}\n{levelSentence}",
+          translation: "My name is {playerName}.\n{motivationSentence}\n{levelSentence}",
+          nextNodeId: "hello2",
+          conceptIds: [CONCEPT_IDS.INTRODUCE_SELF],
+          presentation: { expression: "encouraging" },
+          assessment: { excludedSpans: ["playerName"] },
+          response: {
+            kind: "practice",
+            lines: [
+              { text: "Je m'appelle {playerName}.", translation: "My name is {playerName}." },
+              { text: "{motivationSentence}", translation: "{motivationSentence}" },
+              { text: "{levelSentence}", translation: "{levelSentence}" }
+            ]
+          }
+        },
+        hello2: {
+          id: "hello2",
+          speakerId: "sophie",
+          targetText: "Salut ! Je m'appelle Sophie. Et toi ?",
+          translation: "Hi! My name is Sophie. And you?",
+          nextNodeId: "yourTurn",
+          conceptIds: [CONCEPT_IDS.GREETING, CONCEPT_IDS.INTRODUCE_SELF, CONCEPT_IDS.BASIC_QUESTION],
+          presentation: { expression: "question" }
         },
         yourTurn: {
           id: "yourTurn",
           speakerId: PLAYER_SPEAKER_ID,
           targetText: "Je m'appelle {playerName}.",
           translation: "My name is {playerName}.",
-          nextNodeId: "invitation",
+          nextNodeId: "niceToMeet",
           conceptIds: [CONCEPT_IDS.INTRODUCE_SELF],
           presentation: { expression: "question" },
           hint: "Je m'appelle ____.",
@@ -368,7 +436,7 @@ export const french: LanguagePack = {
             kind: "say",
             exerciseId: "ch1-introduce-self-001",
             intentId: "introduceSelf",
-            prompt: "Your turn. Introduce yourself.",
+            prompt: "Now in French: tell Sophie your name.",
             options: [
               { id: "introduce", text: "Je m'appelle {playerName}.", translation: "My name is {playerName}." },
               { id: "goodbye", text: "Merci, au revoir !", translation: "Thank you, goodbye!" }
@@ -383,6 +451,15 @@ export const french: LanguagePack = {
           translation: "Sorry? What's your name?",
           conceptIds: [CONCEPT_IDS.INTRODUCE_SELF, CONCEPT_IDS.BASIC_QUESTION],
           presentation: { expression: "confused" }
+        },
+        niceToMeet: {
+          id: "niceToMeet",
+          speakerId: "sophie",
+          targetText: "Enchantée, {playerName} !",
+          translation: "Nice to meet you, {playerName}!",
+          nextNodeId: "invitation",
+          conceptIds: [CONCEPT_IDS.GREETING],
+          presentation: { expression: "happy" }
         },
         invitation: {
           id: "invitation",

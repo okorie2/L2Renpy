@@ -8,6 +8,8 @@ export interface VoiceLibraryOptions {
   retryAfterMs?: number;
   now?: () => number;
   onEvict?: (speech: SynthesizedSpeech) => void;
+  /** Lines that never depend on the backend, such as recordings shipped with the game: never held back. */
+  isLocal?: (request: Omit<SynthesisRequest, "signal">) => boolean;
 }
 
 /**
@@ -48,10 +50,11 @@ export class VoiceLibrary {
       this.lines.set(key, known);
       return known;
     }
-    if (!this.available) return Promise.resolve(undefined);
+    const local = this.options.isLocal?.(request) ?? false;
+    if (!local && !this.available) return Promise.resolve(undefined);
 
     const pending = this.provider.synthesize(request).catch(() => {
-      this.unavailableUntil = this.now() + this.retryAfterMs;
+      if (!local) this.unavailableUntil = this.now() + this.retryAfterMs;
       // A failure is not remembered for the line, so it can be tried again later.
       this.lines.delete(key);
       return undefined;

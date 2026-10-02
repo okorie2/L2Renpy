@@ -4,15 +4,17 @@ import type { PlayerProfile } from "../../core/models";
 import { DISPLAY_NAME_MAX_LENGTH, sanitizeDisplayName } from "../../core/player";
 import { sessionLine, suggestionsUnlocked, type DialogueInput, type DialogueSession, type HistoryLine } from "../../dialogue/engine";
 import { PLAYER_SPEAKER_ID, type Dialogue, type DialogueNode } from "../../dialogue/models";
-import { resolveDialogueLine, type ResolvedLine, type ResolvedText, type SlotValues } from "../../dialogue/template";
+import { resolveDialogueLine, resolveTemplate, type ResolvedLine, type ResolvedText, type SlotValues } from "../../dialogue/template";
 import type { AssistanceKind, SupportLevel } from "../../learning/models";
 import { supportPolicy } from "../../learning/support";
-import type { AudioClip, SpeechCapability } from "../../speech/types";
+import type { PracticeClient } from "../../speech/httpPractice";
+import type { AudioClip, SpeechCapability, SpeechRate } from "../../speech/types";
 import type { VoiceLibrary } from "../../speech/voiceLibrary";
 import { useKeyboardInset, useSpeakingPulse } from "../hooks";
 import { icons } from "../icons";
-import { useLineVoice, type AudioSettings, type LineVoice } from "../voice";
+import { playText, useLineVoice, type AudioSettings, type LineVoice } from "../voice";
 import { CharacterPortrait } from "./CharacterPortrait";
+import { Practice } from "./Practice";
 import { SAID_LABEL, SaidText, saidSummary } from "./Said";
 import { SoundSettings } from "./SoundSettings";
 import { SpeechControl } from "./SpeechControl";
@@ -36,6 +38,8 @@ type Props = {
   /** The engine's state. This component renders it and reports inputs; it decides nothing. */
   session: DialogueSession;
   languageCode: string;
+  /** The learner's own language, for lines marked `language: "interface"`. */
+  interfaceLanguageCode: string;
   speakers: Record<string, ConversationSpeaker>;
   slotValues: SlotValues;
   profile: PlayerProfile;
@@ -51,6 +55,9 @@ type Props = {
   onAudioSettingsChange: (change: Partial<AudioSettings>) => void;
   /** The learner's answer is being considered; nothing more can be said until it is. */
   thinking?: boolean;
+  /** Pronunciation practice through the backend, when it can hear and compare. */
+  practice?: PracticeClient;
+  practiceAvailable: boolean;
   onInput: (input: DialogueInput) => void;
   onExit: () => void;
 };
@@ -82,7 +89,12 @@ function renderText(resolved: ResolvedText, markUnscored: boolean) {
   return parts;
 }
 
-type LineProps = Pick<Props, "languageCode" | "profile" | "supportLevel" | "speech" | "transcribe" | "sayChoices" | "thinking" | "onInput"> & {
+type LineProps = Pick<Props, "languageCode" | "profile" | "supportLevel" | "speech" | "transcribe" | "sayChoices" | "thinking" | "onInput" | "slotValues" | "practice" | "practiceAvailable"> & {
+  /** The language this line is written in: the target language, or the learner's own. */
+  lineLanguage: string;
+  /** Who taught the line being practised; their voice is the model. */
+  partnerId?: string;
+  onHear: (text: string, rate: SpeechRate) => void;
   node: DialogueNode;
   /** The words of this line: scripted, or the speaker's reaction to what was said. */
   line: ResolvedLine;
@@ -101,7 +113,7 @@ type LineProps = Pick<Props, "languageCode" | "profile" | "supportLevel" | "spee
 
 /** One line of dialogue. Keyed by node and attempt, so assistance state resets each time. */
 function DialogueLine(props: LineProps) {
-  const { node, line, speakerName, partnerName, languageCode, profile, supportLevel, speech, transcribe, sayChoices, offerAnswers, retrying, voice, subtitles, lastSaid, thinking, onInput } = props;
+  const { node, line, speakerName, partnerName, languageCode, lineLanguage, profile, supportLevel, speech, transcribe, sayChoices, offerAnswers, retrying, voice, subtitles, lastSaid, thinking, onInput } = props;
   const policy = supportPolicy(supportLevel);
   const response = node.response;
   const isSay = response?.kind === "say";
@@ -160,6 +172,33 @@ function DialogueLine(props: LineProps) {
     : [];
   const hasUnscored = isSay && modelVisible && line.target.spans.some((span) => !span.scored);
 
+  if (response?.kind === "practice") {
+    const target = Object.fromEntries(Object.entries(props.slotValues).map(([name, value]) => [name, value.target]));
+    const translation = Object.fromEntries(Object.entries(props.slotValues).map(([name, value]) => [name, value.translation]));
+    const lines = response.lines.map((item) => ({
+      text: resolveTemplate(item.text, target).text,
+      translation: item.translation === undefined ? undefined : resolveTemplate(item.translation, translation).text
+    }));
+    const excluded = (node.assessment?.excludedSpans ?? []).map((slot) => props.slotValues[slot]?.target).filter((value): value is string => Boolean(value));
+    return (
+      <section className="dialogue-card" aria-label="Practise saying it">
+        <div className="name-chip player">{speakerName}</div>
+        <div className="dialogue-scroll">
+          <Practice
+            lines={lines}
+            excluded={excluded}
+            languageCode={languageCode}
+            speakerId={props.partnerId}
+            practice={props.practice}
+            canPractise={props.practiceAvailable && Boolean(props.practice)}
+            onHear={props.onHear}
+            onDone={() => onInput({ type: "PRACTICED", assistance: [] })}
+          />
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="dialogue-card" aria-label={isSay ? "Your turn" : `${speakerName} says`}>
       <div className={`name-chip${isSay ? " player" : ""}`}>{speakerName}</div>
@@ -177,7 +216,7 @@ function DialogueLine(props: LineProps) {
         {lastSaid && <SaidFeedback line={lastSaid} languageCode={languageCode} />}
         {isSay && <p className="turn-prompt">{retrying ? "Try again. " : ""}{response.prompt}</p>}
         {textHidden && <p className="listen-placeholder" role="status">Listen…</p>}
-        {modelVisible && !textHidden && <p className="target-language" lang={languageCode}>{renderText(line.target, isSay)}</p>}
+        {modelVisible && !textHidden && <p className="target-language" lang={lineLanguage}>{renderText(line.target, isSay)}</p>}
         {translationVisible && line.translation && <p className="translation">{line.translation.text}</p>}
         {hintRevealed && node.hint && <p className="hint-text" lang={languageCode}>{node.hint}</p>}
         {hasUnscored && <p className="assessment-note">Underlined words are yours and aren't graded.</p>}
@@ -383,7 +422,7 @@ function AudioSheet({ settings, available, onChange, onClose }: {
  * partner's portrait stands above a bottom dialogue card, and every control is
  * thumb-sized. All progression comes from the dialogue engine.
  */
-export function Conversation({ dialogue, session, speakers, voiceLibrary, audioSettings, onAudioSettingsChange, onExit, ...lineProps }: Props) {
+export function Conversation({ dialogue, session, speakers, voiceLibrary, audioSettings, onAudioSettingsChange, onExit, interfaceLanguageCode, ...lineProps }: Props) {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [audioOpen, setAudioOpen] = useState(false);
   const node = dialogue.nodes[session.nodeId];
@@ -394,12 +433,14 @@ export function Conversation({ dialogue, session, speakers, voiceLibrary, audioS
   const line = sessionLine(session, node, lineProps.slotValues);
   const spoken = line.target.text;
   const lineKey = `${dialogue.id}.${node.id}.${session.history.length}`;
+  const languageOf = (item: DialogueNode) => (item.language === "interface" ? interfaceLanguageCode : lineProps.languageCode);
+  const lineLanguage = languageOf(node);
 
   // Character lines are spoken as they appear; the player's model answer only on request.
   const voice = useLineVoice(voiceLibrary, audioSettings, {
     key: lineKey,
     text: spoken,
-    languageCode: lineProps.languageCode,
+    languageCode: lineLanguage,
     speakerId: playerTurn ? undefined : node.speakerId,
     autoplay: !playerTurn
   });
@@ -421,7 +462,7 @@ export function Conversation({ dialogue, session, speakers, voiceLibrary, audioS
     : undefined;
   useEffect(() => {
     if (voiceLibrary && audioSettings.voice && upcoming && upcomingText) {
-      voiceLibrary.prefetch({ text: upcomingText, languageCode: lineProps.languageCode, speakerId: upcoming.speakerId, rate: "normal" });
+      voiceLibrary.prefetch({ text: upcomingText, languageCode: languageOf(upcoming), speakerId: upcoming.speakerId, rate: "normal" });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [voiceLibrary, audioSettings.voice, upcomingText]);
@@ -458,6 +499,9 @@ export function Conversation({ dialogue, session, speakers, voiceLibrary, audioS
           voice={voice}
           subtitles={audioSettings.subtitles}
           lastSaid={lastSaid}
+          lineLanguage={lineLanguage}
+          partnerId={session.npcId}
+          onHear={(text, rate) => playText(voiceLibrary, audioSettings, { text, languageCode: lineProps.languageCode, speakerId: session.npcId, rate })}
           {...lineProps}
         />
       </div>

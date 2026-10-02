@@ -36,14 +36,15 @@ export function createHttpSpeechToText(baseUrl: string, fetchImpl: Fetch = (inpu
 }
 
 /** What the backend can do right now. Any failure reads as "nothing", never as an error. */
-export async function fetchSpeechCapabilities(baseUrl: string, fetchImpl: Fetch = (input, init) => fetch(input, init)): Promise<{ synthesis: boolean; recognition: boolean }> {
+export async function fetchSpeechCapabilities(baseUrl: string, fetchImpl: Fetch = (input, init) => fetch(input, init)): Promise<{ synthesis: boolean; recognition: boolean; pronunciation: boolean }> {
+  const none = { synthesis: false, recognition: false, pronunciation: false };
   try {
     const response = await fetchImpl(`${baseUrl.replace(/\/+$/, "")}/speech/capabilities`);
-    if (!response.ok) return { synthesis: false, recognition: false };
-    const body = await response.json() as { synthesis?: boolean; recognition?: boolean };
-    return { synthesis: body.synthesis === true, recognition: body.recognition === true };
+    if (!response.ok) return none;
+    const body = await response.json() as { synthesis?: boolean; recognition?: boolean; pronunciation?: boolean };
+    return { synthesis: body.synthesis === true, recognition: body.recognition === true, pronunciation: body.pronunciation === true };
   } catch {
-    return { synthesis: false, recognition: false };
+    return none;
   }
 }
 

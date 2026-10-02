@@ -1,4 +1,5 @@
 import UIKit
+import AVFoundation
 import Capacitor
 
 @UIApplicationMain
@@ -7,7 +8,15 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        // Characters' voices are the point of the app, so they play even when the
+        // ring/silent switch is on (the web view's default follows the switch).
+        // Other audio, such as music, is lowered while a line plays.
+        do {
+            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
+            try AVAudioSession.sharedInstance().setActive(true)
+        } catch {
+            print("Could not set the audio session: \(error)")
+        }
         return true
     }
 

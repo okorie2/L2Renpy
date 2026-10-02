@@ -70,6 +70,7 @@ export type DialogueInput = (
       judgement?: UtteranceJudgement;
     }
   | { type: "ACT"; optionId: string }
+  | { type: "PRACTICED" }
 ) & {
   assistance: AssistanceKind[];
   /** The line's audio was actually listened to. */
@@ -186,12 +187,20 @@ export function stepDialogue(
 
   if (!response) {
     if (input.type !== "CONTINUE") return { session, save, result: "ignored" };
-    next = alsoHeard(recordLineEncounter(next, node, lineVocabulary, lineModality, input.assistance, context.now));
+    // A line in the learner's own language teaches nothing about the target language.
+    if (node.language !== "interface") {
+      next = alsoHeard(recordLineEncounter(next, node, lineVocabulary, lineModality, input.assistance, context.now));
+    }
+  } else if (response.kind === "practice") {
+    // Practice is finished whenever the player moves on; how it went never gates progress.
+    if (input.type !== "PRACTICED") return { session, save, result: "ignored" };
   } else if (response.kind === "text" || response.kind === "choice") {
     if (input.type !== "ANSWER") return { session, save, result: "ignored" };
     const answered = applyDialogueResponse(next, response, input.value);
     if (answered === next) return { session, save, result: "ignored" };
-    next = alsoHeard(recordLineEncounter(answered, node, lineVocabulary, lineModality, input.assistance, context.now));
+    next = node.language === "interface"
+      ? answered
+      : alsoHeard(recordLineEncounter(answered, node, lineVocabulary, lineModality, input.assistance, context.now));
     if (response.kind === "choice") nextOverride = response.options.find((option) => option.value === input.value)?.nextNodeId;
   } else if (response.kind === "say") {
     const intent = context.intents[response.intentId];

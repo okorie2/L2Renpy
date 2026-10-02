@@ -79,11 +79,11 @@ function urlFor(speech: SynthesizedSpeech): string {
  * Say one piece of text once, on request: a word in the phrasebook, a message.
  * Call it from the tap itself. Quietly does nothing when voices are off or away.
  */
-export function playText(library: VoiceLibrary | undefined, settings: AudioSettings, request: { text: string; languageCode: string; speakerId?: string }): void {
+export function playText(library: VoiceLibrary | undefined, settings: AudioSettings, request: { text: string; languageCode: string; speakerId?: string; rate?: SpeechRate }): void {
   if (!library || !settings.voice) return;
   const audio = audioElement();
   audio.pause();
-  void library.get({ ...request, rate: "normal" }).then((speech) => {
+  void library.get({ ...request, rate: request.rate ?? "normal" }).then((speech) => {
     if (!speech) return;
     audio.volume = settings.volume;
     audio.src = urlFor(speech);

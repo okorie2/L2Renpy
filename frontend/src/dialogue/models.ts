@@ -54,6 +54,17 @@ export type DialogueResponse =
       repairNodeId?: string;
     }
   | {
+      /**
+       * Pronunciation practice on lines the player has just been shown: listen,
+       * say it, practise the word that needs it most, then the whole line once
+       * more. Attempts are finite and the player can always move on; the result
+       * never decides progress. `lines` may contain `{slot}` markers; slots named in
+       * the node's `assessment.excludedSpans` are not graded.
+       */
+      kind: "practice";
+      lines: Array<{ text: string; translation?: string }>;
+    }
+  | {
       /** An in-scene action that shows understanding, such as paying the right price. */
       kind: "act";
       conceptId: LanguageConceptId;
@@ -83,6 +94,12 @@ export interface DialogueNode {
   branches?: Array<{ when: Condition[]; nextNodeId: string }>;
   /** Concepts this line exposes. Vocabulary is detected from the text itself. */
   conceptIds: LanguageConceptId[];
+  /**
+   * "interface" marks a line in the learner's own language (English), such as
+   * Sophie's welcome before she starts teaching. It is shown and voiced as it is,
+   * has no translation, and is not evidence of target-language learning.
+   */
+  language?: "interface";
   /** Semantic pose for the conversation partner; never a filename. */
   presentation?: { expression?: CharacterExpression };
   /** Target-language scaffold such as "Je m'appelle ____." */

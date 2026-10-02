@@ -19,7 +19,8 @@ const store = (storage = createMemoryStorage()) => ({ storage, store: createSave
 
 /** A save with real progress in every part: profile, quests, dialogue, learning evidence and support. */
 function playedSave(): GameSave {
-  let save = travelThroughPortal(newSave(), chapterOneLocations, chapterOneLocations.find((item) => item.id === "apartment")!.portals[0].id, chapterOneQuests);
+  // The game opens on the street, where Sophie welcomes the player.
+  let save = newSave();
   const meet = french.dialogues.meetSophie;
   let session = startDialogue(meet, "sophie");
   for (let guard = 0; session.status !== "completed" && guard < 40; guard++) {
@@ -27,6 +28,7 @@ function playedSave(): GameSave {
     const input: DialogueInput = !response ? { type: "CONTINUE", assistance: [] }
       : response.kind === "text" ? { type: "ANSWER", value: "Léa", assistance: [] }
       : response.kind === "choice" ? { type: "ANSWER", value: session.nodeId === "askExperience" ? "some" : "travel", assistance: [] }
+      : response.kind === "practice" ? { type: "PRACTICED", assistance: [] }
       : { type: "SAY", text: "Je m'appelle Léa.", mode: "speech", assistance: [] };
     ({ session, save } = stepDialogue(session, meet, input, save, context));
   }

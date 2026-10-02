@@ -53,12 +53,11 @@ exact wording; a miss gets an in-scene "Pardon ?" and another try. The game
 tracks what you have met, understood and written (open the phone, top right,
 for Progress and the Phrasebook) and adjusts how much help it shows from how you get on.
 
-Characters speak their lines when the backend is running (`cd ../backend && npm
-run dev`); the game looks for it at `VITE_API_URL`, which defaults to
-`http://localhost:3000` in development. Without it the game is silent and
-otherwise the same. To answer by voice, also run the speech service (see
-`../speech-service/README.md`); the microphone appears on your turn when it is
-ready, and typing is always available. With an AI key in the backend's `.env`, a free answer the game's own rules do not recognise gets a second opinion from a language model (see `../docs/AI-CONVERSATION.md`); without one the game plays the same. 
+Characters speak their lines when the backend is running (see
+`../backend/README.md`); the game looks for it at `VITE_API_URL`, which defaults
+to `http://localhost:3000` in development. Without it the game is silent and
+otherwise the same. The microphone appears on your turn once the backend's
+Whisper model is ready, and typing is always available. With an AI key in the backend's `.env`, a free answer the game's own rules do not recognise gets a second opinion from a language model (see `../docs/AI-CONVERSATION.md`); without one the game plays the same. 
 
 The game saves itself in the browser's local storage as you play and resumes
 where you left it. To begin again, open the phone (top right), then Settings, and choose "Start over…".

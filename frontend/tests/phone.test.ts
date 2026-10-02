@@ -118,7 +118,7 @@ test("the phone survives a restart, and older saves gain one", () => {
   const upgraded = decodeSave(JSON.stringify({ savedAt: now, save: { ...versionOne, version: 1 } }));
   assert.equal(upgraded.status, "ok");
   if (upgraded.status !== "ok") return;
-  assert.deepEqual([upgraded.migratedFrom, upgraded.save.version, upgraded.save.messages, upgraded.save.visitedLocationIds], [1, SAVE_VERSION, {}, ["apartment"]]);
+  assert.deepEqual([upgraded.migratedFrom, upgraded.save.version, upgraded.save.messages, upgraded.save.visitedLocationIds], [1, SAVE_VERSION, {}, [upgraded.save.player.locationId]]);
   assert.ok(messages && visitedLocationIds);
   // The message it never received arrives as soon as the game looks.
   assert.deepEqual(unreadThreadIds(deliver(upgraded.save)), ["sophieEvening"]);
@@ -133,9 +133,8 @@ test("the phone survives a restart, and older saves gain one", () => {
 test("contacts and the map show only what the player has found", () => {
   let save = newSave();
   assert.deepEqual(metCharacters(save, chapterOneNpcs), []);
-  assert.deepEqual(mapPlaces(save, chapterOneLocations, chapterOneNpcs, chapterOneQuests).filter((place) => place.visited).map((place) => place.location.id), ["apartment"]);
+  assert.deepEqual(mapPlaces(save, chapterOneLocations, chapterOneNpcs, chapterOneQuests).filter((place) => place.visited).map((place) => place.location.id), ["neighborhood"]);
 
-  save = travelThroughPortal(save, chapterOneLocations, "leaveApartment", chapterOneQuests);
   save = { ...save, completedDialogueIds: ["meetSophie"] };
   assert.deepEqual(metCharacters(save, chapterOneNpcs).map((npc) => npc.id), ["sophie"]);
   const places = Object.fromEntries(mapPlaces(save, chapterOneLocations, chapterOneNpcs, chapterOneQuests).map((place) => [place.location.id, place]));

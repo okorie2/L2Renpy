@@ -165,10 +165,10 @@ test("a recording is uploaded to the backend and comes back as words", async () 
 });
 
 test("a backend that cannot be asked simply offers no microphone", async () => {
-  assert.deepEqual(await fetchSpeechCapabilities("http://api.test/", async () => Response.json({ synthesis: true, recognition: true })), { synthesis: true, recognition: true });
-  assert.deepEqual(await fetchSpeechCapabilities("http://api.test", async () => Response.json({ synthesis: true })), { synthesis: true, recognition: false });
-  assert.deepEqual(await fetchSpeechCapabilities("http://api.test", async () => new Response("", { status: 500 })), { synthesis: false, recognition: false });
-  assert.deepEqual(await fetchSpeechCapabilities("http://api.test", async () => { throw new Error("offline"); }), { synthesis: false, recognition: false });
+  assert.deepEqual(await fetchSpeechCapabilities("http://api.test/", async () => Response.json({ synthesis: true, recognition: true, pronunciation: true })), { synthesis: true, recognition: true, pronunciation: true });
+  assert.deepEqual(await fetchSpeechCapabilities("http://api.test", async () => Response.json({ synthesis: true })), { synthesis: true, recognition: false, pronunciation: false });
+  assert.deepEqual(await fetchSpeechCapabilities("http://api.test", async () => new Response("", { status: 500 })), { synthesis: false, recognition: false, pronunciation: false });
+  assert.deepEqual(await fetchSpeechCapabilities("http://api.test", async () => { throw new Error("offline"); }), { synthesis: false, recognition: false, pronunciation: false });
 });
 
 test("a spoken answer is speaking evidence and moves the quest like any other answer", () => {

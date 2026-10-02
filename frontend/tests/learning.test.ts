@@ -57,7 +57,7 @@ test("pronunciation diagnostics ride along without changing the communication ou
 
 test("reading a line is exposure, not success, and never touches game progression", () => {
   const save = newSave();
-  const node = french.dialogues.meetSophie.nodes.hello;
+  const node = french.dialogues.meetSophie.nodes.hello2;
   const next = recordLineEncounter(save, node, vocabularyInText(node.targetText, french.vocabulary), "reading", ["translation"], at);
   assert.deepEqual(next.conceptMastery.GREETING.byModality.reading, {
     encounters: 1, attempts: 0, successfulAttempts: 0, unsuccessfulAttempts: 0, independentSuccesses: 0, assistedEncounters: 1

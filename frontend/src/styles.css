@@ -447,6 +447,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--blue); outl
 /* The target language leads; everything else is quieter. */
 .target-language {
   margin: 0;
+  white-space: pre-line;
   font-size: clamp(20px, 5.6vw, 24px);
   font-weight: 800;
   line-height: 1.25;
@@ -766,3 +767,75 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--blue); outl
   background: white;
 }
 .thread-composer .turn-prompt { margin-top: 0; }
+
+/* The opening: one tap to begin, which also lets the game play sound. */
+.opening-card {
+  position: absolute;
+  z-index: 20;
+  left: max(20px, var(--safe-left));
+  right: max(20px, var(--safe-right));
+  bottom: calc(max(24px, var(--safe-bottom)) + 24px);
+  padding: 24px 22px 18px;
+  border-radius: 24px;
+  background: var(--cream);
+  box-shadow: var(--shadow-card);
+  text-align: center;
+}
+.opening-card h1 { margin: 6px 0 8px; font-size: 34px; }
+.opening-card p { margin: 0 0 16px; line-height: 1.4; }
+.opening-card .primary-pill { width: 100%; }
+.opening-card .field-note { margin: 10px 0 0; }
+
+/* Pronunciation practice inside the dialogue card. */
+.practice { display: flex; flex-direction: column; gap: 8px; }
+.practice .target-language { font-size: clamp(20px, 5.6vw, 24px); }
+.practice-step { margin: 0; }
+.practice-feedback { padding: 8px 12px; border-radius: 14px; background: var(--blue-soft); }
+.practice-feedback p { margin: 0; font-size: 14px; }
+.practice-words { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 6px !important; font-weight: 700; }
+.practice-words span { padding: 1px 6px; border-radius: 6px; }
+.word-clear { background: #dff3e3; }
+.word-practise { background: #ffe08a; }
+.word-unscored { color: var(--text-secondary); text-decoration: underline dotted; }
+.practice-actions { display: flex; justify-content: space-between; }
+.practice-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; }
+.practice-list li { display: flex; gap: 10px; align-items: flex-start; }
+.practice-list small { display: block; color: var(--text-secondary); }
+.target-language.small { font-size: 17px; }
+
+/* The opening scene: the park painting with Sophie walking up the path. */
+.opening-scene {
+  position: absolute;
+  z-index: 10;
+  inset: 0;
+  overflow: hidden;
+  background: #9fbf8f;
+  transition: opacity .7s ease;
+}
+.opening-scene.leaving { opacity: 0; pointer-events: none; }
+.in-opening .hud { visibility: hidden; }
+.opening-backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 50%;
+}
+/* Far up the path, small; then close to the camera, as in the Ren'Py opening. */
+.opening-sophie {
+  position: absolute;
+  left: 47%;
+  bottom: 36%;
+  height: 22%;
+  width: auto;
+  transform: translateX(-50%);
+  opacity: 0;
+  transition-property: left, bottom, height, opacity;
+  transition-timing-function: linear, linear, linear, ease;
+  filter: drop-shadow(0 6px 6px rgba(31, 42, 68, .25));
+}
+.opening-sophie.near { left: 40%; bottom: 2%; height: 60%; }
+.opening-sophie.visible { opacity: 1; }
+.opening-card.compact { padding: 14px; }
+.opening-scene .opening-card { z-index: 2; }

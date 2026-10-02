@@ -104,37 +104,48 @@ test("understanding is shown by acting, and effects apply once", () => {
   assert.equal(again.save.inventory.coffee, 1, "restarting the conversation cannot duplicate the coffee");
 });
 
-test("branches follow game state and choices; history records what was said", () => {
+test("Sophie's welcome: English questions, a French model, practice, then the player speaks", () => {
   const meet = french.dialogues.meetSophie;
   const street = (): GameSave => ({ ...newSave(), player: { ...newSave().player, locationId: "neighborhood", profile: {} } });
   const until = (state: { session: DialogueSession; save: GameSave }, nodeId: string, experience: string) => {
     let current = state;
-    for (let guard = 0; current.session.nodeId !== nodeId && guard < 20; guard++) {
+    for (let guard = 0; current.session.nodeId !== nodeId && guard < 30; guard++) {
       const response = meet.nodes[current.session.nodeId].response;
       current = go(current, meet, !response ? next
         : response.kind === "text" ? { type: "ANSWER", value: "  Léa  ", assistance: [] }
+        : response.kind === "practice" ? { type: "PRACTICED", assistance: [] }
         : { type: "ANSWER", value: current.session.nodeId === "askExperience" ? experience : "travel", assistance: [] });
     }
     return current;
   };
-  const gentle = until({ session: startDialogue(meet, "sophie"), save: street() }, "askMotivation", "new");
-  const together = until({ session: startDialogue(meet, "sophie"), save: street() }, "askMotivation", "some");
-  assert.ok(gentle.session.history.some((line) => line.nodeId === "paceGentle"));
-  assert.ok(together.session.history.some((line) => line.nodeId === "paceTogether"));
-  assert.ok(!together.session.history.some((line) => line.nodeId === "paceGentle"));
-  assert.equal(gentle.save.player.profile.displayName, "Léa");
 
-  let state = until(gentle, "yourTurn", "new");
+  // The welcome is in the learner's own language and is not evidence of learning French.
+  const welcomed = until({ session: startDialogue(meet, "sophie"), save: street() }, "example", "new");
+  assert.equal(welcomed.save.player.profile.displayName, "Léa");
+  assert.equal(welcomed.save.player.profile.targetLanguageExperience, "new");
+  assert.equal(welcomed.save.evidenceLog.length, 0, "English lines teach no French");
+  assert.deepEqual(welcomed.session.history.map((line) => line.nodeId), ["hello", "niceToMeetYou", "askName", "greetName", "askExperience", "askMotivation", "great", "model"]);
+
+  // The model introduction is French, and is evidence.
+  let state = go(welcomed, meet, next);
+  assert.ok(state.save.evidenceLog.length > 0);
+
+  // Practice is finished whenever the player moves on; only that input fits it.
+  state = until(state, "practice", "new");
+  assert.equal(go(state, meet, next).result, "ignored");
+  state = go(state, meet, { type: "PRACTICED", assistance: [] });
+  assert.equal(state.session.nodeId, "hello2");
+
+  state = until(state, "yourTurn", "new");
   assert.deepEqual(resolveSayOptions(meet.nodes.yourTurn, state.save, context).map((option) => [option.text, option.fits]), [
     ["Je m'appelle Léa.", true], ["Merci, au revoir !", false]
   ]);
   state = go(state, meet, say("moi c'est Léa !"));
-  assert.equal(state.session.nodeId, "invitation");
+  assert.equal(state.session.nodeId, "niceToMeet");
   const last = state.session.history.at(-1)!;
   assert.deepEqual([last.speakerId, last.text], [PLAYER_SPEAKER_ID, "moi c'est Léa !"]);
-  assert.equal(state.session.history[0].translation, "Hi! My name is Sophie.");
 
-  state = go(state, meet, next);
+  state = go(go(state, meet, next), meet, next);
   assert.equal(state.result, "completed");
   assert.equal(state.session.status, "completed");
   assert.deepEqual(state.save.completedDialogueIds, ["meetSophie"]);

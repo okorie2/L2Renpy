@@ -174,6 +174,7 @@ test("Chapter 1 can be played from start to finish through game events alone", (
         : response.kind === "text" ? { type: "ANSWER", value: "Samuel", assistance: [] }
         : response.kind === "choice" ? { type: "ANSWER", value: response.options[0].value, assistance: [] }
         : response.kind === "act" ? { type: "ACT", optionId: response.options.find((option) => option.correct)!.id, assistance: [] }
+        : response.kind === "practice" ? { type: "PRACTICED", assistance: [] }
         : { type: "SAY", text: resolveSayOptions(node, state.save, context).find((option) => option.fits)!.text, mode: "typed", assistance: [] };
       const step = stepDialogue(state.session, dialogue, input, state.save, context);
       assert.notEqual(step.result, "ignored", `${expected}.${node.id}`);
@@ -183,12 +184,11 @@ test("Chapter 1 can be played from start to finish through game events alone", (
   };
   const deliver = (save: GameSave) => deliverMessages(save, chapterOneMessages, french.dialogues, quests, context.now);
 
+  // The game opens on the street, where Sophie comes out to welcome the player.
   let save = start(quests);
-  assert.equal(questGuidance(save, quests)?.text, "Go outside");
-  assert.equal(status(save, "cafe"), "locked");
-
-  save = travel(save, "leaveApartment");
+  assert.equal(save.player.locationId, "neighborhood");
   assert.equal(questGuidance(save, quests)?.text, "Tell Sophie your name");
+  assert.equal(status(save, "cafe"), "locked");
   save = converse(save, sophie, "meetSophie");
   assert.equal(status(save, "meetSophie"), "completed");
   assert.equal(questGuidance(save, quests)?.text, "Go into the café");
@@ -239,7 +239,7 @@ test("Chapter 1 can be played from start to finish through game events alone", (
   assert.deepEqual(save.messages.sophieEvening.session.history.map((line) => line.speakerId), ["sophie", "player", "sophie", "player", "sophie"]);
   assert.deepEqual(unreadThreadIds(save), []);
   assert.equal(deliver(save), save, "and stays after the quest that brought it is over");
-  assert.deepEqual(save.visitedLocationIds, ["apartment", "neighborhood", "cafe", "bakery"]);
+  assert.deepEqual(save.visitedLocationIds, ["neighborhood", "cafe", "bakery", "apartment"]);
 
   for (const item of quests) assert.equal(status(save, item.id), "completed", item.id);
   assert.equal(questGuidance(save, quests), undefined);

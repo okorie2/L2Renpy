@@ -205,7 +205,6 @@ export const chapterOneQuests: Quest[] = [
     summary: "Meet your new neighbour and introduce yourself.",
     prerequisites: [],
     objectives: [
-      { id: "goOutside", description: "Go outside", trigger: { type: "LOCATION_ENTERED", locationId: "neighborhood" } },
       { id: "giveName", description: "Tell Sophie your name", trigger: { type: "DIALOGUE_LINE_COMPLETED", dialogueId: "meetSophie", nodeId: "askName" } },
       { id: "introduceSelf", description: "Introduce yourself in French", trigger: { type: "INTENT_COMMUNICATED", intentId: "introduceSelf" } },
       { id: "hearPlan", description: "Hear Sophie's plan", trigger: { type: "DIALOGUE_COMPLETED", dialogueId: "meetSophie" } }
@@ -288,8 +287,9 @@ export function createStartingPlayer(targetLanguageCode: string): Player {
     id: "local-player",
     name: "You",
     targetLanguageCode,
-    locationId: apartment.id,
-    position: { ...apartment.spawnPoints.entry },
+    // The game opens in the park with Sophie (the opening scene), then on this street.
+    locationId: neighborhood.id,
+    position: { ...neighborhood.spawnPoints.outsideApartment },
     xp: 0,
     profile: {}
   };

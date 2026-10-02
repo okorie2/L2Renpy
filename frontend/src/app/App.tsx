@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Conversation, type ConversationSpeaker } from "./components/Conversation";
+import { OpeningScene, type OpeningArt, type OpeningStage } from "./components/OpeningScene";
 import { GameView } from "./components/GameView";
 import { Phone, type PhoneRoute } from "./components/phone/Phone";
 import type { ThreadEntry } from "./components/phone/MessagesApp";
@@ -23,6 +24,8 @@ import { chapterOneConcepts } from "../learning/concepts";
 import { summarizeLearning } from "../learning/summary";
 import { createHttpSpeechToText, fetchSpeechCapabilities } from "../speech/httpStt";
 import { createHttpTextToSpeech } from "../speech/httpTts";
+import { createHttpPractice } from "../speech/httpPractice";
+import { findRecording, RECORDED_LINES, withRecordings } from "../speech/recordings";
 import type { AudioClip, SpeechCapability } from "../speech/types";
 import { canRecord } from "./recorder";
 import { VoiceLibrary } from "../speech/voiceLibrary";
@@ -72,9 +75,30 @@ for (const appearanceId of ["player", ...chapterOneNpcs.map((npc) => npc.appeara
   };
 }
 
-// Voiced lines come from the application backend. Without one the game is simply silent.
+// Voiced lines come from the application backend, except the recordings shipped with
+// the game (Sophie's welcome). Without a backend only those play.
 const apiUrl = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? "http://localhost:3000" : undefined);
-const voiceLibrary = apiUrl ? new VoiceLibrary(createHttpTextToSpeech(apiUrl), { onEvict: releaseSpeech }) : undefined;
+const voiceLibrary = new VoiceLibrary(
+  withRecordings(apiUrl ? createHttpTextToSpeech(apiUrl) : undefined, RECORDED_LINES, assetUrl),
+  {
+    onEvict: releaseSpeech,
+    isLocal: (request) => (request.rate ?? "normal") === "normal" && findRecording(RECORDED_LINES, request) !== undefined
+  }
+);
+// Pronunciation practice: the backend compares the learner with the character's own voice.
+const practiceClient = apiUrl ? createHttpPractice(apiUrl) : undefined;
+/** The learner's own language, for lines such as Sophie's welcome. */
+const INTERFACE_LANGUAGE = "en";
+/** The first story beat: the dialogue whose completion ends the opening. */
+const OPENING = { npcId: "sophie", dialogueId: "meetSophie" };
+const OPENING_ART: OpeningArt = {
+  backdrop: assetUrl("locations/park.webp"),
+  idle: assetUrl("characters/sophie/opening/idle.webp"),
+  waving: assetUrl("characters/sophie/opening/waving.webp"),
+  walking: [1, 2, 3, 4, 5, 6].map((frame) => assetUrl(`characters/sophie/opening/walking-${frame}.webp`))
+};
+/** How long the park takes to fade into the street. */
+const OPENING_FADE_MS = 700;
 
 const speechToText = apiUrl ? createHttpSpeechToText(apiUrl) : undefined;
 const transcribe = speechToText
@@ -128,13 +152,32 @@ function Game({ initialSave, onSaveChange, onStartOver, saveNotice, onDismissSav
   const [audioSettings, setAudioSettings] = useAudioSettings();
   // The microphone is offered only when the backend can hear and this device can record.
   const [recognitionReady, setRecognitionReady] = useState(false);
+  const [pronunciationReady, setPronunciationReady] = useState(false);
   const refreshSpeech = () => {
-    if (apiUrl && canRecord()) void fetchSpeechCapabilities(apiUrl).then((capabilities) => setRecognitionReady(capabilities.recognition));
+    if (apiUrl && canRecord()) {
+      void fetchSpeechCapabilities(apiUrl).then((capabilities) => {
+        setRecognitionReady(capabilities.recognition);
+        setPronunciationReady(capabilities.pronunciation);
+      });
+    }
   };
   useEffect(refreshSpeech, []);
   const speechCapability: SpeechCapability = recognitionReady ? { available: true } : { available: false, reason: "unavailable" };
   const [completedNotice, setCompletedNotice] = useState<string | null>(null);
   const location = chapterOneLocations.find((item) => item.id === save.player.locationId) ?? chapterOneLocations[0];
+  // The opening, as in the Ren'Py prototype: the park, a first tap, Sophie walking up
+  // and waving, then her welcome. It lasts until her introduction is complete.
+  const [opening, setOpening] = useState<OpeningStage>(() => (
+    initialSave.completedDialogueIds.includes(OPENING.dialogueId) ? "done" : "title"
+  ));
+  const metSophie = save.completedDialogueIds.includes(OPENING.dialogueId);
+  useEffect(() => {
+    if (!metSophie || opening === "done" || opening === "leaving") return;
+    setOpening("leaving");
+    const timer = window.setTimeout(() => setOpening("done"), OPENING_FADE_MS);
+    return () => window.clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [metSophie]);
 
   // The Phaser scene is created at entry and keeps its own transient animation state.
   const world = useMemo<WorldSceneConfig>(() => ({
@@ -186,8 +229,8 @@ function Game({ initialSave, onSaveChange, onStartOver, saveNotice, onDismissSav
   const dialogue = conversation ? activeLanguagePack.dialogues[conversation.dialogueId] : undefined;
 
   useEffect(() => {
-    gameEvents.emit("movement-lock", conversationNpc !== undefined || phone !== null);
-  }, [conversationNpc, phone]);
+    gameEvents.emit("movement-lock", conversationNpc !== undefined || phone !== null || opening !== "done");
+  }, [conversationNpc, phone, opening]);
 
   useEffect(() => {
     const focus: ConversationFocus | null = conversationNpc
@@ -225,6 +268,25 @@ function Game({ initialSave, onSaveChange, onStartOver, saveNotice, onDismissSav
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [completedQuestIds.length]);
 
+  const beginOpening = () => {
+    // This tap is what lets the game play Sophie's voice.
+    unlockVoice();
+    refreshSpeech();
+    setOpening("walking");
+  };
+  const welcome = () => {
+    setOpening("talking");
+    startOpeningConversation();
+  };
+  // The welcome happens in the park, whichever street the save says the player is on.
+  const startOpeningConversation = () => {
+    const dialogue = activeLanguagePack.dialogues[OPENING.dialogueId];
+    if (!dialogue) return;
+    unlockVoice();
+    refreshSpeech();
+    setConversation(startDialogue(dialogue, OPENING.npcId));
+  };
+
   const learning = useMemo(() => summarizeLearning(save, chapterOneConcepts, activeLanguagePack.vocabulary), [save]);
   const nearbyNpc = chapterOneNpcs.find((npc) => npc.locationId === location.id && nearNpcIds.has(npc.id));
   const nearbyPortal = location.portals.find((portal) => nearPortalIds.has(portal.id));
@@ -250,7 +312,7 @@ function Game({ initialSave, onSaveChange, onStartOver, saveNotice, onDismissSav
   const noticeThread = threads.find((entry) => entry.id === messageNotice);
   const openPhone = (route: PhoneRoute) => {
     // Opened by a tap, which is what lets the phone play voices afterwards.
-    if (voiceLibrary) unlockVoice();
+    unlockVoice();
     gameEvents.emit("cancel-movement");
     setPhone(route);
   };
@@ -261,7 +323,7 @@ function Game({ initialSave, onSaveChange, onStartOver, saveNotice, onDismissSav
     const next = dialogueId ? activeLanguagePack.dialogues[dialogueId] : undefined;
     if (!npc || !next) return;
     // This runs inside the tap, which is what lets the browser play voices afterwards.
-    if (voiceLibrary) unlockVoice();
+    unlockVoice();
     refreshSpeech();
     setConversation(startDialogue(next, npc.id));
   };
@@ -329,7 +391,7 @@ function Game({ initialSave, onSaveChange, onStartOver, saveNotice, onDismissSav
   };
 
   return (
-    <main className={`app${conversation ? " in-conversation" : ""}`}>
+    <main className={`app${conversation ? " in-conversation" : ""}${opening !== "done" ? " in-opening" : ""}`}>
       <header className="hud">
         <button className="quest-summary" onClick={() => openPhone({ app: "quests" })} aria-label="Open quests">
           <span className="eyebrow">
@@ -339,6 +401,7 @@ function Game({ initialSave, onSaveChange, onStartOver, saveNotice, onDismissSav
           </span>
           <strong>{guidance?.text ?? "All quests complete. Keep exploring!"}</strong>
         </button>
+
         <button
           className="phone-button"
           onClick={() => openPhone({})}
@@ -351,11 +414,22 @@ function Game({ initialSave, onSaveChange, onStartOver, saveNotice, onDismissSav
 
       <GameView key={location.id} world={world} />
 
-      <div className="hint">
-        {location.kind === "apartment" ? "Tap the floor to walk. Find the door to go outside." : "Tap to walk. Approach people and doors."}
-      </div>
+      {opening === "done" && (
+        <div className="hint">
+          {location.kind === "apartment" ? "Tap the floor to walk. Find the door to go outside." : "Tap to walk. Approach people and doors."}
+        </div>
+      )}
 
-      {!conversation && !phone && (
+      <OpeningScene
+        stage={opening}
+        art={OPENING_ART}
+        onStart={beginOpening}
+        onArrived={welcome}
+        onTalk={conversation ? undefined : startOpeningConversation}
+        title={{ eyebrow: "CHAPTER 1", heading: "Bienvenue", headingLang: activeLanguagePack.code, text: "A sunny morning in the park. Someone is coming to say hello." }}
+      />
+
+      {!conversation && !phone && opening === "done" && (
         <div className="interaction-actions">
           {moving && <button className="stop-move" onClick={() => gameEvents.emit("cancel-movement")}>Stop walking</button>}
           {nearbyNpc && (
@@ -380,6 +454,9 @@ function Game({ initialSave, onSaveChange, onStartOver, saveNotice, onDismissSav
           dialogue={dialogue}
           session={conversation}
           languageCode={activeLanguagePack.code}
+          interfaceLanguageCode={INTERFACE_LANGUAGE}
+          practice={practiceClient}
+          practiceAvailable={pronunciationReady && canRecord()}
           speakers={speakers}
           slotValues={slotValues}
           profile={save.player.profile}
@@ -447,9 +524,9 @@ function Game({ initialSave, onSaveChange, onStartOver, saveNotice, onDismissSav
             .map((entry) => ({ concept: entry.concept, examples: activeLanguagePack.conceptExpressions[entry.concept.id] ?? [] }))
             .filter((entry) => entry.examples.length > 0)}
           audioSettings={audioSettings}
-          voicesAvailable={voiceLibrary?.available ?? false}
+          voicesAvailable={Boolean(apiUrl) && voiceLibrary.available}
           onAudioSettingsChange={setAudioSettings}
-          onHear={voiceLibrary ? (text, speakerId) => playText(voiceLibrary, audioSettings, { text, languageCode: activeLanguagePack.code, speakerId }) : undefined}
+          onHear={apiUrl ? (text, speakerId) => playText(voiceLibrary, audioSettings, { text, languageCode: activeLanguagePack.code, speakerId }) : undefined}
           onStartOver={onStartOver}
         />
       )}
