@@ -13,6 +13,7 @@ define speech_api_production_base_url = ""
 
 
 init -10 python:
+    import json
     import os
     import re
     from collections.abc import Mapping
@@ -132,6 +133,7 @@ init -10 python:
         reference_audio_path,
         learner_audio_path,
         language="fr",
+        evaluation_exclusions=None,
     ):
         """Evaluate one learner recording against a generated Sophie sample."""
 
@@ -164,6 +166,9 @@ init -10 python:
                         url,
                         data={
                             "reference_text": reference_text,
+                            "evaluation_exclusions": json.dumps(
+                                evaluation_exclusions or []
+                            ),
                         },
                         files={
                             "reference_audio": (

@@ -1,5 +1,7 @@
-# Sophie uses complete standalone sprites in the opening scene. The experimental
-# layered assets remain in the project for future work.
+# Sophie uses complete standalone sprites in the opening scene. The full-body
+# images below are for movement/navigation; Scene 1's close conversation images
+# are declared separately so their poses do not depend on the old layered
+# expression system.
 
 image bg park_day:
     "images/backgrounds/park/park_day.jpg"
@@ -26,3 +28,38 @@ image sophie walk:
     "sophie walk_b"
     pause 0.16
     repeat
+
+
+# Close conversation sprites. Each pose has a closed-mouth image and an
+# open-mouth image. The "speaking" versions only move their mouth while
+# Sophie's voice is actually playing, in sync with the line (see
+# systems/sophie_lipsync.rpy); otherwise they show the closed mouth. The
+# semantic image names keep Scene 1 independent from the asset filenames.
+
+image sophie conversation neutral closed = "images/characters/sophie/scene_1/neutral_closed.png"
+
+image sophie conversation neutral speaking = SophieTalking(
+    "images/characters/sophie/scene_1/neutral_closed.png",
+    "images/characters/sophie/scene_1/neutral_speaking.png",
+)
+
+image sophie conversation question closed = "images/characters/sophie/scene_1/question_closed.png"
+
+image sophie conversation question speaking = SophieTalking(
+    "images/characters/sophie/scene_1/question_closed.png",
+    "images/characters/sophie/scene_1/question_opened.png",
+)
+
+image sophie conversation explain closed = "images/characters/sophie/scene_1/explain_closed.png"
+
+image sophie conversation explain speaking = SophieTalking(
+    "images/characters/sophie/scene_1/explain_closed.png",
+    "images/characters/sophie/scene_1/explain_speaking.png",
+)
+
+image sophie conversation encouraging closed = "images/characters/sophie/scene_1/encouraging_closed.png"
+
+image sophie conversation encouraging speaking = SophieTalking(
+    "images/characters/sophie/scene_1/encouraging_closed.png",
+    "images/characters/sophie/scene_1/encouraging_opened.png",
+)

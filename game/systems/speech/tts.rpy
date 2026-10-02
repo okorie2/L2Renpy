@@ -123,6 +123,13 @@ init -10 python:
             _remove_tts_file(audio_path, unregister=False)
             raise TTSError("Could not save generated Sophie audio.") from exc
 
+        # Mouth timeline for Sophie's talking animation, keyed by the name
+        # the file is played under (see systems/sophie_lipsync.rpy).
+        register_sophie_mouth_timeline(
+            os.path.basename(audio_path),
+            response.headers.get("X-Sophie-Mouth", ""),
+        )
+
         return audio_path
 
 

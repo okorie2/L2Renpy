@@ -6,6 +6,42 @@
 # later audio timing.
 
 init python:
+    import re
+
+
+    _REFERENCE_WORD_PATTERN = re.compile(
+        r"[^\W_]+(?:['’][^\W_]+)*(?:-[^\W_]+(?:['’][^\W_]+)*)*",
+        re.UNICODE,
+    )
+
+
+    def _reference_words(text):
+        """Tokenize text the same way the pronunciation evaluator does."""
+
+        return [
+            match.group(0)
+            for match in _REFERENCE_WORD_PATTERN.finditer(text or "")
+        ]
+
+
+    def _player_name_evaluation_exclusion(reference_line, player_name):
+        """Return a token span for the dynamic name at the end of line one."""
+
+        name_words = _reference_words(player_name)
+        line_words = _reference_words(reference_line)
+        if not name_words or line_words[-len(name_words):] != name_words:
+            return []
+
+        start = len(line_words) - len(name_words)
+        return [
+            {
+                "start": start,
+                "end": start + len(name_words),
+                "label": "player_name",
+            }
+        ]
+
+
     _FRENCH_NUMBERS_UNDER_20 = {
         1: "un",
         2: "deux",
@@ -209,9 +245,17 @@ init python:
             level_english,
         ]
 
+        evaluation_exclusions = [
+            _player_name_evaluation_exclusion(french_lines[0], name),
+            [],
+            [],
+            [],
+        ]
+
         return {
             "french_lines": french_lines,
             "english_lines": english_lines,
             "french_text": "\n".join(french_lines),
             "english_text": "\n".join(english_lines),
+            "evaluation_exclusions": evaluation_exclusions,
         }

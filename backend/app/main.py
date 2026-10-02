@@ -1,5 +1,6 @@
 """FastAPI application for local speech processing."""
 
+import json
 import logging
 import threading
 from contextlib import asynccontextmanager
@@ -11,6 +12,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 
 from .speech.audio import AudioError
+from .speech.lipsync import mouth_timeline_from_bytes
 from .speech.pronunciation import evaluate_pronunciation
 from .speech.transcribe import (
     STTConfigurationError,
@@ -69,10 +71,25 @@ async def _save_upload(upload: UploadFile, destination: Path) -> None:
         raise AudioError("The uploaded audio file is empty.")
 
 
+def _parse_evaluation_exclusions(raw_exclusions: str) -> list[dict]:
+    """Parse optional pronunciation metadata from its multipart form field."""
+
+    try:
+        exclusions = json.loads(raw_exclusions or "[]")
+    except json.JSONDecodeError as exc:
+        raise ValueError("evaluation_exclusions must be valid JSON.") from exc
+
+    if not isinstance(exclusions, list):
+        raise ValueError("evaluation_exclusions must be a JSON list.")
+
+    return exclusions
+
+
 # Evaluates pronunciation of learner speech against reference text and audio.
 @app.post("/speech/pronunciation")
 async def pronunciation(
     reference_text: str = Form(...),
+    evaluation_exclusions: str = Form("[]"),
     reference_audio: UploadFile | None = File(None),
     learner_audio: UploadFile | None = File(None),
 ) -> dict:
@@ -92,6 +109,13 @@ async def pronunciation(
         )
 
     try:
+        parsed_evaluation_exclusions = _parse_evaluation_exclusions(
+            evaluation_exclusions
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    try:
         with TemporaryDirectory(prefix="pronunciation-") as temp_dir:
             temp_path = Path(temp_dir)
             reference_path = temp_path / "reference_audio"
@@ -104,6 +128,7 @@ async def pronunciation(
                 reference_text=reference_text,
                 reference_audio_path=str(reference_path),
                 learner_audio_path=str(learner_path),
+                evaluation_exclusions=parsed_evaluation_exclusions,
             )
     except AudioError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -201,14 +226,25 @@ async def synthesize(request: SynthesizeRequest) -> Response:
             detail="Speech synthesis failed.",
         ) from exc
 
+    headers = {
+        "Content-Disposition": (
+            'inline; filename="sophie-introduction{}"'.format(audio.file_extension)
+        )
+    }
+
+    # Mouth timeline for Sophie's talking animation ("0"/"1" per 1/20 s).
+    # Optional: if it can't be computed the game falls back to a simple flap.
+    try:
+        timeline = mouth_timeline_from_bytes(audio.content)
+        if timeline:
+            headers["X-Sophie-Mouth"] = timeline
+    except Exception:
+        logger.warning("Could not compute the mouth timeline", exc_info=True)
+
     return Response(
         content=audio.content,
         media_type=audio.media_type,
-        headers={
-            "Content-Disposition": (
-                'inline; filename="sophie-introduction{}"'.format(audio.file_extension)
-            )
-        },
+        headers=headers,
     )
 
 

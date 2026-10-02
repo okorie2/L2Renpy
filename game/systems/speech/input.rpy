@@ -23,6 +23,7 @@ init python:
             reference_audio_path=None,
             reference_tts_session=None,
             practice_mode="phrase",
+            evaluation_exclusions=None,
         ):
             self.mode = mode
             self.language = language
@@ -31,6 +32,7 @@ init python:
             self.reference_audio_path = reference_audio_path
             self.reference_tts_session = reference_tts_session
             self.practice_mode = practice_mode
+            self.evaluation_exclusions = evaluation_exclusions or []
             self.status = SPEECH_IDLE
             self.transcript = ""
             self.error = ""
@@ -210,6 +212,7 @@ init python:
                         reference_audio_path=reference_audio_path,
                         learner_audio_path=audio_path,
                         language=self.language,
+                        evaluation_exclusions=self.evaluation_exclusions,
                     )
                 else:
                     raise SpeechAPIError(

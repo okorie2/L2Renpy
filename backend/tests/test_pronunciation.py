@@ -1,3 +1,4 @@
+import itertools
 import sys
 import types
 import unittest
@@ -24,24 +25,37 @@ finally:
 
 
 class PronunciationEvaluationTests(unittest.TestCase):
-    def evaluate(self, reference_text, learner_audio, word_phonemes):
+    def evaluate(
+        self,
+        reference_text,
+        learner_audio,
+        word_phonemes,
+        evaluation_exclusions=None,
+        reference_audio="ʒə mapɛl ɛla",
+    ):
         with patch(
             "app.speech.pronunciation.phonemize_audio",
-            side_effect=["ʒə mapɛl ɛla", learner_audio],
+            side_effect=[reference_audio, learner_audio],
         ) as phonemize, patch(
             "app.speech.pronunciation.phonemize_french_word",
-            side_effect=word_phonemes,
+            side_effect=(
+                itertools.cycle(word_phonemes)
+                if evaluation_exclusions
+                else word_phonemes
+            ),
         ) as phonemize_word:
             result = evaluate_pronunciation(
                 reference_text=reference_text,
                 reference_audio_path="reference.mp3",
                 learner_audio_path="learner.wav",
+                evaluation_exclusions=evaluation_exclusions,
             )
 
         phonemize.assert_has_calls(
             [call("reference.mp3"), call("learner.wav")]
         )
-        self.assertEqual(phonemize_word.call_count, len(word_phonemes))
+        if not evaluation_exclusions:
+            self.assertEqual(phonemize_word.call_count, len(word_phonemes))
         return result
 
     def test_perfect_phrase_has_perfect_words_and_no_weakest_word(self):
@@ -71,6 +85,77 @@ class PronunciationEvaluationTests(unittest.TestCase):
         )
         self.assertNotIn("transcript", result)
         self.assertNotIn("text_similarity", result)
+
+    def test_excluded_name_is_preserved_but_not_scored(self):
+        result = self.evaluate(
+            "Je m'appelle Emmanuella.",
+            "ʒə mapɛl zz",
+            ["ʒə", "mapɛl", "emanuɛla"],
+            evaluation_exclusions=[
+                {"start": 2, "end": 3, "label": "player_name"}
+            ],
+            reference_audio="ʒə mapɛl emanuɛla",
+        )
+
+        self.assertEqual(result["reference_text"], "Je m'appelle Emmanuella.")
+        self.assertEqual(result["learner_phonemes"], "ʒə mapɛl zz")
+        self.assertEqual(result["pronunciation_similarity"], 1.0)
+        self.assertEqual(result["differences"], [])
+        self.assertIsNone(result["weakest_word"])
+        self.assertEqual(result["word_results"][2]["word"], "Emmanuella")
+        self.assertIsNone(result["word_results"][2]["score"])
+        self.assertFalse(result["word_results"][2]["scorable"])
+        self.assertFalse(result["word_results"][2]["evaluated"])
+
+    def test_empty_exclusions_match_missing_exclusions(self):
+        without_exclusions = self.evaluate(
+            "Je m'appelle Ella.",
+            "ʒə matɛl ɛla",
+            ["ʒə", "mapɛl", "ɛla"],
+        )
+        with_empty_exclusions = self.evaluate(
+            "Je m'appelle Ella.",
+            "ʒə matɛl ɛla",
+            ["ʒə", "mapɛl", "ɛla"],
+            evaluation_exclusions=[],
+        )
+
+        self.assertEqual(with_empty_exclusions, without_exclusions)
+
+    def test_errors_in_fixed_words_still_count_with_excluded_name(self):
+        result = self.evaluate(
+            "Je m'appelle Emmanuella.",
+            "tɛ mapɛl zz",
+            ["ʒə", "mapɛl", "emanuɛla"],
+            evaluation_exclusions=[
+                {"start": 2, "end": 3, "label": "player_name"}
+            ],
+            reference_audio="ʒə mapɛl emanuɛla",
+        )
+
+        self.assertLess(result["pronunciation_similarity"], 1.0)
+        self.assertTrue(result["differences"])
+        self.assertEqual(result["weakest_word"]["word"], "Je")
+        self.assertEqual(result["word_results"][2]["score"], None)
+
+    def test_multiword_punctuated_name_span_is_excluded(self):
+        result = self.evaluate(
+            "Je m'appelle Mary-Jane O'Connor.",
+            "ʒə mapɛl zz yy xx",
+            ["ʒə", "mapɛl", "maʀiʒan", "ɔkɔnɔʀ"],
+            evaluation_exclusions=[
+                {"start": 2, "end": 4, "label": "player_name"}
+            ],
+            reference_audio="ʒə mapɛl maʀiʒan ɔkɔnɔʀ",
+        )
+
+        self.assertEqual(result["pronunciation_similarity"], 1.0)
+        self.assertEqual(result["differences"], [])
+        self.assertIsNone(result["weakest_word"])
+        self.assertEqual(
+            [word["scorable"] for word in result["word_results"]],
+            [True, True, False, False],
+        )
 
     def test_middle_word_is_selected_as_weakest(self):
         result = self.evaluate(

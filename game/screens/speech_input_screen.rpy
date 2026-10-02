@@ -11,6 +11,7 @@ screen speech_input(
     translation="",
     practice_mode="phrase",
     practice_state=None,
+    evaluation_exclusions=None,
 ):
     default session = SpeechInputSession(
         mode=mode,
@@ -20,6 +21,7 @@ screen speech_input(
         reference_audio_path=reference_audio_path,
         reference_tts_session=reference_tts_session,
         practice_mode=practice_mode,
+        evaluation_exclusions=evaluation_exclusions,
     )
 
     modal True

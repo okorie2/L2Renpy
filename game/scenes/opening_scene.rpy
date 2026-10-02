@@ -13,12 +13,29 @@
 # rendered height <= the 1536px sprite canvas (0.65 here): above that the
 # sprites are upscaled and start to look soft.
 define sophie_sprite_height = 1536  # all Sophie sprites share this canvas
+define sophie_sprite_width = 1024
 define sophie_screen_height = 0.60
 define sophie_park_zoom = (
     sophie_screen_height * layout_viewport[1] / float(sophie_sprite_height)
 )
 define sophie_park_xalign = 0.30
 define sophie_ground_yalign = 0.94
+
+# Conversation sprites use the same canvas but are independently framed: they
+# stay centred and large enough for a close mobile conversation, while the
+# width cap keeps the image inside narrower future phone/tablet variants.
+define sophie_conversation_screen_height = 0.68
+define sophie_conversation_max_width = 0.96
+define sophie_conversation_zoom = min(
+    sophie_conversation_screen_height
+    * layout_viewport[1]
+    / float(sophie_sprite_height),
+    sophie_conversation_max_width
+    * layout_viewport[0]
+    / float(sophie_sprite_width),
+)
+define sophie_conversation_xalign = 0.50
+define sophie_conversation_yalign = 0.94
 
 # The walk-in starts further down the path at 40% of her final size (the same
 # proportion as before), so the entrance keeps its feel at any final size.
@@ -47,6 +64,13 @@ transform sophie_park_position:
     xalign sophie_park_xalign
     yalign sophie_ground_yalign
     zoom sophie_park_zoom
+
+
+transform sophie_conversation_position:
+    # Close conversation sprites are centred separately from the walking path.
+    xalign sophie_conversation_xalign
+    yalign sophie_conversation_yalign
+    zoom sophie_conversation_zoom
 
 
 transform sophie_walk_to_park_position:
@@ -82,14 +106,20 @@ label opening_scene:
     voice "audio/chapter1/scene1/sophie/nice_to_meet_you.mp3"
     Sophie "It's really nice to meet you."
 
+    # The movement/full-body introduction is complete. Conversation from this
+    # point uses the centred close sprites and their semantic pose states.
+    show sophie conversation neutral closed at sophie_conversation_position
+
 
 label ask_introduction:
+    show sophie conversation question closed at sophie_conversation_position
     # Sophie's question is shown inside the sheet itself (inspo #2), so it is
     # queued here instead of on a separate dialogue line. Use `voice`, not
     # `play voice`: Ren'Py's voice system stops the voice channel when a new
     # interaction (the `call screen`) starts unless the line was queued with
     # `voice`, which would cut the audio off after the first word.
     if renpy.loadable(whats_your_name_voice):
+        show sophie conversation question speaking at sophie_conversation_position
         $ voice(whats_your_name_voice)
         call screen introduction_controls(voice=whats_your_name_voice)
     else:
@@ -97,6 +127,7 @@ label ask_introduction:
 
 
 label type_introduction:
+    show sophie conversation neutral closed at sophie_conversation_position
     call screen mobile_text_input("What's your name?", length=30)
 
     # Back returns None: go back to the Speak / Type choice.
@@ -113,6 +144,7 @@ label type_introduction:
 
 
 label speak_introduction:
+    show sophie conversation neutral closed at sophie_conversation_position
     # Reuse the existing Speak button route with the generic speech component.
     call screen speech_input(
         mode="transcription",
@@ -146,19 +178,23 @@ label resolve_player_name:
 
 label introduction_name_complete:
     if player_name:
-        show sophie wave at sophie_park_position
         # Sophie says the player's name with the backend text-to-speech.
         call queue_generated_voice("Nice to meet you, {}!".format(player_name))
         $ name_line_voice = _return
+        if name_line_voice.status == TTS_READY and name_line_voice.audio_path:
+            show sophie conversation neutral speaking at sophie_conversation_position
+        else:
+            show sophie conversation neutral closed at sophie_conversation_position
         Sophie "Nice to meet you, [player_name]!"
         $ name_line_voice.dispose()
         $ renpy.pause(0.75, hard=True)
-        show sophie casual at sophie_park_position
+        show sophie conversation neutral closed at sophie_conversation_position
 
     jump after_introduction
 
 
 label after_introduction:
+    show sophie conversation question speaking at sophie_conversation_position
     voice "audio/chapter1/scene1/sophie/french_level_question.mp3"
     $ renpy.transition(onboarding_step_transition)
     call screen onboarding_choice(
@@ -171,6 +207,7 @@ label after_introduction:
         "french_level",
         voice="audio/chapter1/scene1/sophie/french_level_question.mp3",
     )
+    show sophie conversation question closed at sophie_conversation_position
     jump ask_learning_goal
 
 
@@ -179,6 +216,7 @@ label ask_learning_goal:
     # must be queued directly before `call screen` or Ren'Py cuts it off.
     with onboarding_step_transition
     $ renpy.pause(onboarding_step_pause, hard=True)
+    show sophie conversation question speaking at sophie_conversation_position
     voice "audio/chapter1/scene1/sophie/why_learn_french.mp3"
     $ renpy.transition(onboarding_step_transition)
     call screen onboarding_choice(
@@ -193,6 +231,7 @@ label ask_learning_goal:
         "learning_goal",
         voice="audio/chapter1/scene1/sophie/why_learn_french.mp3",
     )
+    show sophie conversation question closed at sophie_conversation_position
 
     # TODO: Use learning_goal with future onboarding answers to select a
     # learning world. For now, every choice follows the same General Purpose flow.
@@ -204,21 +243,27 @@ label ask_age:
     # must be queued directly before `call screen` or Ren'Py cuts it off.
     with onboarding_step_transition
     $ renpy.pause(onboarding_step_pause, hard=True)
+    show sophie conversation question speaking at sophie_conversation_position
     voice "audio/chapter1/scene1/sophie/age_question.mp3"
     $ renpy.transition(onboarding_step_transition)
     call screen onboarding_age_input(
         "One last thing — how old are you?",
         voice="audio/chapter1/scene1/sophie/age_question.mp3",
     )
+    show sophie conversation question closed at sophie_conversation_position
     $ player_age = _return
     jump onboarding_questions_complete
 
 
 label onboarding_questions_complete:
+    show sophie conversation encouraging speaking at sophie_conversation_position
     voice "audio/chapter1/scene1/sophie/great.mp3"
     Sophie "Great."
+    show sophie conversation encouraging closed at sophie_conversation_position
+    show sophie conversation explain speaking at sophie_conversation_position
     voice "audio/chapter1/scene1/sophie/how_i_would_introduce_myself.mp3"
     Sophie "With the details you've given me, this is how you could introduce yourself in French."
+    show sophie conversation explain closed at sophie_conversation_position
 
     $ personalized_introduction = build_personalized_introduction(
         player_name,
@@ -230,17 +275,23 @@ label onboarding_questions_complete:
         personalized_introduction["french_text"]
     )
     $ french_tts_session.start()
+    show sophie conversation explain speaking at sophie_conversation_position
     call screen bilingual_introduction(
         personalized_introduction["french_text"],
         personalized_introduction["english_text"],
         french_tts_session,
     )
     $ french_tts_session.dispose()
+    show sophie conversation explain closed at sophie_conversation_position
 
+    show sophie conversation explain speaking at sophie_conversation_position
     voice "audio/chapter1/scene1/sophie/mouthful.mp3"
     Sophie "I know, it's a mouthful!"
+    show sophie conversation explain closed at sophie_conversation_position
+    show sophie conversation explain speaking at sophie_conversation_position
     voice "audio/chapter1/scene1/sophie/bit_by_bit.mp3"
     Sophie "So we'll take it bit by bit."
+    show sophie conversation explain closed at sophie_conversation_position
 
     $ practice_index = 0
     $ practice_results = []
@@ -263,6 +314,9 @@ label pronunciation_practice_loop:
 
         $ practice_target = personalized_introduction["french_lines"][practice_index]
         $ practice_translation = personalized_introduction["english_lines"][practice_index]
+        $ practice_evaluation_exclusions = personalized_introduction[
+            "evaluation_exclusions"
+        ][practice_index]
         $ original_reference_text = practice_target
         $ practice_state.start_phrase_attempt(
             final_phrase=practice_state.final_phrase_attempt
@@ -276,6 +330,7 @@ label pronunciation_practice_loop:
 
         $ practice_target = remediation_word["word"]
         $ practice_translation = ""
+        $ practice_evaluation_exclusions = []
         $ practice_state.start_word_attempt()
         $ practice_mode = practice_state.practice_mode
     else:
@@ -286,6 +341,9 @@ label pronunciation_practice_loop:
         practice_target,
         practice_mode,
     )
+    # The learner is listening or recording now; keep Sophie resting while the
+    # speech screen owns that interaction and its reference audio.
+    show sophie conversation neutral closed at sophie_conversation_position
     call screen speech_input(
         mode="pronunciation",
         language="fr",
@@ -294,6 +352,7 @@ label pronunciation_practice_loop:
         translation=practice_translation,
         practice_mode=practice_mode,
         practice_state=practice_state,
+        evaluation_exclusions=practice_evaluation_exclusions,
     )
     $ practice_result = _return
 
