@@ -1,8 +1,8 @@
-# Sophie asks the player to introduce themselves; they choose to speak or type.
+# Sophie asks the player's name; they choose to speak or type it.
 
 screen introduction_controls(
-    question="Why don't you introduce yourself?",
-    voice="audio/chapter1/scene1/sophie/introduce_yourself.mp3",
+    question="What's your name?",
+    voice=None,
 ):
     modal True
     zorder 90

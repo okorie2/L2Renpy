@@ -9,7 +9,10 @@ init offset = -2
 ## Calling gui.init resets the styles to sensible default values, and sets the
 ## width and height of the game.
 init python:
-    gui.init(1080, 1920)
+    ## 1080x2340 (19.5:9) matches iPhone X and later and most current Android
+    ## phones, so the game fills the screen edge to edge. Older 16:9 phones and
+    ## iPads show thin side bars instead. Layout is relative to this size.
+    gui.init(1080, 2340)
 
 
 ## Shared layout values. Derive these from the active Ren'Py design viewport so

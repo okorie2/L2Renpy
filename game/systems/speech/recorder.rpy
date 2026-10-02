@@ -24,6 +24,9 @@ init -20 python:
 
 
     IOS_RECORD_PERMISSION_DENIED = 1684369017
+    # AVAudioSessionCategoryOptionDefaultToSpeaker: while recording, keep game
+    # audio on the loudspeaker instead of the quiet earpiece.
+    IOS_CATEGORY_OPTION_DEFAULT_TO_SPEAKER = 0x8
 
 
     def _is_ios_simulator():
@@ -241,6 +244,8 @@ init -20 python:
 
         def __init__(self):
             self.audio_session = None
+            self.previous_category = None
+            self.paused_music = False
             self.native_recorder = None
             self.temp_dir = None
             self.recording_path = None
@@ -273,8 +278,17 @@ init -20 python:
                 self.audio_session = AVAudioSession.sharedInstance()
                 self._raise_if_permission_denied()
 
-                if not self.audio_session.setCategory_error_(
-                    objc_str("record"),
+                # Ren'Py's own audio output uses this same shared session.
+                # The "Record" category silences all playback, and deactivating
+                # the session afterwards stops Ren'Py's audio for the rest of
+                # the run (music and Sophie's voice both went silent). Use
+                # PlayAndRecord so output stays alive, remember the previous
+                # category, and restore it - never deactivate - when done.
+                self.previous_category = self.audio_session.category
+
+                if not self.audio_session.setCategory_withOptions_error_(
+                    objc_str("AVAudioSessionCategoryPlayAndRecord"),
+                    IOS_CATEGORY_OPTION_DEFAULT_TO_SPEAKER,
                     None,
                 ):
                     raise RecordingError(
@@ -285,6 +299,7 @@ init -20 python:
                     raise RecordingError(
                         "The iOS audio session could not become active."
                     )
+                renpy.log("SpeechRecorder: iOS audio session activated")
 
                 self.temp_dir = tempfile.mkdtemp(
                     prefix="language-app-speech-"
@@ -296,12 +311,12 @@ init -20 python:
 
                 settings = objc_dict(
                     {
-                        objc_str("AVFormatIDKey"): objc_i(1819304813),
-                        objc_str("AVSampleRateKey"): objc_d(16000.0),
-                        objc_str("AVNumberOfChannelsKey"): objc_i(1),
-                        objc_str("AVLinearPCMBitDepthKey"): objc_i(16),
-                        objc_str("AVLinearPCMIsFloatKey"): objc_b(False),
-                        objc_str("AVLinearPCMIsBigEndianKey"): objc_b(False),
+                        "AVFormatIDKey": objc_i(1819304813),
+                        "AVSampleRateKey": objc_d(16000.0),
+                        "AVNumberOfChannelsKey": objc_i(1),
+                        "AVLinearPCMBitDepthKey": objc_i(16),
+                        "AVLinearPCMIsFloatKey": objc_b(False),
+                        "AVLinearPCMIsBigEndianKey": objc_b(False),
                     }
                 )
                 recording_url = NSURL.fileURLWithPath_(
@@ -319,11 +334,17 @@ init -20 python:
                     raise RecordingError(
                         "The iOS microphone recorder could not be created."
                     )
+                renpy.log("SpeechRecorder: iOS recorder created")
 
                 if not self.native_recorder.prepareToRecord():
                     raise RecordingError(
                         "The iOS microphone recorder could not prepare an audio file."
                     )
+
+                # Output stays live in PlayAndRecord, so pause the background
+                # music while the mic is open to keep it out of the recording.
+                renpy.music.set_pause(True, channel="music")
+                self.paused_music = True
 
                 # When permission is undetermined, iOS presents its native
                 # prompt when AVAudioRecorder first attempts to record.
@@ -334,15 +355,16 @@ init -20 python:
                         "Microphone recording was unavailable. Check microphone "
                         "permission in the iPhone Settings app."
                     )
+                renpy.log("SpeechRecorder: iOS recording started")
 
             except RecordingError:
                 self._cancel_native_recording()
-                self._deactivate_audio_session()
+                self._restore_audio_session()
                 self._remove_recording()
                 raise
             except Exception as exc:
                 self._cancel_native_recording()
-                self._deactivate_audio_session()
+                self._restore_audio_session()
                 self._remove_recording()
                 raise RecordingError(
                     "Could not start the iOS microphone recorder: {}".format(
@@ -360,13 +382,13 @@ init -20 python:
             try:
                 native_recorder.stop()
                 self._raise_if_permission_denied()
-                self._deactivate_audio_session()
+                self._restore_audio_session()
             except RecordingError:
-                self._deactivate_audio_session()
+                self._restore_audio_session()
                 self._remove_recording()
                 raise
             except Exception as exc:
-                self._deactivate_audio_session()
+                self._restore_audio_session()
                 self._remove_recording()
                 raise RecordingError(
                     "The iOS microphone recorder did not stop cleanly: {}".format(
@@ -394,7 +416,7 @@ init -20 python:
 
         def cancel_recording(self):
             self._cancel_native_recording()
-            self._deactivate_audio_session()
+            self._restore_audio_session()
             self._remove_recording()
 
         def get_recording_path(self):
@@ -406,7 +428,12 @@ init -20 python:
             if self.audio_session is None:
                 return
 
-            permission = self.audio_session.recordPermission()
+            permission = self.audio_session.recordPermission
+            renpy.log(
+                "SpeechRecorder: iOS microphone permission={}".format(
+                    permission,
+                )
+            )
             try:
                 permission = int(permission)
             except (TypeError, ValueError):
@@ -425,20 +452,43 @@ init -20 python:
             native_recorder = self.native_recorder
             self.native_recorder = None
             try:
-                if native_recorder.isRecording():
+                if native_recorder.isRecording:
                     native_recorder.stop()
             except Exception:
                 pass
 
-        def _deactivate_audio_session(self):
+        def _restore_audio_session(self):
+            """Give the shared audio session back to Ren'Py's playback."""
+
+            if self.paused_music:
+                try:
+                    renpy.music.set_pause(False, channel="music")
+                except Exception:
+                    pass
+                self.paused_music = False
+
             if self.audio_session is None:
                 return
 
             try:
-                self.audio_session.setActive_error_(False, None)
-            except Exception:
-                pass
+                from pyobjus import objc_str
+
+                category = self.previous_category or objc_str(
+                    "AVAudioSessionCategorySoloAmbient"
+                )
+                self.audio_session.setCategory_error_(category, None)
+                # Keep the session active: deactivating it stops Ren'Py audio.
+                self.audio_session.setActive_error_(True, None)
+                renpy.log("SpeechRecorder: iOS audio session restored")
+            except Exception as exc:
+                renpy.log(
+                    "SpeechRecorder: could not restore iOS audio session: {!r}".format(
+                        exc
+                    )
+                )
+
             self.audio_session = None
+            self.previous_category = None
 
         def _remove_recording(self):
             if self.temp_dir and os.path.isdir(self.temp_dir):

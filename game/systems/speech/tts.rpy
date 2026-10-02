@@ -106,9 +106,12 @@ init -10 python:
             raise TTSError("The speech backend returned empty audio.")
 
         temp_dir = tempfile.mkdtemp(prefix="language-app-tts-")
+        # Unique file name per request (the temp dir name is unique): several
+        # generated lines can be registered with Ren'Py at once, and a shared
+        # name would make it play the wrong file.
         audio_path = os.path.join(
             temp_dir,
-            "sophie-introduction" + _tts_file_extension(
+            os.path.basename(temp_dir) + _tts_file_extension(
                 response.headers.get("content-type", "")
             ),
         )
@@ -124,10 +127,15 @@ init -10 python:
 
 
     class FrenchTTSSession(object):
-        """Generate and play one French introduction without blocking Ren'Py."""
+        """Generate and play one Sophie line without blocking Ren'Py.
 
-        def __init__(self, text):
+        Despite the name it isn't French-only: pass language="en" for English
+        lines (e.g. "Nice to meet you, <name>!").
+        """
+
+        def __init__(self, text, language="fr"):
             self.text = text
+            self.language = language
             self.status = TTS_IDLE
             self.error = ""
             self.audio_path = None
@@ -144,7 +152,10 @@ init -10 python:
 
         def _generate_audio(self):
             try:
-                audio_path = synthesize_speech(self.text, language="fr")
+                audio_path = synthesize_speech(
+                    self.text,
+                    language=getattr(self, "language", "fr"),
+                )
                 renpy.invoke_in_main_thread(self._set_ready, audio_path)
             except Exception as exc:
                 renpy.log("Speech TTS: synthesis failed = {!r}".format(exc))

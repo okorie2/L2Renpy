@@ -1,4 +1,56 @@
 # Reusable presentation components for the mobile learning UI.
+
+
+init python:
+    class MobileFieldValue(ScreenVariableInputValue):
+        """A screen-variable input whose keyboard Return key submits.
+
+        on_submit(text) is called with the current text; if it returns a
+        non-None value the screen closes and returns it (like a Continue
+        button), otherwise the field stays open (e.g. validation failed).
+        """
+
+        def __init__(self, variable, on_submit=None):
+            super(MobileFieldValue, self).__init__(variable, returnable=False)
+            self.on_submit = on_submit
+
+        def enter(self):
+            result = None
+            if self.on_submit is not None:
+                result = self.on_submit(self.get_text())
+
+            if result is None:
+                # Keep the Return key here: otherwise Ren'Py passes it on to
+                # other handlers, which can end the screen with a stray value.
+                raise renpy.IgnoreEvent()
+            return result
+
+
+    def mobile_auto_advance_check_voice(what):
+        """Timer callback for the say screen: note when the voice has ended.
+
+        State is keyed by the line's text so it can never carry over from
+        the previous line, whether or not Ren'Py reuses the screen.
+        """
+
+        if not renpy.music.is_playing(channel="voice"):
+            renpy.set_screen_variable("auto_voice_done_for", what)
+            renpy.restart_interaction()
+
+
+    def mobile_auto_advance_wait(what):
+        return max(
+            dialogue_auto_advance_delay,
+            len(what or "") * dialogue_auto_advance_per_char,
+        )
+
+
+    def mobile_submit_text(text):
+        """Return stripped text, or None (stay open) when it is empty."""
+
+        text = (text or "").strip()
+        return text or None
+
 #
 # These screens render content supplied by their callers. They do not own story
 # state, speech state, API calls, or navigation decisions.
@@ -18,6 +70,10 @@ style mobile_sheet_frame is default:
     top_padding sheet_shadow_top + sheet_padding_top
     bottom_padding sheet_padding_bottom
     background Frame("gui/mobile/bottom_sheet.svg", sheet_borders, tile=False)
+
+
+# Floating card variant of the sheet (dock="top"): same card as the dialogue.
+style mobile_top_card_frame is mobile_pronunciation_frame
 
 
 style mobile_sheet_title is default:
@@ -102,21 +158,21 @@ style mobile_name_chip_text is default:
 style mobile_question_text is default:
     xmaximum ui_text_width
     color ui_navy
-    size ui_px(38)
+    size ui_text_title_size
     bold True
     text_align 0.0
 
 
 style mobile_section_label is default:
     color ui_primary_blue
-    size ui_px(23)
+    size ui_text_label_size
     bold True
 
 
 style mobile_french_text is default:
     xmaximum ui_text_width
     color ui_navy
-    size ui_px(34)
+    size ui_text_french_size
     bold True
     text_align 0.0
 
@@ -124,14 +180,29 @@ style mobile_french_text is default:
 style mobile_english_text is default:
     xmaximum ui_text_width
     color ui_secondary_text
-    size ui_px(27)
+    size ui_text_english_size
     text_align 0.0
+
+
+style mobile_bilingual_french is default:
+    xmaximum bilingual_text_width
+    color ui_navy
+    size ui_text_title_size
+    bold True
+    line_spacing ui_px(6)
+    text_align 0.0
+
+
+style mobile_bilingual_english is mobile_bilingual_french:
+    color ui_secondary_text
+    size ui_text_english_size
+    bold False
 
 
 style mobile_body_text is default:
     xmaximum ui_text_width
     color ui_navy
-    size ui_px(28)
+    size ui_text_body_size
     text_align 0.0
 
 
@@ -143,7 +214,7 @@ style mobile_say_dialogue is mobile_body_text:
 style mobile_status_text is default:
     xmaximum ui_text_width
     color ui_secondary_text
-    size ui_px(23)
+    size ui_text_status_size
     text_align 0.0
 
 
@@ -213,14 +284,24 @@ style mobile_choice_button_text is button_text:
     size choice_text_size
 
 
-style mobile_input is input:
-    xalign 0.5
-    xmaximum ui_px(360)
-    xpadding ui_px(22)
-    ypadding ui_px(14)
+# Full-width text field: a framed box containing an `input`.
+style mobile_text_field is default:
+    xfill True
+    ysize text_field_height
+    left_padding text_field_padding_x
+    right_padding text_field_padding_x
+    background Frame("gui/mobile/text_field.svg", text_field_borders, tile=False)
+
+
+style mobile_text_field_input is input:
+    xfill True
+    yalign 0.5
     color ui_navy
-    size ui_px(29)
-    background Frame("gui/mobile/secondary_button.svg", ui_control_borders, tile=False)
+    size text_field_text_size
+
+
+# Kept for older callers; new screens use mobile_text_field + _input.
+style mobile_input is mobile_text_field_input
 
 
 style mobile_mic_button is button:
@@ -255,6 +336,12 @@ transform mobile_sheet_position:
     yalign 1.0
 
 
+transform mobile_top_card_position:
+    xalign 0.5
+    yanchor 0.0
+    ypos ui_safe_top + dialogue_name_chip_overlap_y
+
+
 # Shared bottom sheet (inspo #2): full-width white sheet anchored to the bottom
 # edge with a grab handle, the speaker's name chip on the top-left edge, an
 # optional replay button on the top-right edge, an optional title (usually the
@@ -263,14 +350,19 @@ transform mobile_sheet_position:
 # voice: audio file for the question. The caller queues it with the `voice`
 # statement just before `call screen` (not `play voice`, which Ren'Py's voice
 # system cuts off); the replay button plays it again.
-screen mobile_sheet(title=None, speaker="Sophie", voice=None):
+#
+# dock: "bottom" (default) or "top". Text-input screens use "top" on phones so
+# the on-screen keyboard, which Ren'Py does not move the game for, never
+# covers the question or the field. Docked at the top it becomes a floating
+# card below the notch / Dynamic Island.
+screen mobile_sheet(title=None, speaker="Sophie", voice=None, dock="bottom"):
     fixed:
         fit_first True
-        xsize layout_viewport[0]
-        at mobile_sheet_position
+        xsize (dialogue_card_outer_width if dock == "top" else layout_viewport[0])
+        at (mobile_top_card_position if dock == "top" else mobile_sheet_position)
 
         frame:
-            style "mobile_sheet_frame"
+            style ("mobile_top_card_frame" if dock == "top" else "mobile_sheet_frame")
 
             vbox:
                 xfill True
@@ -282,17 +374,26 @@ screen mobile_sheet(title=None, speaker="Sophie", voice=None):
 
                 transclude
 
-        add "gui/mobile/sheet_handle.svg":
-            xalign 0.5
-            ypos sheet_shadow_top + sheet_handle_top
-            xsize sheet_handle_width
-            ysize sheet_handle_height
+        if dock == "top":
+            $ edge_x = dialogue_card_shadow_x + dialogue_name_chip_left_inset
+            $ edge_y = dialogue_card_shadow_top
+            $ button_x = dialogue_card_shadow_x + dialogue_speaker_right_inset
+        else:
+            $ edge_x = sheet_padding_x
+            $ edge_y = sheet_shadow_top
+            $ button_x = sheet_padding_x
+
+            add "gui/mobile/sheet_handle.svg":
+                xalign 0.5
+                ypos sheet_shadow_top + sheet_handle_top
+                xsize sheet_handle_width
+                ysize sheet_handle_height
 
         if speaker:
             frame:
                 style "mobile_dialogue_name_chip_frame"
-                xpos sheet_padding_x
-                ypos sheet_shadow_top - dialogue_name_chip_overlap_y
+                xpos edge_x
+                ypos edge_y - dialogue_name_chip_overlap_y
                 text speaker:
                     style "mobile_dialogue_name_chip_text"
 
@@ -300,8 +401,8 @@ screen mobile_sheet(title=None, speaker="Sophie", voice=None):
             button:
                 style "mobile_dialogue_speaker_button"
                 xalign 1.0
-                xoffset -sheet_padding_x
-                ypos sheet_shadow_top - (dialogue_speaker_size // 2)
+                xoffset -button_x
+                ypos edge_y - (dialogue_speaker_size // 2)
                 action Play("voice", voice)
                 alt "Replay audio"
 
@@ -324,8 +425,14 @@ screen mobile_choice_sheet(placement=UI_LAYOUT_BOTTOM_SHEET, title=None, speaker
         transclude
 
 
+# On phones, input sheets dock to the top so the keyboard can't cover them.
 screen mobile_input_sheet(placement=UI_LAYOUT_BOTTOM_SHEET, title=None, speaker="Sophie", voice=None):
-    use mobile_sheet(title=title, speaker=speaker, voice=voice):
+    use mobile_sheet(
+        title=title,
+        speaker=speaker,
+        voice=voice,
+        dock=("top" if renpy.variant("mobile") else "bottom"),
+    ):
         transclude
 
 
@@ -473,6 +580,42 @@ screen mobile_pronunciation_card(
                     ysize dialogue_speaker_icon_size
 
 
+# A single text field in a Sophie sheet/card with Back and Continue. The
+# keyboard's Return key also submits. Returns the stripped text, or None when
+# the player taps Back. Continue is disabled until something is typed.
+screen mobile_text_input(question, voice=None, length=30):
+    default text_value = ""
+
+    modal True
+    zorder 90
+
+    use mobile_input_sheet(title=question, voice=voice):
+        vbox:
+            xfill True
+            spacing ui_card_gap_large
+
+            frame:
+                style "mobile_text_field"
+
+                input:
+                    style "mobile_text_field_input"
+                    value MobileFieldValue("text_value", on_submit=mobile_submit_text)
+                    length length
+
+            use mobile_button_row([
+                ("Back", Return(None), "secondary"),
+                (
+                    "Continue",
+                    If(
+                        text_value.strip(),
+                        Function(mobile_submit_text, text_value),
+                        None,
+                    ),
+                    "primary",
+                ),
+            ])
+
+
 # A row of equal-width, equal-height buttons that fills the card's width.
 # buttons: list of (label, action, kind) where kind is "primary" or "secondary".
 screen mobile_button_row(buttons):
@@ -570,51 +713,59 @@ screen mobile_speaker_header(label="Sophie", show_speaker=False):
                 ysize ui_px(42)
 
 
+# Bilingual card (inspo #3): same white card as the dialogue, with a flag
+# beside each language - French (bold, primary) then English (grey). The
+# replay button reads the French again once Sophie has finished.
 screen mobile_bilingual_card(
     french_text,
     english_text,
     tts_session=None,
     placement=UI_LAYOUT_BOTTOM,
 ):
-    use mobile_card(placement=placement):
+    $ replay_action = (
+        Function(tts_session.replay)
+        if tts_session is not None and tts_session.status == TTS_FINISHED
+        else None
+    )
+
+    use mobile_pronunciation_card(
+        placement=placement,
+        show_speaker=tts_session is not None,
+        speaker_action=replay_action,
+    ):
         vbox:
             xfill True
-            spacing ui_card_gap
+            spacing ui_card_gap_large
 
-            use mobile_speaker_header(
-                label="Sophie",
-                show_speaker=tts_session is not None,
-            )
+            use mobile_flag_line("gui/mobile/flag_fr.svg", french_text, "mobile_bilingual_french")
+            use mobile_flag_line("gui/mobile/flag_gb.svg", english_text, "mobile_bilingual_english")
 
-            use mobile_language_block(
-                "FRANÇAIS",
-                french_text,
-                primary=True,
-            )
+            # No Continue when dialogue auto-advances: the screen moves on by
+            # itself once Sophie has read the French (see bilingual_introduction).
+            if not dialogue_auto_advance:
+                use mobile_primary_button(
+                    "Continue",
+                    Return(),
+                    sensitive=tts_session is None or tts_session.can_continue(),
+                )
 
-            use mobile_language_block(
-                "ENGLISH",
-                english_text,
-                primary=False,
-            )
 
-            if tts_session is not None:
-                if tts_session.status == TTS_PREPARING:
-                    text "Preparing Sophie's voice...":
-                        style "mobile_status_text"
-                elif tts_session.status == TTS_PLAYING:
-                    text "Sophie is speaking...":
-                        style "mobile_status_text"
-                elif tts_session.status == TTS_ERROR:
-                    text "Voice unavailable — the text is still available.":
-                        style "mobile_status_text"
-                        color ui_error
+# A flag beside a (possibly multi-line) text, aligned to its first line.
+screen mobile_flag_line(flag, content, text_style):
+    hbox:
+        spacing bilingual_flag_gap
 
-            use mobile_primary_button(
-                "Continue",
-                Return(),
-                sensitive=tts_session is None or tts_session.can_continue(),
-            )
+        add flag:
+            xsize bilingual_flag_width
+            ysize bilingual_flag_height
+            yoffset ui_px(8)
+
+        text content:
+            style text_style
+
+
+transform mobile_mic_state(enabled=True):
+    alpha (1.0 if enabled else 0.4)
 
 
 screen mobile_microphone_button(action, recording=False, sensitive=True):
@@ -622,6 +773,8 @@ screen mobile_microphone_button(action, recording=False, sensitive=True):
         style "mobile_mic_button"
         action action
         sensitive sensitive
+        # Dimmed while unavailable (e.g. while Sophie is speaking).
+        at mobile_mic_state(sensitive)
 
         if recording:
             add "gui/mobile/mic_circle_recording.svg":

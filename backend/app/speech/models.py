@@ -1,10 +1,9 @@
-"""Load the local speech models once for the lifetime of the process."""
+"""Load the local pronunciation model once for the process lifetime."""
 
-from transformers import AutoModelForCTC, AutoProcessor, pipeline
+from transformers import AutoModelForCTC, AutoProcessor
 
 
 PHONEMIZER_MODEL_ID = "Cnam-LMSSC/wav2vec2-french-phonemizer-v2"
-WHISPER_MODEL_ID = "openai/whisper-small"
 
 
 # These module-level objects are intentionally initialized once when the
@@ -12,8 +11,3 @@ WHISPER_MODEL_ID = "openai/whisper-small"
 phoneme_processor = AutoProcessor.from_pretrained(PHONEMIZER_MODEL_ID)
 phoneme_model = AutoModelForCTC.from_pretrained(PHONEMIZER_MODEL_ID)
 phoneme_model.eval()
-
-whisper = pipeline(
-    "automatic-speech-recognition",
-    model=WHISPER_MODEL_ID,
-)

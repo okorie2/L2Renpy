@@ -8,3 +8,4 @@ librosa
 soundfile
 elevenlabs
 python-dotenv
+faster-whisper
