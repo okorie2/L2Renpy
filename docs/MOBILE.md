@@ -71,8 +71,10 @@ Android's automatic cloud backup is switched off (`allowBackup="false"`), so the
 
 ## What only works with your computer
 
-- **Voices** use the voices built into macOS, so the backend must be the Mac. A hosted backend needs another voice provider (an open decision in `PLAN.md`).
-- **Speech recognition** runs in `speech-service/` on the same computer.
+The backend (`backend/README.md`) must be started with `--host 0.0.0.0 --port 3000`, or the phone cannot reach it.
+
+- **Voices** come from ElevenLabs when it is configured in `backend/.env`; otherwise from the voices built into macOS, which only exist on a Mac.
+- **Speech recognition** runs a local Whisper model inside the backend, on the same computer.
 - **The AI second opinion** needs the OpenRouter key in `backend/.env`.
 
 ## Status

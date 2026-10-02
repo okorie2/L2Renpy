@@ -63,12 +63,13 @@ Existing architecture includes:
 - Communication assessment of the player's turn (typed or picked), finite retries
 - Learning engine: per-modality evidence and log, vocabulary detection, standings
   without percentages, support that follows behaviour, a Progress sheet
-- Backend slice (`backend/`): NestJS health checks and cached, provider-neutral
-  text-to-speech with a local development provider
+- Backend (`backend/`): one Python/FastAPI service with health checks, cached,
+  provider-neutral text-to-speech with a voice per character, local Whisper
+  recognition, the AI second opinion and pronunciation evaluation (section 4A.8)
 - Voiced lines: replay, slower playback, mouth timeline, sound settings,
   listening evidence, silent fallback
 - Spoken answers: microphone capture, backend transcription through a local
-  Whisper model (`speech-service/`), typed fallback on every turn
+  Whisper model in `backend/`, typed fallback on every turn
 - Initial French language pack
 - Four-location neighborhood with tap movement, collision and portals
 - Sophie as the guide: world sprite (idle/walking/waving) and conversation portrait
@@ -89,7 +90,6 @@ Existing documentation:
 - docs/DIALOGUE-SYSTEM.md
 - docs/LEARNING-SYSTEM.md
 - backend/README.md
-- speech-service/README.md
 - docs/SPEECH-SYSTEM.md
 - docs/SAVE-SYSTEM.md
 - docs/AI-CONVERSATION.md
@@ -345,9 +345,17 @@ always continue, and the concept is recorded for later reinforcement.
 ## 4A.8 Provider-neutral speech and backend boundary
 
 The game depends on interfaces for speech-to-text, text-to-speech and
-pronunciation assessment, never on a named vendor. NestJS remains the primary
-application backend. Machine-learning and audio work may live in a specialised
-Python/FastAPI service behind it. See Phase 7 and docs/SPEECH-SYSTEM.md.
+pronunciation assessment, never on a named vendor. The application backend is
+one Python/FastAPI service (`backend/`), and the only server the client talks
+to. See Phase 7 and docs/SPEECH-SYSTEM.md.
+
+Decision (owner, 2026-10-02): the NestJS application backend and the separate
+Python speech service were replaced by a single Python backend, starting from the
+Ren'Py version's speech backend (tag `renpy-final`). Reasons: nearly all of the
+backend's work is speech and ML, which lives in Python; that backend already had
+pronunciation analysis and hosted voices; one service is simpler to run and to
+maintain. Accounts, cloud save and the database will be built in the same
+service when their phases come.
 
 ## 4A.9 Portrait-first mobile
 
@@ -852,37 +860,29 @@ Provide mock/development support where practical.
 
 Only introduce the backend once the local gameplay loop is functioning.
 
-Create:
-
-backend/
-NestJS
-Prisma
-PostgreSQL
+The backend is one Python/FastAPI service in `backend/` (decision in section
+4A.8). Persistence, when it comes, is PostgreSQL behind it.
 
 ## Architecture
 
     React + Phaser + Capacitor
                |
                v
-             NestJS
-        main application API
+      Python backend (FastAPI)
+      main application API
+       /     |       |       \
+     STT    TTS   Pronunc.   AI conversation
                |
-        ------------------
-        |                |
-      Postgres       Speech/ML service
-                         FastAPI
-                     /     |      \
-                   STT    TTS    Pronunciation
+           Postgres (planned)
 
-NestJS is the primary application backend and the only service the client talks
-to. A specialised Python/FastAPI service is planned for machine-learning and
-audio work where that ecosystem fits better: faster-whisper, torch models,
-librosa/audio processing, phoneme analysis and other speech ML. Do not build it
-before a phase needs it.
+The backend is the only service the client talks to. Speech and ML run inside
+it (faster-whisper, torch models, librosa/audio processing, phoneme analysis).
+A model with dependencies that clash with the rest may run as a separate local
+process behind it, as the optional Chatterbox voice does.
 
 ## Responsibilities
 
-NestJS should eventually handle:
+The backend should eventually handle:
 
 - accounts
 - cloud save
@@ -1554,31 +1554,35 @@ phone of Phase 10 are complete.
 Real speech providers need credentials or models that cannot ship inside the
 app, so audio was built in this order rather than by phase number:
 
-1. **Backend slice for speech.** `backend/`: NestJS with liveness and readiness,
-   and a provider-neutral, cached `POST /speech/synthesize`.
+1. **Backend slice for speech.** `backend/`: liveness and readiness, and a
+   provider-neutral, cached `POST /speech/synthesize`. First built in NestJS,
+   now the Python backend (section 4A.8).
 2. **Phase 6 — voiced lines.** Replay, slower playback, a mouth that follows the
    audio, sound settings, listening evidence, silent fallback.
-3. **Phase 5 — speech input.** `speech-service/`: FastAPI with a local Whisper
-   model, warmed at startup. The backend's `POST /speech/transcribe` forwards
-   recordings to it. In the game the learner taps, speaks, and the transcript
-   enters the dialogue engine as a spoken answer. Typing remains on every turn.
+3. **Phase 5 — speech input.** A local Whisper model in the backend, warmed at
+   startup, behind `POST /speech/transcribe`. In the game the learner taps,
+   speaks, and the transcript enters the dialogue engine as a spoken answer.
+   Typing remains on every turn.
 
-Three processes run in development: the frontend (5173), the backend (3000) and
-the speech service (8000). Without the last two the game is silent and typed,
-and otherwise the same.
+Two processes run in development: the frontend (5173) and the backend (3000).
+Without the backend the game is silent and typed, and otherwise the same.
 
 Still open from the speech plan:
 
 - **Pronunciation analysis and the word-practice loop** (section 4A.7). Speech is
-  assessed for communication only. L2Renpy's approach (a French phoneme model,
-  word-by-word alignment, weakest word, finite practice) is written up in
-  `docs/SPEECH-SYSTEM.md` as the starting point.
-- **A production voice.** The development voice is the macOS system voice; a
-  hosted or local TTS model is one backend adapter. Owner's decision.
+  assessed for communication only in the game. The Ren'Py evaluator (a French
+  phoneme model, word-by-word alignment, weakest word) is back in the backend as
+  `POST /speech/pronunciation`, still in its Ren'Py shape (reference audio
+  uploaded with each attempt). Next: an exercise-ID endpoint, and the practice
+  loop in the game (`docs/SPEECH-SYSTEM.md`).
+- **A production voice.** ElevenLabs is wired in, with a voice per character
+  (`ELEVENLABS_VOICES`); the macOS voices remain for development. Choosing the
+  voices for Nadia, Luc and Malik is the owner's.
 - **Authentication or rate limiting** on the speech endpoints, required before
   the backend is reachable from outside a developer machine.
-- **Recognition accuracy** has been checked with synthesized speech only, on the
-  `small` model. Real learner accents may need `large-v3-turbo`.
+- **Recognition accuracy** has been checked with synthesized speech only. The
+  backend now defaults to `large-v3-turbo`, as the Ren'Py version did;
+  `FASTER_WHISPER_MODEL=small` is quicker if answers feel slow.
 
 ## Local save, as built
 

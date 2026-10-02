@@ -1,5 +1,6 @@
-node_modules
-dist
 .env
-.tts-cache
-.DS_Store
+.venv/
+tts_service/.venv/
+.tts_cache/
+__pycache__/
+.pytest_cache/

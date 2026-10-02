@@ -36,9 +36,9 @@ There is no "suggested game events" field. The only thing an opinion can lead to
 | Engine support | `frontend/src/dialogue/engine.ts` | `SAY.judgement`, `session.lineOverride`, `sessionLine`, `HistoryLine.rewording` |
 | `buildTurnContext` | `frontend/src/conversation/context.ts` | The scene sent for an opinion |
 | `createHttpTurnJudge` | `frontend/src/conversation/httpJudge.ts` | Asks the backend; never throws; leaves it alone for 30 s after a failure |
-| Request limits, prompt, reply checks | `backend/src/conversation/turn.ts` | Pure functions |
-| `ConversationService` | `backend/src/conversation/conversation.service.ts` | Cache, calls-per-minute cap, timeout, one retry, error statuses |
-| `ChatModel`, `OpenRouterProvider` | `backend/src/conversation/chat-model.ts`, `providers/` | The provider-neutral interface and its one adapter |
+| Request limits, prompt, reply checks | `backend/app/conversation/turn.py` | Pure functions |
+| `ConversationService` | `backend/app/conversation/service.py` | Cache, calls-per-minute cap, timeout, one retry, error statuses |
+| `ChatModel`, `OpenRouterModel` | `backend/app/conversation/service.py` | The provider-neutral interface and its one adapter |
 
 ## What is sent
 
@@ -72,11 +72,11 @@ Today the client describes the scene because the content lives in the client. Wh
 | `AI_TIMEOUT_MS` | `8000` | Per model call. |
 | `AI_REQUESTS_PER_MINUTE` | `60` | Cap across all players. |
 
-Adding a provider is one adapter implementing `ChatModel` and one case in `createChatModel`.
+Adding a provider is one adapter implementing `ChatModel` and one case in `create_chat_model`.
 
 ## Checking a model
 
-`npm run eval` in `backend/` runs 18 Chapter 1 turns through the configured model and prints verdicts, replies and timings (`AI_MODEL=<id> npm run eval` to compare another). It needs the key, costs a fraction of a cent, and is not part of `npm test` because answers can vary. On 2026-10-02 `google/gemini-3.1-flash-lite` gave the expected verdict on 17 of 18 with a median of about 1.1 s; the other was a malformed reply, which the service now retries once.
+On 2026-10-02 `google/gemini-3.1-flash-lite` gave the expected verdict on 17 of 18 Chapter 1 turns with a median of about 1.1 s; the other was a malformed reply, which the service now retries once. That check was a script in the earlier NestJS backend and was not ported to the Python backend; the unit tests (`backend/tests/test_conversation.py`) fake the model.
 
 ## Known limits
 

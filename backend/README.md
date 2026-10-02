@@ -1,135 +1,180 @@
 # Second Language backend
 
-The application API. The game client talks only to this service; provider keys, models and voices stay here.
+One Python (FastAPI) service, and the only server the game talks to. It voices character lines, turns spoken answers into words, gives a second opinion on answers the game's own rules do not recognise, and evaluates pronunciation.
 
-This is a deliberately small first slice: health checks, text-to-speech, speech recognition and the AI conversation layer. The game uses it to voice character lines, to hear spoken answers, and to get a second opinion on what a learner meant. Accounts, saves, progression, content APIs, speech recognition and the database come in later phases (see `../PLAN.md`).
+The game never needs it. Without it the game is silent and typed-only, and otherwise the same. Progress and saves stay on the device.
+
+This backend started as the Ren'Py version's speech backend (`renpy-final` tag). It was extended to serve the Phaser game: voices per character, slower playback, lip-sync timelines in the response, readiness checks, CORS for the installed apps, and the AI conversation layer ported from the earlier NestJS slice.
+
+| Service | Port | What it does | Needed? |
+| --- | --- | --- | --- |
+| Main backend (`backend/app`) | 3000 | Everything the game calls | For voices, the microphone and the AI second opinion |
+| Chatterbox (`backend/tts_service`) | 8001 | A local voice model | Only with `LANGUAGE_APP_TTS_PROVIDER=chatterbox` |
+
+## One-time setup
+
+Run from `backend/`. Use **uv's own Python**, not Homebrew's: Homebrew's `python@3.12` 3.12.14 is broken on macOS 26.2 (its XML module fails to load, which breaks pip).
+
+```bash
+uv python install 3.12
+uv venv --python 3.12 --python-preference only-managed .venv
+uv pip install --python .venv/bin/python -r requirements.txt -r requirements-dev.txt
+cp .env.example .env    # then fill in what you use; see "Settings"
+```
+
+Models download on first use and are cached afterwards: Whisper `large-v3-turbo` (about 1.6 GB, at startup), the pronunciation model (about 400 MB, on the first pronunciation request) and the name model (about 430 MB, only if `/text/extract-name` is called).
 
 ## Run
 
 ```bash
-npm install
-npm run dev
+.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 3000
 ```
 
-It listens on port 3000. Settings come from `.env` (copy `.env.example`); every value has a development default, so no `.env` is needed to start.
+- **`--host 0.0.0.0`** lets a phone on the same Wi-Fi reach it. Without it only the Mac can.
+- **Port 3000** is where the game looks by default (`VITE_API_URL`).
+- Add `--reload` while editing the code.
+
+The server answers at once and loads Whisper in the background. Recognition is ready when the log says `Speech-to-text (faster-whisper) ready`. Until then the game shows the typed field only.
+
+Check it:
 
 ```bash
-npm test
+curl http://127.0.0.1:3000/health/ready
 ```
+
+```bash
+.venv/bin/python -m pytest
+```
+
+The tests fake every provider and model, so they run offline in about a second.
 
 ## Endpoints
 
 | Method | Path | Purpose |
 | --- | --- | --- |
 | GET | `/health` | Liveness: the process is up. |
-| GET | `/health/ready` | Readiness: the speech provider is warmed and its voices exist. `503` until then. |
-| GET | `/speech/capabilities` | What works right now: `{ synthesis, recognition }`. The game offers the microphone only when recognition is true. |
-| POST | `/speech/synthesize` | Voice one line. |
-| POST | `/speech/transcribe` | Turn a short recording into words. |
-| GET | `/conversation/capabilities` | `{ judgement }`: whether a language model is configured. |
-| POST | `/conversation/turn` | A second opinion on one learner turn. |
+| GET | `/health/ready` | Readiness: `200` once lines can be voiced, `503` before. Also reports recognition, pronunciation and the AI layer. |
+| GET | `/speech/capabilities` | `{ synthesis, recognition }`. The game shows the microphone only when `recognition` is true. |
+| POST | `/speech/synthesize` | JSON `{ text, languageCode, speakerId?, rate? }` → audio. Headers: `X-Mouth-Timeline` (one `0`/`1` per frame), `X-Mouth-Fps` (20), `X-Speech-Cache` (`hit`/`miss`), `X-Speech-Key`. |
+| POST | `/speech/transcribe` | Multipart `audio` + `languageCode` → `{ transcript, speechDetected, confidence, language }`. Silence is `speechDetected: false`, not an error. |
+| POST | `/speech/practice` | Multipart `audio`, `text`, `languageCode`, `speakerId`, `excluded` (JSON list of words not graded) → `{ similarity, words, weakestWord }`. The reference is the speaker's own cached voice for `text`. Used by the opening's practice. |
+| POST | `/speech/pronunciation` | Multipart `reference_text`, `reference_audio`, `learner_audio`, optional `evaluation_exclusions` → per-word results and the weakest word. From the Ren'Py version. **The game does not call it yet.** |
+| POST | `/text/extract-name` | `{ text }` → `{ name }`. A name-finding model, from the Ren'Py version. The game uses its own rules today. |
+| GET | `/conversation/capabilities` | `{ judgement }`: whether the AI second opinion is switched on. |
+| POST | `/conversation/turn` | A second opinion on one learner turn. See `../docs/AI-CONVERSATION.md`. |
 
-### `POST /speech/synthesize`
+Status codes the game relies on:
 
-```json
-{ "text": "Salut ! Je m'appelle Sophie.", "languageCode": "fr", "speakerId": "sophie", "rate": "normal" }
-```
+- **`400`**: the request itself is wrong. The game does not back off.
+- **`413`**: a recording over 3 MB or 20 s.
+- **`422`**: audio that cannot be decoded.
+- **`429`**: the AI per-minute cap is reached.
+- **`502`**: a provider gave an unusable answer.
+- **`503`**: not configured, not ready or not reachable.
 
-- `text`: up to 300 characters.
-- `languageCode`: a language that has voices configured.
-- `speakerId` (optional): who is speaking, as a game ID. The server maps it to a voice; an unknown speaker gets the language's default voice.
-- `rate` (optional): `normal` or `slow`.
+## Settings
 
-The response body is the audio. Headers:
+Everything lives in `backend/.env` (never committed). Every value has a default. `.env.example` lists them all.
 
-| Header | Meaning |
-| --- | --- |
-| `Content-Type` | the audio format (`audio/wav` from the system provider) |
-| `X-Speech-Cache` | `hit` or `miss` |
-| `X-Speech-Key` | the cache key of this line |
-| `X-Mouth-Timeline`, `X-Mouth-Fps` | optional lip-sync track: one `0` (closed) or `1` (open) per frame |
+### Voices
 
-Try it:
+`LANGUAGE_APP_TTS_PROVIDER` picks the voice:
 
-```bash
-curl -X POST http://localhost:3000/speech/synthesize -H 'Content-Type: application/json' -d '{"text":"Bonjour ! Vous désirez ?","languageCode":"fr","speakerId":"barista"}' --output line.wav
-```
-
-### `POST /speech/transcribe`
-
-Multipart form: `audio` (the recording, up to 3 MB) and `languageCode`.
-
-```json
-{ "transcript": "Je voudrais un café, s'il vous plaît.", "speechDetected": true, "confidence": 0.94 }
-```
-
-The backend forwards the recording to the speech service (`../speech-service`, local Whisper) and returns only the words. It does not decide whether they answered anything; the game's dialogue engine does. Recordings are held in memory for the request and never stored, and logs record sizes and timings, never what was said.
-
-```bash
-curl -X POST http://localhost:3000/speech/transcribe -F audio=@answer.wav -F languageCode=fr
-```
-
-Recognition needs the speech service running (`SPEECH_SERVICE_URL`, default `http://127.0.0.1:8000`). Without it `/speech/capabilities` reports `recognition: false`, voices still work, and the game falls back to typed answers.
-
-### `POST /conversation/turn`
-
-Asks the configured language model which expected intent, if any, the learner expressed, and what the character might say if none. The answer is advice; the game's dialogue engine decides what happens. Full description in `../docs/AI-CONVERSATION.md`.
-
-```json
-{
-  "languageCode": "fr", "level": "A1",
-  "npc": { "name": "Nadia", "role": "the barista of the neighbourhood café", "register": "formal" },
-  "place": "Café", "goal": "Order a coffee",
-  "recentLines": [{ "speaker": "npc", "text": "Vous désirez ?" }],
-  "intents": [{ "id": "orderDrink", "description": "Order a coffee (any kind of coffee, but not another drink).", "examples": ["Un café, s'il vous plaît."] }],
-  "knownVocabulary": ["bonjour", "café"],
-  "utterance": "Je prends un petit noir", "attempt": 1
-}
-```
-
-```json
-{ "detectedIntent": "orderDrink", "confidence": 1 }
-```
-
-On a miss: `{ "detectedIntent": null, "confidence": 0, "npcResponse": { "text": "…", "translation": "…" } }`. An accepted answer may carry `correction`, another way to say it.
-
-| Status | Meaning |
-| --- | --- |
-| `400` | The request is missing something or is over a limit. |
-| `429` | The per-minute cap (`AI_REQUESTS_PER_MINUTE`) is reached. |
-| `502` | The model's reply was unusable, twice. |
-| `503` | No model is configured, or it could not be reached in time. |
-
-Put `OPENROUTER_API_KEY` in `.env` to switch it on; `AI_MODEL` chooses the model. `npm run eval` runs a set of Chapter 1 turns through the live model and prints what it decided.
-
-## Providers
-
-Speech vendors sit behind one interface, `TtsProvider` (`src/speech/tts.provider.ts`). `TTS_PROVIDER` chooses the adapter in `createTtsProvider` (`src/speech/speech.module.ts`).
-
-| Provider | Status | Notes |
+| Value | What it is | Notes |
 | --- | --- | --- |
-| `system` | implemented | The voices built into macOS (`say`). Free and local, for development only: it does not exist on Linux servers and is not a production voice. See "Better development voices" below. |
-| a hosted provider | not chosen yet | Needs an account and key. Adding one is a new adapter file plus one line in `createTtsProvider`; nothing else changes. |
+| `elevenlabs` | Hosted voices | Needs `ELEVENLABS_API_KEY`, `ELEVENLABS_MODEL_ID` and a voice. The production choice. |
+| `system` | The voices built into macOS (`say`) | Free and local. The default on a Mac. Development only. |
+| `chatterbox` | A local model in `tts_service/` | One voice for everyone, and slow on a laptop. |
+| `none` | Off | The game runs silently. |
 
-Voices are configured per language and speaker with `TTS_VOICES`. A speaker's value may be a list in order of preference; the first voice the provider has is used, and the startup log says which were chosen. Voice names belong to the provider and never appear in the client.
+**ElevenLabs voices per character.** `ELEVENLABS_VOICES` maps the game's speaker IDs to voice IDs:
 
-### Better development voices
+```dotenv
+ELEVENLABS_VOICES={"sophie":"<voice-id>","barista":"<voice-id>","baker":"<voice-id>","neighbor":"<voice-id>"}
+```
 
-macOS has two kinds of French voice. `Thomas`, `Jacques` and `Amélie` sound natural. The ones with a locale in brackets, such as `Flo (French (France))`, are an old robotic synthesizer that speaks syllable by syllable; they are not used.
+Anyone not listed, including the player's model answers, uses `ELEVENLABS_VOICE_ID`, which was Sophie's voice in the Ren'Py `.env`. With only that set, everyone sounds like Sophie. "Slower" asks ElevenLabs for speed 0.8.
 
-Out of the box the female voice is `Amélie`, which has a Canadian accent. For a France-French female voice and better quality all round, download an enhanced voice (free): **System Settings → Accessibility → Spoken Content → System Voice → Manage Voices → French**, then pick `Audrey` (Premium or Enhanced) and, if you like, the enhanced `Thomas`. Restart the backend; they are picked up automatically, and because the voice is part of the cache key, lines are regenerated with the new voice.
+**macOS voices.** Out of the box the female voice is `Amélie`, which has a Canadian accent. For a France-French voice, download `Audrey` (free): **System Settings → Accessibility → Spoken Content → System Voice → Manage Voices → French**. Restart the backend and it is picked up. `SYSTEM_VOICES` overrides the whole table as JSON.
 
-## Caching
+**Cache.** Every line is stored in `.tts_cache/` with its lip-sync timeline and reused. The key covers the provider, model, voice, language, speed and exact text, so changing any of them never plays stale audio. ElevenLabs is paid for once per line. Delete the folder to clear it, or set `LANGUAGE_APP_TTS_CACHE_DIR=off`.
 
-Every generated line is stored in `TTS_CACHE_DIR` (default `.tts-cache/`) and reused. The key is built from provider, model, voice, language, rate and the exact text, so changing any of them never plays stale audio, and an identical line is synthesized only once. Simultaneous requests for the same line share one synthesis. Delete the folder to clear it, or set `TTS_CACHE_DIR=off`.
+### Speech recognition
 
-## Startup and readiness
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `LANGUAGE_APP_STT_PROVIDER` | `faster-whisper` | `faster-whisper` (local), `elevenlabs` (Scribe; needs the key) or `none` |
+| `FASTER_WHISPER_MODEL` | `large-v3-turbo` | `small` is quicker on a laptop (about 1 s an answer) but copes less well with accents |
+| `FASTER_WHISPER_DEVICE` | `auto` | GPU when there is one, else CPU |
+| `FASTER_WHISPER_COMPUTE_TYPE` | `auto` | `int8` is a good choice on CPU |
+| `FASTER_WHISPER_BEAM_SIZE` | `1` | Higher is slightly more accurate and slower |
 
-The provider is warmed when the service starts: models load, credentials are checked, and every configured voice must exist. If that fails the service stays up but reports not-ready, and synthesis returns `503`; the game then shows lines without voice. The first learner never pays the model-loading time.
+Recordings are decoded with PyAV, which reads what iPhones (MP4/AAC) and browsers (WebM/Opus) record. Whisper's invented subtitles on silence ("Sous-titres réalisés par…") and low-confidence guesses are dropped. A recording is used for one request and deleted; logs hold sizes and timings, never words.
 
-## Not here yet
+### AI second opinion
 
-- A hosted voice provider (a decision and a key are needed).
-- Pronunciation assessment.
-- Accounts, saves, progression, content/exercise APIs, Postgres/Prisma.
-- Authentication. Until accounts exist, anything that can reach the service can ask it to synthesize or transcribe speech, or to spend the AI key up to its per-minute cap; with a paid provider, or on a public address, that must be closed first.
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `OPENROUTER_API_KEY` | none | Without it the layer is off and the game uses its own rules only |
+| `AI_PROVIDER` | `openrouter` with a key, else `none` | `none` switches it off |
+| `AI_MODEL` | `google/gemini-3.1-flash-lite` | Any OpenRouter model with structured output |
+| `AI_TIMEOUT_MS` | `8000` | Per model call |
+| `AI_REQUESTS_PER_MINUTE` | `60` | Cap across all players |
+
+### Pronunciation
+
+The phoneme model is loaded at startup, in the background, because the game's opening uses it. `PRONUNCIATION_PRELOAD=false` loads it on the first request instead. `VOICE_LANGUAGES` (default `en`) adds languages that characters may be voiced in without learners answering in them, such as Sophie's English welcome.
+
+### Access
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `CORS_ORIGINS` | the dev page plus the iOS and Android app origins | Which web pages may call the API |
+| `SPEECH_LANGUAGES` | `fr` | Languages characters speak and learners may answer in |
+
+**There is no authentication.** Anyone who can reach the backend can use your ElevenLabs and OpenRouter keys, up to the AI per-minute cap. It is safe on a home network only. Set spending limits on both keys.
+
+## Chatterbox (optional)
+
+Chatterbox has its own environment because it pins torch/transformers/librosa versions that clash with the pronunciation model's.
+
+```bash
+uv venv --python 3.12 --python-preference only-managed tts_service/.venv
+uv pip install --python tts_service/.venv/bin/python -r tts_service/requirements.txt
+tts_service/.venv/bin/uvicorn server:app --app-dir tts_service --port 8001
+```
+
+Then set `LANGUAGE_APP_TTS_PROVIDER=chatterbox` and restart the main backend.
+
+## Pronunciation by hand
+
+The fixtures from the Ren'Py version are still here:
+
+```bash
+curl -X POST http://127.0.0.1:3000/speech/pronunciation \
+  -F "reference_text=Bonjour, je m'appelle Sophie." \
+  -F "reference_audio=@test.wav" \
+  -F "learner_audio=@learner.wav"
+```
+
+`evaluate_pronunciation.py` runs the same evaluation from the command line. How it works is described in `../docs/SPEECH-SYSTEM.md`.
+
+## Layout
+
+```
+app/
+  main.py                  routes, CORS, startup
+  config.py                shared settings
+  speech/
+    tts.py                 voice providers, voices per speaker, cache, readiness
+    lipsync.py             mouth timeline from audio
+    transcribe.py          recognition providers, warm-up, readiness
+    audio.py               decoding (PyAV for recordings, librosa for the phoneme model)
+    pronunciation.py …     phoneme alignment, weakest word, phonetic guide
+  conversation/
+    turn.py                request limits, prompt, reply checks (pure)
+    service.py             model adapter (OpenRouter), cache, per-minute cap
+  text/names.py            name extraction
+tts_service/               optional Chatterbox server
+tests/                     pytest; everything external is faked
+```

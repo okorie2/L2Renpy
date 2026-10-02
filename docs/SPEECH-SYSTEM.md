@@ -7,7 +7,7 @@ Speaking is central to the product and strongly encouraged. It is also never a w
 ## Spoken answers
 
 ```
-tap ─▶ recorder (MediaRecorder) ─▶ backend /speech/transcribe ─▶ speech service (Whisper) ─▶ transcript
+tap ─▶ recorder (MediaRecorder) ─▶ backend /speech/transcribe (local Whisper) ─▶ transcript
                                                                                               │
                               dialogue engine: SAY, mode "speech" ◀─────────────────────────────┘
                               (intent assessed ─▶ quest event ─▶ speaking evidence, or an in-scene "Pardon ?")
@@ -19,8 +19,7 @@ tap ─▶ recorder (MediaRecorder) ─▶ backend /speech/transcribe ─▶ spe
 | `SpeechControl` | `frontend/src/app/components/SpeechControl.tsx` | the microphone button, rendered from the speech session state machine |
 | `createHttpSpeechToText` | `frontend/src/speech/httpStt.ts` | uploads the recording to the backend |
 | `fetchSpeechCapabilities` | same file | asks the backend whether recognition is available |
-| `POST /speech/transcribe` | `backend/` | validates and forwards; returns only the words |
-| speech service | `speech-service/` | FastAPI with a local Whisper model, warmed at startup |
+| `POST /speech/transcribe` | `backend/app/speech/transcribe.py` | validates, decodes the recording, runs a local Whisper model (warmed at startup); returns only the words |
 
 Behaviour:
 
@@ -137,6 +136,17 @@ The server and content system own the expected text, phonemes, canonical audio, 
 
 Names, places, brands, foreign words and dynamic story values are excluded from pronunciation assessment through `assessment.excludedSpans` on the line (see `CONTENT-SCHEMA.md`).
 
+## Pronunciation practice in the opening
+
+The first pronunciation practice is built: at the end of Sophie's welcome the learner practises the introduction she just taught, line by line (`meetSophie.practice`, a `practice` response).
+
+- `frontend/src/speech/practice.ts` is the loop as pure functions, with the Ren'Py thresholds: a line is clear at 0.85; otherwise the weakest word is practised (clear at 0.80, at most three tries, a sound-it-out guide on the third), then the whole line once more, then on regardless.
+- `POST /speech/practice` takes the learner's audio, the line, the speaker and the words not to grade (the learner's name). The server makes the reference from the speaker's cached voice for that line, so the learner is compared with exactly what they heard.
+- The learner sees words marked clear or worth practising, never a number. "Skip this line" and "Stop practising" are always there; without a microphone or the pronunciation model, the lines are shown to listen to and repeat, and the game continues.
+- Practice records no learning evidence yet and never affects quests.
+
+Lines in the learner's own language (`language: "interface"` on a node, such as Sophie's welcome) are voiced in English: from a recording shipped with the game when there is one (`frontend/src/speech/recordings.ts`), otherwise by the backend, whose `VOICE_LANGUAGES` adds English to the voiced languages.
+
 ## Pronunciation remediation loop
 
 ```
@@ -151,7 +161,7 @@ Retries are always finite. After the bounded attempts the player continues and t
 
 ### How L2Renpy analyses pronunciation (reference for this phase)
 
-Read from the L2Renpy prototype on 2026-10-02 (`backend/app/speech/pronunciation.py`, `phonemize.py`, `text_phonemize.py`, `phonetic_guide.py`, `game/systems/speech/practice.rpy`). Nothing was copied; this records the approach so the phase can start from it.
+Read from the L2Renpy prototype on 2026-10-02 (`backend/app/speech/pronunciation.py`, `phonemize.py`, `text_phonemize.py`, `phonetic_guide.py`, `game/systems/speech/practice.rpy`). The evaluator itself is now back in this project's backend as `POST /speech/pronunciation`, unchanged; the game-side practice loop is still to build.
 
 | Step | What L2Renpy does |
 | --- | --- |
@@ -166,7 +176,7 @@ Read from the L2Renpy prototype on 2026-10-02 (`backend/app/speech/pronunciation
 
 What adopting it here needs:
 
-- **Speech service:** load the phoneme model beside Whisper at startup (`torch`, `transformers`, `epitran`; roughly 400 MB more memory and a first download), and add an endpoint that returns per-word results for an exercise.
+- **Backend:** the evaluator and its model are in `backend/` (loaded on the first request, or at startup with `PRONUNCIATION_PRELOAD=true`; roughly 400 MB more memory and a first download). Still needed: an endpoint that takes an exercise ID plus the learner's audio, instead of the Ren'Py shape that uploads the reference with every attempt.
 - **Reference audio:** L2Renpy compares against recorded reference audio. Here lines are synthesized, so the reference is either the cached TTS clip or text-derived IPA alone. Text-derived IPA ignores liaison and elision, so it over-reports differences; this is the main accuracy question to settle.
 - **Game side:** `PronunciationAssessor` and `PronunciationDiagnostics` already exist as contracts. The word marks would extend the answer feedback (`said`), in a different style from the "used" marks, and the practice loop would follow the diagram above.
 - **Rules already fixed:** pronunciation never decides quest progress, numbers are never shown to the learner, retries are finite.
@@ -174,26 +184,27 @@ What adopting it here needs:
 ## Backend boundary
 
 ```
-React + Phaser + Capacitor ──▶ NestJS ──▶ Postgres
-                                  └────▶ Speech/ML service (FastAPI): STT, TTS, pronunciation
+React + Phaser + Capacitor ──▶ Python backend (FastAPI): TTS, STT, pronunciation, AI second opinion
+                                     └────▶ Postgres (planned)
 ```
 
-NestJS is the application API the client calls and the holder of provider credentials. A Python/FastAPI service is the planned home for ML and audio work: faster-whisper, torch models, librosa, phoneme analysis. Local models are loaded and warmed during service startup, and readiness is exposed separately from liveness, so the first learner's attempt does not pay the model-load latency.
+`backend/` is the application API the client calls and the holder of provider credentials (`PLAN.md` 4A.8). ML and audio work run inside it: faster-whisper, torch models, librosa, phoneme analysis. Local models are loaded and warmed at startup, in the background, and readiness is exposed separately from liveness, so the first learner's attempt does not pay the model-load latency. Full reference: `backend/README.md`.
 
 ### What exists
 
-`backend/` is a first NestJS slice (see `backend/README.md`):
-
 | Piece | State |
 | --- | --- |
-| `GET /health`, `GET /health/ready` | liveness, and readiness that is `503` until the speech provider is warmed and its voices exist |
-| `POST /speech/synthesize` | text, language, speaker ID and rate in; audio out, with cache status and an optional mouth timeline in headers |
-| Provider interface (`TtsProvider`) | one adapter so far: `system`, the voices built into macOS, for development |
-| Cache | on disk, keyed by provider, model, voice, language, rate and exact text; simultaneous identical requests share one synthesis |
-| Mouth timeline | computed from the audio's loudness, 20 frames per second |
+| `GET /health`, `GET /health/ready` | liveness, and readiness that is `503` until lines can be voiced; recognition, pronunciation and the AI layer are reported alongside |
+| `GET /speech/capabilities` | `{ synthesis, recognition }`, so the game offers the microphone only when it will work |
+| `POST /speech/synthesize` | text, language, speaker ID and rate in; audio out, with cache status and the mouth timeline in headers |
+| Voice providers | `elevenlabs` (a voice per character, speed 0.8 for "Slower"), `system` (macOS voices, development), `chatterbox` (local model, one voice) |
+| Cache | on disk, keyed by provider, model, voice, language, rate and exact text, with the mouth timeline stored beside the audio; simultaneous identical requests share one synthesis |
+| Mouth timeline | 20 frames per second, opening on syllable peaks rather than staying open for whole sentences (L2Renpy's algorithm) |
+| `POST /speech/transcribe` | local Whisper (`large-v3-turbo` by default) or ElevenLabs Scribe; PyAV decodes iPhone and browser recordings; Whisper's invented text on silence is dropped |
+| `POST /speech/pronunciation` | L2Renpy's evaluator, not yet called by the game |
 
-The client sends who is speaking (`speakerId`), never a provider voice name; the server maps speakers to voices. The backend also exposes `GET /speech/capabilities` and `POST /speech/transcribe`, which forwards to the FastAPI speech service in `speech-service/` (local Whisper). Not built: a hosted voice provider, pronunciation assessment, authentication and rate limiting.
+The client sends who is speaking (`speakerId`), never a provider voice name; the server maps speakers to voices. Not built: the exercise-ID pronunciation endpoint, authentication and rate limiting on the speech endpoints.
 
 ## What L2Renpy contributed
 
-The state names, the bounded word-remediation flow, the cache-key composition, the exercise-ID direction, the warm-at-startup rule and the mouth-timeline format all come from the L2Renpy prototype, re-expressed for this architecture. Its Ren'Py screens, Python recorder and backend code were not copied.
+The state names, the bounded word-remediation flow, the cache-key composition, the exercise-ID direction, the warm-at-startup rule and the mouth-timeline format all come from the L2Renpy prototype, re-expressed for this architecture. Its Ren'Py screens and Python recorder were not copied; its backend became this project's backend (`L2RENPY-IMPORTS.md`).

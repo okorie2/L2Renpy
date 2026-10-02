@@ -1,0 +1,17 @@
+fastapi
+uvicorn
+python-multipart
+httpx
+python-dotenv
+numpy
+# Speech recognition (local Whisper) and audio decoding
+faster-whisper
+av
+# Pronunciation evaluation and name extraction (loaded on first use)
+torch
+transformers
+epitran
+librosa
+soundfile
+# Hosted voices and recognition (optional; needs ELEVENLABS_API_KEY)
+elevenlabs

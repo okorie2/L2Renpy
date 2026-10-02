@@ -49,8 +49,8 @@
 
 ## Backend slice for speech (complete)
 
-- `backend/`: NestJS service with liveness and readiness, and a provider-neutral, cached text-to-speech endpoint.
-- A free local development provider (macOS system voices); a hosted provider is one adapter away and needs a decision and a key.
+- `backend/`: liveness and readiness, and a provider-neutral, cached text-to-speech endpoint (first in NestJS, now Python; see below).
+- A free local development provider (macOS system voices).
 - This is the part of Phase 7 that audio needs. Accounts, saves, database and the rest of Phase 7 remain.
 
 ## Phase 6 — Voiced lines (complete)
@@ -94,6 +94,20 @@
 - The save is version 2 (messages, places visited) with an upgrade from version 1.
 - "Start over" lives in Settings.
 - Not included: more threads, voice notes, relationships, inventory, fast travel, real app icons. See `PHONE.md`.
+
+## One Python backend (complete)
+
+- The NestJS backend and the separate speech service were replaced by one Python/FastAPI backend, built from the Ren'Py version's (`PLAN.md` 4A.8).
+- ElevenLabs voices, one per character, with slower playback; macOS voices and Chatterbox remain as alternatives.
+- Whisper recognition, the AI second opinion and the game's HTTP contract carried over unchanged.
+- Ren'Py's pronunciation evaluator and name extraction are back as endpoints; the game does not call them yet.
+
+## The Ren'Py opening (complete)
+
+- The game opens in the park: Sophie walks up the path toward the camera, waves, and welcomes the player in English with her recorded voice.
+- She asks for a name, French level and reason for learning, shows the personalised French introduction, and the player practises it line by line with pronunciation feedback (finite, never blocking).
+- Then the first French exchange, and the park fades into the street.
+- Navigation help (a guide marker, tap-to-talk) was started and paused at the owner's request.
 
 ## Next: Phase 11 — Review and reinforcement
 

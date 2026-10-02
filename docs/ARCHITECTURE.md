@@ -75,24 +75,20 @@ Quest rules are described in `QUEST-SYSTEM.md`.
 
 The save is versioned and stored on the device (`SAVE-SYSTEM.md`); reopening the game resumes it. The pure engines know nothing about storage: they take a save and return a save, and `app/savedGame.ts` is the only code that writes it. Capacitor wraps the same frontend. The game talks to the backend only for voices, spoken answers and second opinions on what the learner said; progress never leaves the device.
 
-## Planned backend boundary
+## Backend boundary
 
 ```
 React + Phaser + Capacitor
            |
            v
-         NestJS            main application API
+  Python backend (FastAPI)        backend/, the only server the game calls
+   /     |        |        \
+ STT    TTS   Pronunciation  AI conversation
            |
-    ------------------
-    |                |
-  Postgres       Speech/ML service (FastAPI)
-                 /     |      \
-               STT    TTS    Pronunciation
+       Postgres (planned)
 ```
 
-The speech half of this exists. `backend/` is a NestJS service with liveness and readiness checks, a text-to-speech endpoint (provider-neutral, cached, warmed at startup) and a transcription endpoint; `speech-service/` is the FastAPI service behind it, running a local Whisper model. It also has the AI conversation endpoint (`POST /conversation/turn`), behind a provider-neutral model interface with an OpenRouter adapter. The game calls the backend for voiced lines, spoken answers and second opinions. Accounts, cloud saves, the database and the rest of this section are still planned.
-
-NestJS is the primary backend and the only service the client calls: accounts, cloud saves, game state, progression, authoritative rewards, content/version APIs, AI conversation orchestration and provider credentials. A specialised Python/FastAPI service is planned behind it for ML and audio work (faster-whisper, torch models, librosa, phoneme analysis). Local models are loaded and warmed at service startup, with readiness reported separately from liveness. The frontend depends only on the provider-neutral contracts in `frontend/src/speech`. Details are in `SPEECH-SYSTEM.md`.
+`backend/` is one Python/FastAPI service (decision in `PLAN.md` section 4A.8). It has liveness and readiness checks; text-to-speech with a voice per character, cached with its lip-sync timeline (ElevenLabs, or the macOS voices for development); recognition with a local Whisper model warmed at startup; the AI conversation endpoint (`POST /conversation/turn`) behind a provider-neutral model interface with an OpenRouter adapter; and pronunciation evaluation, which the game does not call yet. Accounts, cloud saves, the database and authoritative rewards are still planned, in the same service. Provider credentials stay in it. The frontend depends only on the provider-neutral contracts in `frontend/src/speech`. Details are in `SPEECH-SYSTEM.md` and `backend/README.md`.
 
 AI-driven NPC dialogue stays constrained, and the first layer of it is built (`AI-CONVERSATION.md`). A model may generate, paraphrase, hint, classify meaning and respond in character. It may only *suggest* structured game events; the deterministic core validates them. It never completes quests, awards XP or currency, unlocks locations, or changes inventory or relationship state.
 

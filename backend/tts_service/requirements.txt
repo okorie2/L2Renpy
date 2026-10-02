@@ -1,0 +1,10 @@
+# Chatterbox runs in its own virtualenv: it pins torch/transformers/librosa
+# versions that differ from the main backend's (pronunciation model).
+chatterbox-tts==0.1.7
+fastapi
+uvicorn
+soundfile
+python-dotenv
+# Chatterbox's watermarker (resemble-perth) imports pkg_resources, which newer
+# setuptools no longer ships and uv environments don't include by default.
+setuptools<81
