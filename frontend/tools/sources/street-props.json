@@ -1,0 +1,16 @@
+{
+  "_comment": "Things in the street painting a character can walk behind. Shapes are in pixels of tools/sources/street.webp. baseY is the pixel row where the thing meets the ground: a character whose feet are above that row is drawn behind it.",
+  "location": "neighborhood",
+  "props": [
+    {
+      "name": "fountain",
+      "baseY": 580,
+      "shapes": [
+        { "ellipse": [1056, 516, 1398, 640] },
+        { "polygon": [[1219, 453], [1235, 453], [1247, 478], [1287, 489], [1287, 506], [1264, 521], [1264, 562], [1190, 562], [1190, 521], [1168, 506], [1168, 489], [1208, 478]] }
+      ]
+    },
+    { "name": "bench-left", "baseY": 700, "shapes": [{ "rect": [913, 612, 1107, 706] }] },
+    { "name": "bench-right", "baseY": 700, "shapes": [{ "rect": [1316, 612, 1482, 706] }] }
+  ]
+}

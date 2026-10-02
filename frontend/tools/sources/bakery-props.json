@@ -1,0 +1,5 @@
+{
+  "_comment": "The bakery's display counter, cut out so the baker stands behind it. Pixels of tools/sources/bakery.webp.",
+  "location": "bakery",
+  "props": [{ "name": "counter", "baseY": 559, "shapes": [{ "rect": [100, 343, 1162, 559] }] }]
+}

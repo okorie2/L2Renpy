@@ -1,0 +1,5 @@
+{
+  "_comment": "The café counter, cut out so the barista stands behind it. Pixels of tools/sources/cafe.webp.",
+  "location": "cafe",
+  "props": [{ "name": "counter", "baseY": 524, "shapes": [{ "rect": [112, 336, 1174, 524] }] }]
+}
