@@ -1,3 +1,4 @@
+import type { CharacterExpression } from "../characters/types";
 /**
  * The pronunciation-practice loop, as plain data and pure functions. Ported from
  * the Ren'Py prototype (`game/systems/speech/practice.rpy`):
@@ -176,6 +177,35 @@ export type PhraseKind = keyof typeof PRACTICE_PHRASES;
 
 /** Every phrase Sophie may say, for the voice pack. */
 export const ALL_PRACTICE_PHRASES: string[] = Object.values(PRACTICE_PHRASES).flat();
+
+/** Sophie's gesture for each kind of thing she says during practice. */
+const PHRASE_EXPRESSION: Record<PhraseKind, CharacterExpression> = {
+  excellent: "excellent",
+  clear: "well-done",
+  close: "close",
+  goodTry: "good-try",
+  tricky: "good-try",
+  practisePart: "beckoning",
+  sayAgain: "beckoning",
+  wholeAgain: "beckoning",
+  movingOn: "presenting",
+  listenFirst: "presenting"
+};
+const PHRASE_KINDS = new Map<string, PhraseKind>(
+  (Object.entries(PRACTICE_PHRASES) as Array<[PhraseKind, readonly string[]]>).flatMap(([kind, phrases]) => phrases.map((text) => [text, kind] as [string, PhraseKind]))
+);
+
+/**
+ * How Sophie looks at each moment of practice: a gesture that fits what she is
+ * saying, the French line said as French, and her hand to her ear while it is
+ * the learner's turn.
+ */
+export function practiceExpression(saying: { text: string; languageCode: string } | undefined, targetLanguageCode: string): CharacterExpression {
+  if (!saying) return "listening";
+  if (saying.languageCode === targetLanguageCode) return "speaking-french";
+  const kind = PHRASE_KINDS.get(saying.text);
+  return kind ? PHRASE_EXPRESSION[kind] : "talking";
+}
 
 /** How an attempt went, as a kind of feedback. Close means within a short way of passing. */
 export function feedbackKind(similarity: number | null | undefined, pass: number): Extract<PhraseKind, "excellent" | "clear" | "close" | "goodTry" | "tricky"> {

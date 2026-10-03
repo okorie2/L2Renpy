@@ -1,5 +1,6 @@
-import { useEffect, useState, type CSSProperties, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { resolveConversationVisual } from "../../characters/resolve";
+import type { CharacterExpression } from "../../characters/types";
 import type { PlayerProfile } from "../../core/models";
 import { DISPLAY_NAME_MAX_LENGTH, sanitizeDisplayName } from "../../core/player";
 import { sessionLine, suggestionsUnlocked, type DialogueInput, type DialogueSession, type HistoryLine } from "../../dialogue/engine";
@@ -61,6 +62,12 @@ type Props = {
   practice?: PracticeClient;
   practiceAvailable: boolean;
   onInput: (input: DialogueInput) => void;
+  /** Back to the previous card, which plays again. Absent on the first card. */
+  onBack?: () => void;
+  /** Forward again through cards already seen. Absent at the furthest card reached. */
+  onForward?: () => void;
+  /** Behind the furthest card: answers here are practice and are not recorded. */
+  replaying?: boolean;
   onExit: () => void;
 };
 
@@ -101,6 +108,14 @@ type LineProps = Pick<Props, "languageCode" | "profile" | "supportLevel" | "spee
   speak: (items: SpokenItem[]) => Promise<void>;
   /** Move on by itself once the line has been heard or read. */
   autoAdvance: boolean;
+  /** Held by the learner: nothing plays and nothing moves on. */
+  paused: boolean;
+  /** The card's own control: pause or play. */
+  controls: ReactNode;
+  /** How this card was reached, for the way it slides in. */
+  arrival?: "back" | "forward";
+  /** During practice: the gesture Sophie should show for what she is saying. */
+  onExpression: (expression: CharacterExpression) => void;
   node: DialogueNode;
   /** The words of this line: scripted, or the speaker's reaction to what was said. */
   line: ResolvedLine;
@@ -166,17 +181,17 @@ function DialogueLine(props: LineProps) {
 
   // A line with nothing to answer moves on once it has been heard, or read in silence.
   useEffect(() => {
-    if (!props.autoAdvance || response || thinking) return;
+    if (!props.autoAdvance || response || thinking || props.paused) return;
     const silent = voice.status === "off" || voice.status === "unavailable";
     if (voice.status !== "finished" && !silent) return;
     const readingTime = silent ? Math.max(1800, line.target.text.length * 55) : 700;
     const timer = window.setTimeout(() => onInput({ type: "CONTINUE", assistance: assistance(), ...heardAs() }), readingTime);
     return () => window.clearTimeout(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [props.autoAdvance, voice.status, node.id]);
+  }, [props.autoAdvance, voice.status, node.id, props.paused]);
 
   // While the line is spoken, the words light up as they are said.
-  const tracing = voice.status === "playing" && !isSay;
+  const tracing = (voice.status === "playing" || voice.status === "paused") && !isSay;
 
   const submitProfileText = (event: FormEvent) => {
     event.preventDefault();
@@ -203,7 +218,7 @@ function DialogueLine(props: LineProps) {
     }));
     const excluded = (node.assessment?.excludedSpans ?? []).map((slot) => props.slotValues[slot]?.target).filter((value): value is string => Boolean(value));
     return (
-      <section className="dialogue-card" aria-label="Practise saying it">
+      <section className={`dialogue-card has-controls${props.arrival ? ` arrived-${props.arrival}` : ""}`} aria-label="Practise saying it">
         <div className="name-chip player">{speakerName}</div>
         <div className="dialogue-scroll">
           <Practice
@@ -217,14 +232,16 @@ function DialogueLine(props: LineProps) {
             speaking={props.speaking}
             speak={props.speak}
             onDone={() => onInput({ type: "PRACTICED", assistance: [] })}
+            onExpression={props.onExpression}
           />
         </div>
+        {props.controls}
       </section>
     );
   }
 
   return (
-    <section className="dialogue-card" aria-label={isSay ? "Your turn" : `${speakerName} says`}>
+    <section className={`dialogue-card has-controls${props.arrival ? ` arrived-${props.arrival}` : ""}`} aria-label={isSay ? "Your turn" : `${speakerName} says`}>
       <div className={`name-chip${isSay ? " player" : ""}`}>{speakerName}</div>
       {canHear && (
         <button
@@ -386,6 +403,7 @@ function DialogueLine(props: LineProps) {
           <img src={icons.next} alt="" />
         </button>
       )}
+      {props.controls}
     </section>
   );
 }
@@ -450,7 +468,7 @@ function AudioSheet({ settings, available, onChange, onClose }: {
  * partner's portrait stands above a bottom dialogue card, and every control is
  * thumb-sized. All progression comes from the dialogue engine.
  */
-export function Conversation({ dialogue, session, speakers, voiceLibrary, audioSettings, onAudioSettingsChange, onExit, interfaceLanguageCode, ...lineProps }: Props) {
+export function Conversation({ dialogue, session, speakers, voiceLibrary, audioSettings, onAudioSettingsChange, onBack, onForward, replaying, onExit, interfaceLanguageCode, onInput, ...lineProps }: Props) {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [audioOpen, setAudioOpen] = useState(false);
   const node = dialogue.nodes[session.nodeId];
@@ -475,9 +493,99 @@ export function Conversation({ dialogue, session, speakers, voiceLibrary, audioS
   const silent = voice.status === "off" || voice.status === "unavailable";
   // Sequences of prompts and lines, such as during pronunciation practice.
   const speaker = useSpeaker(voiceLibrary, audioSettings);
+
+  // The learner sets the pace: pause holds the voice and the moving on; back replays the card before.
+  const [paused, setPaused] = useState(false);
+  const [arrival, setArrival] = useState<"back" | "forward" | undefined>(undefined);
+  // Every card starts playing, whatever the one before was doing.
+  useEffect(() => setPaused(false), [lineKey]);
+  const autoAdvance = !SHOW_NEXT_BUTTON || Boolean(dialogue.autoAdvance);
+  const willAdvance = autoAdvance && !node.response && !lineProps.thinking;
+  const pausable = paused || willAdvance || voice.status === "loading" || voice.status === "playing" || speaker.speaking !== null;
+  const pause = () => {
+    setPaused(true);
+    voice.pause();
+    speaker.pause();
+  };
+  const resume = () => {
+    setPaused(false);
+    voice.resume();
+    speaker.resume();
+  };
+  const back = () => {
+    if (!onBack) return;
+    speaker.stop();
+    setArrival("back");
+    onBack();
+  };
+  const forward = () => {
+    if (!onForward) return;
+    speaker.stop();
+    setArrival("forward");
+    onForward();
+  };
+  const input = (value: DialogueInput) => {
+    setArrival(undefined);
+    onInput(value);
+  };
+  // Asking to hear something is also asking to carry on.
+  const lineVoice: LineVoice = { ...voice, play: (rate) => { setPaused(false); voice.play(rate); } };
+  const speak = (items: SpokenItem[]) => {
+    setPaused(false);
+    return speaker.speak(items);
+  };
+
+  // A swipe in from the left edge of the screen goes back, as in iOS. Only the
+  // edge listens, so tapping and dragging anywhere else is left to the scene.
+  const [edgeDrag, setEdgeDrag] = useState<number | null>(null);
+  const edge = useRef<{ x: number; y: number } | null>(null);
+  const edgeDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!onBack) return;
+    edge.current = { x: event.clientX, y: event.clientY };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setEdgeDrag(0);
+  };
+  const edgeMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (edge.current) setEdgeDrag(Math.max(0, event.clientX - edge.current.x));
+  };
+  const edgeUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const start = edge.current;
+    edge.current = null;
+    setEdgeDrag(null);
+    if (!start) return;
+    const dx = event.clientX - start.x;
+    if (dx > 70 && Math.abs(event.clientY - start.y) < dx) back();
+  };
+  const edgeCancel = () => {
+    edge.current = null;
+    setEdgeDrag(null);
+  };
+
+  const controls = (
+    <>
+      <button
+        className={`round-button card-pause${paused ? " paused" : ""}`}
+        onClick={paused ? resume : pause}
+        disabled={!pausable}
+        aria-pressed={paused}
+        aria-label={paused ? "Play" : "Pause"}
+      >
+        <img src={paused ? icons.play : icons.pause} alt="" />
+      </button>
+    </>
+  );
+
   // The partner's mouth follows the voice, or a timed flap when there is no sound.
-  const flap = useSpeakingPulse(lineKey, spoken, silent && !playerTurn);
+  const flap = useSpeakingPulse(lineKey, spoken, silent && !playerTurn && !paused);
   const speaking = speaker.speaking ? speaker.speaking.mouthOpen : !playerTurn && (silent ? flap : voice.mouthOpen);
+  // During practice her gesture follows what she says. Elsewhere it is the line's own, and a
+  // plain line alternates between two standing poses from card to card, so she never freezes.
+  const [practiceLook, setPracticeLook] = useState<{ key: string; expression: CharacterExpression } | undefined>(undefined);
+  const reportPracticeLook = useCallback((expression: CharacterExpression) => setPracticeLook({ key: lineKey, expression }), [lineKey]);
+  const scripted = node.presentation?.expression ?? "neutral";
+  const expression = node.response?.kind === "practice" && practiceLook?.key === lineKey
+    ? practiceLook.expression
+    : scripted === "neutral" && session.history.length % 2 === 1 ? "talking" : scripted;
   const hasPortrait = Boolean(partner?.characterId && resolveConversationVisual({ character: partner.characterId }));
   const failures = session.failedAttempts[node.id] ?? 0;
   // On the line that follows the player's answer, show what was taken in and how it went.
@@ -499,6 +607,27 @@ export function Conversation({ dialogue, session, speakers, voiceLibrary, audioS
 
   return (
     <div className="conversation" style={{ "--keyboard-inset": `${keyboardInset}px` } as CSSProperties}>
+      <nav className="conversation-nav" aria-label="Move through the conversation">
+        <button onClick={back} disabled={!onBack} aria-label="Back to the previous line">
+          <img src={icons.back} alt="" />
+        </button>
+        {onForward && (
+          <button onClick={forward} aria-label="Forward to the next line you've seen">
+            <img src={icons.back} className="mirrored" alt="" />
+          </button>
+        )}
+        {replaying && <span className="replay-tag" title="Answers here are practice and don't change your progress">Replay</span>}
+      </nav>
+      {onBack && (
+        <div
+          className="edge-swipe"
+          aria-hidden="true"
+          onPointerDown={edgeDown}
+          onPointerMove={edgeMove}
+          onPointerUp={edgeUp}
+          onPointerCancel={edgeCancel}
+        />
+      )}
       <div className="conversation-tools">
         {session.history.length > 0 && (
           <button onClick={() => setHistoryOpen(true)} aria-label="Earlier in this conversation">
@@ -514,27 +643,35 @@ export function Conversation({ dialogue, session, speakers, voiceLibrary, audioS
       <button className="conversation-leave" onClick={onExit} aria-label="Leave conversation">×</button>
       <div className="conversation-stage">
         {hasPortrait && partner?.characterId && (
-          <CharacterPortrait character={partner.characterId} expression={node.presentation?.expression} speaking={speaking} />
+          <CharacterPortrait character={partner.characterId} expression={expression} speaking={speaking} />
         )}
       </div>
-      <div className="conversation-dock">
+      <div
+        className={`conversation-dock${edgeDrag !== null ? " dragging" : ""}`}
+        style={edgeDrag ? { transform: `translateX(${Math.min(edgeDrag, 160) * 0.5}px)` } : undefined}
+      >
         <DialogueLine
-          key={`${node.id}:${failures}`}
+          key={`${node.id}:${failures}:${session.history.length}`}
           node={node}
           line={line}
           speakerName={speakerName}
           partnerName={partner?.name}
           offerAnswers={suggestionsUnlocked(session, node.id)}
           retrying={failures > 0}
-          voice={voice}
+          voice={lineVoice}
           subtitles={audioSettings.subtitles}
           lastSaid={lastSaid}
           lineLanguage={lineLanguage}
           partnerId={session.npcId}
           interfaceLanguageCode={interfaceLanguageCode}
           speaking={speaker.speaking}
-          speak={speaker.speak}
-          autoAdvance={!SHOW_NEXT_BUTTON || Boolean(dialogue.autoAdvance)}
+          speak={speak}
+          autoAdvance={autoAdvance}
+          paused={paused}
+          controls={controls}
+          arrival={arrival}
+          onExpression={reportPracticeLook}
+          onInput={input}
           {...lineProps}
         />
       </div>

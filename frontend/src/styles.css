@@ -397,6 +397,71 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--blue); outl
 .replay { top: -26px; width: 52px; height: 52px; background: white; border: 1.5px solid #edf0f5; }
 .next { bottom: -28px; width: 56px; height: 56px; background: var(--navy); border: 0; }
 
+/* The learner's own pace: pause or play straddles the card's lower edge, where "Next" used to be. */
+.card-pause { bottom: -27px; width: 54px; height: 54px; background: var(--navy); border: 0; transition: opacity .2s, background-color .2s; }
+.card-pause img { width: 22px; height: 22px; }
+.card-pause.paused { background: var(--blue); }
+.card-pause:disabled { opacity: .35; box-shadow: none; }
+.next ~ .card-pause { right: 86px; }
+.dialogue-card.has-controls .dialogue-scroll { padding-bottom: 40px; }
+
+/* Back and forward, top left, as on any phone screen. The tools move to the right, beside "leave". */
+.conversation-nav {
+  position: absolute;
+  z-index: 3;
+  top: max(12px, var(--safe-top));
+  left: max(12px, var(--safe-left));
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.conversation-nav button {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .92);
+  box-shadow: var(--shadow-control);
+}
+.conversation-nav button:disabled { opacity: .4; box-shadow: none; }
+.conversation-nav img { width: 22px; height: 22px; }
+.conversation-nav img.mirrored { transform: scaleX(-1); }
+.replay-tag {
+  height: 28px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  border-radius: 14px;
+  background: rgba(31, 42, 68, .78);
+  color: white;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.conversation .conversation-tools { left: auto; right: calc(max(12px, var(--safe-right)) + 56px); }
+
+/* Only the screen's left edge listens for the back swipe. */
+.edge-swipe {
+  position: absolute;
+  z-index: 4;
+  top: calc(max(12px, var(--safe-top)) + 56px);
+  bottom: 0;
+  left: 0;
+  width: max(20px, var(--safe-left));
+  touch-action: none;
+}
+.conversation-dock.dragging { transition: none; }
+.conversation-dock:not(.dragging) { transition: transform .2s ease; }
+
+/* A card reached by going back slides in from the left; going forward, from the right. */
+.dialogue-card.arrived-back { animation: card-back .3s cubic-bezier(.2, .8, .3, 1) both; }
+.dialogue-card.arrived-forward { animation: card-forward .3s cubic-bezier(.2, .8, .3, 1) both; }
+@keyframes card-back { from { opacity: 0; transform: translateX(-36px); } }
+@keyframes card-forward { from { opacity: 0; transform: translateX(36px); } }
+
 .name-chip.player { background: var(--blue-soft); }
 .turn-prompt { margin: 0 0 8px; font-size: 14px; font-weight: 700; color: var(--text-secondary); }
 
@@ -570,7 +635,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--blue); outl
 @keyframes card-in { from { opacity: 0; transform: translateY(18px); } }
 
 @media (prefers-reduced-motion: reduce) {
-  .conversation, .portrait, .conversation-dock, .sheet, .sheet-backdrop, .quest-toast { animation: none; }
+  .conversation, .portrait, .conversation-dock, .dialogue-card, .sheet, .sheet-backdrop, .quest-toast { animation: none; }
 }
 
 @media (min-width: 700px) {

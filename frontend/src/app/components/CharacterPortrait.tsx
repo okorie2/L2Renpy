@@ -3,6 +3,9 @@ import { listCharacterAssetPaths, resolveConversationVisual } from "../../charac
 import type { CharacterExpression, ConversationVisual } from "../../characters/types";
 import { assetUrl } from "../assets";
 
+/** How long the eyes stay shut in a blink. */
+const BLINK_MS = 140;
+
 type Props = {
   character: string;
   expression?: CharacterExpression;
@@ -39,13 +42,51 @@ export function CharacterPortrait({ character, expression, speaking }: Props) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requested?.path]);
 
+  // Now and then she blinks: a moment with her eyes shut, at an unhurried, uneven pace.
+  const [blinking, setBlinking] = useState(false);
+  const canBlink = Boolean(shown?.blinkOverlay);
+  useEffect(() => {
+    if (!canBlink || (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false)) return;
+    let timer: number;
+    const next = () => {
+      timer = window.setTimeout(() => {
+        setBlinking(true);
+        timer = window.setTimeout(() => {
+          setBlinking(false);
+          next();
+        }, BLINK_MS);
+      }, 2500 + Math.random() * 3500);
+    };
+    next();
+    return () => {
+      window.clearTimeout(timer);
+      setBlinking(false);
+    };
+  }, [canBlink, shown?.path]);
+
   if (!shown) return null;
   const mouth = shown.mouthOverlay;
+  const blink = shown.blinkOverlay;
   const figureStyle = { "--portrait-ratio": shown.aspectRatio } as CSSProperties;
   return (
     <div className="portrait" aria-hidden="true">
       <div className="portrait-figure" style={figureStyle}>
         <img className="portrait-base" src={assetUrl(shown.path)} alt="" draggable={false} />
+        {blink && (
+          <img
+            className="portrait-blink"
+            src={assetUrl(blink.path)}
+            alt=""
+            draggable={false}
+            style={{
+              left: `${blink.left * 100}%`,
+              top: `${blink.top * 100}%`,
+              width: `${blink.width * 100}%`,
+              height: `${blink.height * 100}%`,
+              opacity: blinking ? 1 : 0
+            }}
+          />
+        )}
         {mouth && (
           <img
             className="portrait-mouth"

@@ -102,7 +102,7 @@ export interface SpokenLine {
   autoplay: boolean;
 }
 
-export type VoiceStatus = "off" | "loading" | "playing" | "finished" | "unavailable";
+export type VoiceStatus = "off" | "loading" | "playing" | "paused" | "finished" | "unavailable";
 
 /** The word being heard at `time`, as an index into `words`; after the last word, the last one. */
 export function wordAt(words: WordTiming[] | undefined, time: number): number | undefined {
@@ -125,6 +125,10 @@ export interface LineVoice {
   canPlay: boolean;
   mouthOpen: boolean;
   play: (rate: SpeechRate) => void;
+  /** Hold the line where it is; a line still loading waits, ready, instead of starting. */
+  pause: () => void;
+  /** Carry on from where it was paused. */
+  resume: () => void;
   /** Whether the learner actually listened to most of the line. */
   wasHeard: () => boolean;
 }
@@ -144,6 +148,9 @@ export function useLineVoice(library: VoiceLibrary | undefined, settings: AudioS
   const [activeWord, setActiveWord] = useState<number | undefined>(undefined);
   const heard = useRef(false);
   const request = useRef(0);
+  const held = useRef(false);
+  const statusRef = useRef<VoiceStatus>("off");
+  statusRef.current = status;
   const timeline = useRef<MouthTimeline | undefined>(undefined);
   const lineRef = useRef(line);
   lineRef.current = line;
@@ -154,6 +161,8 @@ export function useLineVoice(library: VoiceLibrary | undefined, settings: AudioS
     const ticket = ++request.current;
     const audio = audioElement();
     audio.pause();
+    // Asking to hear a line again is also asking to carry on.
+    held.current = false;
     setStatus("loading");
     void library.get({ text: current.text, languageCode: current.languageCode, speakerId: current.speakerId, rate }).then((speech) => {
       if (ticket !== request.current) return;
@@ -165,6 +174,10 @@ export function useLineVoice(library: VoiceLibrary | undefined, settings: AudioS
       setWords(speech.words);
       audio.src = urlFor(speech);
       audio.currentTime = 0;
+      if (held.current) {
+        setStatus("paused");
+        return;
+      }
       audio.play().then(
         () => { if (ticket === request.current) setStatus("playing"); },
         // Playback refused (no tap yet, or the device is muted by policy): stay silent.
@@ -173,9 +186,29 @@ export function useLineVoice(library: VoiceLibrary | undefined, settings: AudioS
     });
   }, [library]);
 
+  const pause = useCallback(() => {
+    held.current = true;
+    if (statusRef.current === "playing") {
+      audioElement().pause();
+      setStatus("paused");
+    }
+  }, []);
+
+  const resume = useCallback(() => {
+    if (!held.current) return;
+    held.current = false;
+    if (statusRef.current !== "paused") return;
+    const ticket = request.current;
+    audioElement().play().then(
+      () => { if (ticket === request.current) setStatus("playing"); },
+      () => { if (ticket === request.current) setStatus("unavailable"); }
+    );
+  }, []);
+
   // Follow the line on screen: speak it, or fall silent when it goes.
   useEffect(() => {
     heard.current = false;
+    held.current = false;
     setMouthOpen(false);
     setWords(undefined);
     setActiveWord(undefined);
@@ -196,7 +229,7 @@ export function useLineVoice(library: VoiceLibrary | undefined, settings: AudioS
   useEffect(() => {
     if (status !== "playing") {
       setMouthOpen(false);
-      if (status !== "finished") setActiveWord(undefined);
+      if (status !== "finished" && status !== "paused") setActiveWord(undefined);
       return;
     }
     const audio = audioElement();
@@ -221,10 +254,12 @@ export function useLineVoice(library: VoiceLibrary | undefined, settings: AudioS
   return {
     status,
     words,
-    activeWord: status === "playing" ? activeWord : undefined,
+    activeWord: status === "playing" || status === "paused" ? activeWord : undefined,
     canPlay: enabled && Boolean(line) && (library?.available ?? false),
     mouthOpen,
     play,
+    pause,
+    resume,
     wasHeard: () => heard.current
   };
 }
@@ -256,16 +291,33 @@ export interface SpeakerState {
 export function useSpeaker(library: VoiceLibrary | undefined, settings: AudioSettings) {
   const [state, setState] = useState<SpeakerState | null>(null);
   const ticket = useRef(0);
+  const held = useRef(false);
 
   const stop = useCallback(() => {
     ticket.current++;
+    held.current = false;
     audioElement().pause();
     setState(null);
+  }, []);
+
+  /** Hold the sequence: the clip stops where it is and nothing more is said until `resume`. */
+  const pause = useCallback(() => {
+    held.current = true;
+    audioElement().pause();
+    setState((current) => (current ? { ...current, mouthOpen: false } : current));
+  }, []);
+  const resume = useCallback(() => {
+    if (!held.current) return;
+    held.current = false;
+    const audio = audioElement();
+    // Carry on with the clip that was cut off, if one was.
+    if (audio.paused && audio.currentTime > 0 && !audio.ended) audio.play().catch(() => undefined);
   }, []);
   useEffect(() => stop, [stop]);
 
   const speak = useCallback(async (items: SpokenItem[]): Promise<void> => {
     const current = ++ticket.current;
+    held.current = false;
     const audio = audioElement();
     audio.pause();
     if (!library || !settings.voice) {
@@ -273,9 +325,14 @@ export function useSpeaker(library: VoiceLibrary | undefined, settings: AudioSet
       return;
     }
     audio.volume = settings.volume;
+    const whilePaused = async () => {
+      while (held.current && current === ticket.current) await new Promise((resolve) => window.setTimeout(resolve, 100));
+    };
     for (const item of items) {
+      await whilePaused();
       if (current !== ticket.current) return;
       const speech = await library.get({ text: item.text, languageCode: item.languageCode, speakerId: item.speakerId, rate: item.rate ?? "normal", ...(item.context ? { context: item.context } : {}) });
+      await whilePaused();
       if (current !== ticket.current) return;
       if (!speech) continue;
       setState({ item, words: speech.words, mouthOpen: false });
@@ -284,25 +341,29 @@ export function useSpeaker(library: VoiceLibrary | undefined, settings: AudioSet
       await new Promise<void>((resolve) => {
         const timer = window.setInterval(() => {
           if (current !== ticket.current) return finish();
+          if (held.current) return;
           setState({ item, words: speech.words, activeWord: wordAt(speech.words, audio.currentTime), mouthOpen: mouthOpenAt(speech.mouthTimeline, audio.currentTime) });
         }, MOUTH_INTERVAL_MS);
         const finish = () => {
           window.clearInterval(timer);
           audio.removeEventListener("ended", finish);
-          audio.removeEventListener("pause", finish);
+          audio.removeEventListener("pause", interrupted);
           audio.removeEventListener("error", finish);
           resolve();
         };
         audio.addEventListener("ended", finish);
-        audio.addEventListener("pause", finish);
+        // Paused on purpose, the clip is only waiting; paused by anything else, it is over.
+        const interrupted = () => { if (!held.current) finish(); };
+        audio.addEventListener("pause", interrupted);
         audio.addEventListener("error", finish);
         audio.play().catch(finish);
       });
       // A short breath between one thing said and the next.
       if (current === ticket.current) await new Promise((resolve) => window.setTimeout(resolve, 250));
+      await whilePaused();
     }
     if (current === ticket.current) setState(null);
   }, [library, settings.voice, settings.volume]);
 
-  return { speaking: state, speak, stop };
+  return { speaking: state, speak, stop, pause, resume };
 }

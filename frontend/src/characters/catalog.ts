@@ -1,11 +1,11 @@
-import type { CharacterVisualDefinition } from "./types";
+import type { CanvasRect, CharacterVisualDefinition } from "./types";
 
 /**
  * Sophie's approved art, imported from L2Renpy (see docs/L2RENPY-IMPORTS.md).
  * All sprites share a 2:3 canvas, so poses can swap without repositioning.
  * Each expression has one master portrait plus a small open-mouth patch built by
  * tools/build_mouth_overlays.py, so speaking changes the mouth and nothing else.
- * `happy` and `confused` have no close-up art yet and borrow the nearest pose.
+ * `happy` borrows `pleased` and `confused` borrows `question`.
  */
 /**
  * How tall an adult stands in the world, in world units. One value for everyone,
@@ -13,6 +13,13 @@ import type { CharacterVisualDefinition } from "./types";
  * draws its "a person is this tall" figure to the same height.
  */
 export const WORLD_FIGURE_HEIGHT = 116;
+
+/** One of Sophie's gesture poses: a master portrait and its own mouth patch. */
+const gesture = (name: string, mouthRect: CanvasRect) => ({
+  closed: `characters/sophie/conversation/${name}/closed.webp`,
+  mouthOpen: `characters/sophie/conversation/${name}/mouth-open.png`,
+  mouthRect
+});
 
 const sophie: CharacterVisualDefinition = {
   id: "sophie",
@@ -36,7 +43,8 @@ const sophie: CharacterVisualDefinition = {
     expressions: {
       neutral: {
         closed: "characters/sophie/conversation/neutral/closed.png",
-        mouthOpen: "characters/sophie/conversation/neutral/mouth-open.png"
+        mouthOpen: "characters/sophie/conversation/neutral/mouth-open.png",
+        blink: { path: "characters/sophie/conversation/neutral/blink.png", rect: { x: 400, y: 260, width: 224, height: 90 } }
       },
       question: {
         closed: "characters/sophie/conversation/question/closed.png",
@@ -49,9 +57,26 @@ const sophie: CharacterVisualDefinition = {
       encouraging: {
         closed: "characters/sophie/conversation/encouraging/closed.png",
         mouthOpen: "characters/sophie/conversation/encouraging/mouth-open.png"
-      }
+      },
+      // Gestures for particular moments, built by tools/build_pose_portraits.py. Each has its
+      // own mouth position, as the head moves a little with the gesture. Turned away, she
+      // is shown as drawn, without a moving mouth.
+      talking: { ...gesture("talking", { x: 429, y: 352, width: 160, height: 104 }), blink: { path: "characters/sophie/conversation/neutral/blink.png", rect: { x: 400, y: 260, width: 224, height: 90 } } },
+      presenting: gesture("presenting", { x: 429, y: 351, width: 160, height: 104 }),
+      playful: gesture("playful", { x: 431, y: 354, width: 160, height: 104 }),
+      pinching: gesture("pinching", { x: 429, y: 352, width: 160, height: 104 }),
+      "speaking-french": gesture("speaking-french", { x: 428, y: 351, width: 160, height: 104 }),
+      listening: gesture("listening", { x: 433, y: 353, width: 160, height: 104 }),
+      excellent: gesture("excellent", { x: 428, y: 352, width: 160, height: 104 }),
+      "well-done": gesture("well-done", { x: 429, y: 353, width: 160, height: 104 }),
+      close: gesture("close", { x: 429, y: 355, width: 160, height: 104 }),
+      "good-try": gesture("good-try", { x: 429, y: 352, width: 160, height: 104 }),
+      beckoning: gesture("beckoning", { x: 428, y: 370, width: 160, height: 104 }),
+      pleased: gesture("pleased", { x: 431, y: 352, width: 160, height: 104 }),
+      inviting: { closed: "characters/sophie/conversation/inviting/closed.webp" },
+      goodbye: { closed: "characters/sophie/conversation/goodbye/closed.webp" }
     },
-    fallbacks: { happy: "encouraging", confused: "question" }
+    fallbacks: { happy: "pleased", confused: "question" }
   }
 };
 

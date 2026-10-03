@@ -287,7 +287,7 @@ export const french: LanguagePack = {
           targetText: "It's really nice to meet you.",
           nextNodeId: "askName",
           conceptIds: [],
-          presentation: { expression: "encouraging" }
+          presentation: { expression: "talking" }
         },
         askName: {
           id: "askName",
@@ -311,7 +311,7 @@ export const french: LanguagePack = {
           targetText: "Nice to meet you, {playerName}!",
           nextNodeId: "askExperience",
           conceptIds: [],
-          presentation: { expression: "happy" }
+          presentation: { expression: "excellent" }
         },
         askExperience: {
           id: "askExperience",
@@ -358,7 +358,7 @@ export const french: LanguagePack = {
           targetText: "Great.",
           nextNodeId: "model",
           conceptIds: [],
-          presentation: { expression: "encouraging" }
+          presentation: { expression: "well-done" }
         },
         model: {
           id: "model",
@@ -367,7 +367,7 @@ export const french: LanguagePack = {
           targetText: "With the details you've given me, this is how you could introduce yourself in French.",
           nextNodeId: "example",
           conceptIds: [],
-          presentation: { expression: "explaining" }
+          presentation: { expression: "presenting" }
         },
         example: {
           id: "example",
@@ -376,7 +376,7 @@ export const french: LanguagePack = {
           translation: "My name is {playerName}.\n{motivationSentence}\n{levelSentence}",
           nextNodeId: "mouthful",
           conceptIds: [CONCEPT_IDS.INTRODUCE_SELF],
-          presentation: { expression: "explaining" }
+          presentation: { expression: "speaking-french" }
         },
         mouthful: {
           id: "mouthful",
@@ -385,7 +385,7 @@ export const french: LanguagePack = {
           targetText: "I know, it's a mouthful!",
           nextNodeId: "bitByBit",
           conceptIds: [],
-          presentation: { expression: "encouraging" }
+          presentation: { expression: "playful" }
         },
         bitByBit: {
           id: "bitByBit",
@@ -394,7 +394,7 @@ export const french: LanguagePack = {
           targetText: "So we'll take it bit by bit.",
           nextNodeId: "practice",
           conceptIds: [],
-          presentation: { expression: "explaining" }
+          presentation: { expression: "pinching" }
         },
         practice: {
           id: "practice",
@@ -421,7 +421,7 @@ export const french: LanguagePack = {
           translation: "Hi! My name is Sophie. And you?",
           nextNodeId: "yourTurn",
           conceptIds: [CONCEPT_IDS.GREETING, CONCEPT_IDS.INTRODUCE_SELF, CONCEPT_IDS.BASIC_QUESTION],
-          presentation: { expression: "question" }
+          presentation: { expression: "speaking-french" }
         },
         yourTurn: {
           id: "yourTurn",
@@ -430,7 +430,7 @@ export const french: LanguagePack = {
           translation: "My name is {playerName}.",
           nextNodeId: "niceToMeet",
           conceptIds: [CONCEPT_IDS.INTRODUCE_SELF],
-          presentation: { expression: "question" },
+          presentation: { expression: "listening" },
           hint: "Je m'appelle ____.",
           assessment: { excludedSpans: ["playerName"] },
           response: {
@@ -460,7 +460,7 @@ export const french: LanguagePack = {
           translation: "Nice to meet you, {playerName}!",
           nextNodeId: "invitation",
           conceptIds: [CONCEPT_IDS.GREETING],
-          presentation: { expression: "happy" }
+          presentation: { expression: "pleased" }
         },
         invitation: {
           id: "invitation",
@@ -468,7 +468,7 @@ export const french: LanguagePack = {
           targetText: "Allez, viens ! Je vais te montrer le quartier.",
           translation: "Come on! I'll show you the neighborhood.",
           conceptIds: [],
-          presentation: { expression: "encouraging" }
+          presentation: { expression: "inviting" }
         }
       }
     },
@@ -496,7 +496,7 @@ export const french: LanguagePack = {
           targetText: "Le café est juste là. Vas-y, commande un café !",
           translation: "The café is right there. Go on, order a coffee!",
           conceptIds: [],
-          presentation: { expression: "encouraging" }
+          presentation: { expression: "inviting" }
         }
       }
     },
@@ -510,7 +510,7 @@ export const french: LanguagePack = {
           targetText: "Bravo pour le café ! Maintenant, la boulangerie.",
           translation: "Well done with the coffee! Now, the bakery.",
           conceptIds: [],
-          presentation: { expression: "explaining" }
+          presentation: { expression: "well-done" }
         }
       }
     },
@@ -533,7 +533,7 @@ export const french: LanguagePack = {
           targetText: "Va lui dire bonjour !",
           translation: "Go and say hello to him!",
           conceptIds: [CONCEPT_IDS.GREETING],
-          presentation: { expression: "encouraging" }
+          presentation: { expression: "inviting" }
         }
       }
     },
@@ -557,7 +557,7 @@ export const french: LanguagePack = {
           translation: "A coffee, a croissant, a new friend… Well done!",
           nextNodeId: "later",
           conceptIds: [],
-          presentation: { expression: "happy" }
+          presentation: { expression: "excellent" }
         },
         later: {
           id: "later",
@@ -565,7 +565,7 @@ export const french: LanguagePack = {
           targetText: "Je t'écris plus tard. À bientôt !",
           translation: "I'll write to you later. See you soon!",
           conceptIds: [CONCEPT_IDS.FAREWELL],
-          presentation: { expression: "neutral" }
+          presentation: { expression: "goodbye" }
         }
       }
     },
@@ -579,7 +579,7 @@ export const french: LanguagePack = {
           targetText: "À bientôt, {playerName} ! Rentre bien.",
           translation: "See you soon, {playerName}! Get home safe.",
           conceptIds: [CONCEPT_IDS.FAREWELL],
-          presentation: { expression: "neutral" }
+          presentation: { expression: "goodbye" }
         }
       }
     },

@@ -15,6 +15,7 @@ import { chapterOneItems, chapterOneLocations, chapterOneMessages, chapterOneNpc
 import { mapPlaces, metCharacters } from "../phone/directory";
 import { deliverMessages, markThreadRead, saveThreadSession, unreadThreadIds } from "../phone/messages";
 import { resolveSayOptions, startDialogue, stepDialogue, type DialogueInput, type DialogueSession } from "../dialogue/engine";
+import { afterLiveStep, afterReplayStep, canGoBack, canGoForward, currentCard, goBack, goForward, isReplaying, startTrail, type Trail } from "../dialogue/trail";
 import { PLAYER_SPEAKER_ID } from "../dialogue/models";
 import { buildSlotValues } from "../dialogue/template";
 import { buildTurnContext } from "../conversation/context";
@@ -139,7 +140,11 @@ function Game({ initialSave, onSaveChange, onStartOver, saveNotice, onDismissSav
   const [nearNpcIds, setNearNpcIds] = useState<Set<string>>(() => new Set());
   const [nearPortalIds, setNearPortalIds] = useState<Set<string>>(() => new Set());
   const [moving, setMoving] = useState(false);
-  const [conversation, setConversation] = useState<DialogueSession | null>(null);
+  // Every card reached in the conversation, and which one is on screen.
+  const [trail, setTrail] = useState<Trail | null>(null);
+  const conversation = trail ? currentCard(trail) : null;
+  /** Start or end a conversation; a new one has nothing behind it. */
+  const setConversation = (session: DialogueSession | null) => setTrail(session ? startTrail(session) : null);
   // True while a second opinion on the learner's answer is on its way.
   const [thinking, setThinking] = useState(false);
   const judgedTurn = useRef(0);
@@ -370,14 +375,27 @@ function Game({ initialSave, onSaveChange, onStartOver, saveNotice, onDismissSav
 
   // Report the input; the dialogue engine decides what it means for the save and the conversation.
   const sendDialogueInput = async (input: DialogueInput) => {
-    if (!conversation || !dialogue || thinking) return;
+    if (!trail || !conversation || !dialogue || thinking) return;
     const turn = ++judgedTurn.current;
     const step = await stepWithSecondOpinion(conversation, dialogue, conversationNpc, input, location, () => setThinking(true));
-    // The learner left the conversation while waiting.
+    // The learner left the conversation, or moved to another card, while waiting.
     if (turn !== judgedTurn.current) return;
     setThinking(false);
+    // A replayed card is practice: it moves the replay along and records nothing.
+    if (isReplaying(trail)) {
+      setTrail(afterReplayStep(trail, step));
+      return;
+    }
     setSave(step.save);
-    setConversation(step.session.status === "completed" ? null : step.session);
+    setTrail(step.session.status === "completed" ? null : afterLiveStep(trail, step));
+  };
+  /** Back to an earlier card, or forward again as far as the furthest reached. */
+  const moveInConversation = (move: (current: Trail) => Trail) => {
+    if (!trail) return;
+    // Anything still being decided about the card being left no longer applies.
+    judgedTurn.current++;
+    setThinking(false);
+    setTrail(move(trail));
   };
 
   // The same engine drives a message thread; its session is kept in the save.
@@ -473,6 +491,9 @@ function Game({ initialSave, onSaveChange, onStartOver, saveNotice, onDismissSav
           sayChoices={resolveSayOptions(dialogue.nodes[conversation.nodeId], save, activeLanguagePack)}
           thinking={thinking}
           onInput={(input) => void sendDialogueInput(input)}
+          onBack={trail && canGoBack(trail) ? () => moveInConversation(goBack) : undefined}
+          onForward={trail && canGoForward(trail) ? () => moveInConversation(goForward) : undefined}
+          replaying={Boolean(trail && isReplaying(trail))}
           onExit={leaveConversation}
         />
       )}

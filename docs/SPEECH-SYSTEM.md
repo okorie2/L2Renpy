@@ -140,7 +140,13 @@ Names, places, brands, foreign words and dynamic story values are excluded from 
 
 - **Tracing.** While a line plays, the word being said is highlighted, one word at a time, in whichever language Sophie is speaking. Generated lines carry word timings from ElevenLabs (`X-Word-Timings`); Sophie's recorded English lines are timed once by ElevenLabs forced alignment when the voice pack is built (`voices/pack/recordings.json`). The written translation is not spoken, so it is not highlighted.
 - **Speed.** ElevenLabs speaks at 0.9 by default and 0.75 for "Slower" (`ELEVENLABS_SPEED`, `ELEVENLABS_SLOW_SPEED`). Changing a speed regenerates lines, because it is part of the cache key.
-- **Flow.** A dialogue marked `autoAdvance` (Sophie's welcome) moves on by itself 0.7 s after each line has been heard, or after a reading pause in silence. "Next" is still there for the impatient.
+- **Flow.** Lines with nothing to answer move on by themselves 0.7 s after they have been heard, or after a reading pause in silence. There is no "Next" button (`SHOW_NEXT_BUTTON` in `frontend/src/app/flags.ts` brings it back); with it on, only dialogues marked `autoAdvance` move on by themselves.
+- **The learner's pace.**
+  - **Pause / play** sits on the card's lower edge. It holds everything: Sophie's voice stops mid-word, the word tracing freezes, her mouth closes and the card does not move on. Play carries on from the same point. Tapping Listen, Slower or the replay button also resumes. In practice, pause holds Sophie's prompts and feedback.
+  - **Back** is the arrow at the top left, or a swipe in from the left edge of the screen (as in iOS). Only a 20 px strip at the edge listens, so taps and drags anywhere else stay with the scene. The previous card slides in from the left and plays again in full: voice, lip-sync, expression, word tracing and text.
+  - **Forward** (the mirrored arrow) appears only when the learner is behind the furthest card they reached. It goes one card at a time and never past that card, so nothing new can be skipped.
+  - **Replays record nothing.** Behind the furthest card a "Replay" tag shows. Answers there are practice: a miss still gets its repair line, but no learning evidence, profile answer or quest progress is written. Moving on from a replayed card goes to the card that came next the first time, passing over that first time's misses. Saved progress is never undone.
+  - The rules live in `src/dialogue/trail.ts` (tested in `tests/trail.test.ts`): every card reached, up to 60, and which one is on screen. A new conversation starts a new trail.
 - **"Slower"** is offered only on lines in the language being learned, not on English ones.
 - **Speech-to-text** is ElevenLabs Scribe when an ElevenLabs key is set; local Whisper otherwise.
 - **Voice pack.** Lines that are the same for everyone are shipped as files (`frontend/public/assets/voices/pack/`, listed by `frontend/src/speech/voicePack.ts`, built by `backend/tools/build_voice_pack.py`), with their lip-sync and word timings. The game plays recordings first, then the pack, and asks the backend only for lines with the player's name in them (or anything the pack lacks).
@@ -220,3 +226,12 @@ The client sends who is speaking (`speakerId`), never a provider voice name; the
 ## What L2Renpy contributed
 
 The state names, the bounded word-remediation flow, the cache-key composition, the exercise-ID direction, the warm-at-startup rule and the mouth-timeline format all come from the L2Renpy prototype, re-expressed for this architecture. Its Ren'Py screens and Python recorder were not copied; its backend became this project's backend (`L2RENPY-IMPORTS.md`).
+
+## Sophie's poses
+
+Each line names an expression (`presentation.expression`), which is a pose in `src/characters/catalog.ts`. Besides the original four (neutral, question, explaining, encouraging) she has gestures for particular moments: `talking`, `presenting`, `playful`, `pinching`, `speaking-french`, `listening`, `excellent`, `well-done`, `close`, `good-try`, `beckoning`, `pleased`, `inviting` and `goodbye`. `happy` borrows `pleased`.
+
+- **Lip-sync on every pose.** `tools/build_pose_portraits.py --sources <folder with the pose PNGs>` turns each pose into a closed-mouth master (`closed.webp`) and its own open-mouth patch (`mouth-open.png`, with its own `mouthRect`, as her head moves a little with each gesture). A pose drawn with her mouth closed borrows the open mouth from `neutral_speaking`. A pose drawn mid-word keeps its own mouth as the patch and gets a closed mouth from `neutral_closed`. Turned away (`inviting`, `goodbye`), she is shown as drawn.
+- **Blinking.** The neutral and talking poses have a shut-eyes patch (`neutral/blink.png`, cut from `blink_idle`), shown for 140 ms every 2.5 to 6 s. It is off when the device asks for reduced motion.
+- **Never frozen.** A line left on `neutral` alternates with `talking` from card to card.
+- **Practice.** Her gesture follows what she says (`practiceExpression` in `src/speech/practice.ts`): `excellent`, `well-done`, `close` or `good-try` for the feedback, `beckoning` for "say it again", `speaking-french` for the line itself, and `listening` (hand to her ear) while it is the learner's turn.

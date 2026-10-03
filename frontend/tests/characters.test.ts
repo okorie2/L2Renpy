@@ -39,8 +39,10 @@ test("game code asks for Sophie by character, expression and activity", () => {
 });
 
 test("speaking changes only the mouth: one master portrait plus a small patch", () => {
-  const { canvas, mouthRect } = characterVisuals.sophie.conversation!;
+  const { canvas, mouthRect, expressions } = characterVisuals.sophie.conversation!;
   assert.ok(mouthRect);
+  // Turned away, she is shown as drawn: there is no mouth to move.
+  const turnedAway = new Set(["inviting", "goodbye"]);
   for (const expression of CHARACTER_EXPRESSIONS) {
     const closed = resolveConversationVisual({ character: "sophie", expression, activity: "closed" });
     const speaking = resolveConversationVisual({ character: "sophie", expression, activity: "speaking" });
@@ -49,11 +51,17 @@ test("speaking changes only the mouth: one master portrait plus a small patch", 
     assert.equal(closed.mouthOverlay, undefined);
     // The same base image in both states is what keeps the rest of her still.
     assert.equal(speaking.path, closed.path, expression);
-    assert.deepEqual(pngSize(closed.path), canvas, closed.path);
+    assert.deepEqual(imageSize(closed.path), canvas, closed.path);
+    if (turnedAway.has(expression)) {
+      assert.equal(speaking.mouthOverlay, undefined, expression);
+      continue;
+    }
 
     const mouth = speaking.mouthOverlay;
+    const rect = expressions[speaking.expression]?.mouthRect ?? mouthRect;
     assert.ok(mouth, `${expression} has a mouth patch`);
-    assert.deepEqual(pngSize(mouth.path), { width: mouthRect.width, height: mouthRect.height }, mouth.path);
+    assert.deepEqual(pngSize(mouth.path), { width: rect.width, height: rect.height }, mouth.path);
+    assert.equal(mouth.left, rect.x / canvas.width, `${expression}'s patch sits on its own mouth`);
     assert.ok(mouth.left >= 0 && mouth.top >= 0 && mouth.left + mouth.width <= 1 && mouth.top + mouth.height <= 1);
     // A patch, not a second portrait: it covers a small fraction of the canvas.
     assert.ok(mouth.width * mouth.height < 0.02, expression);
@@ -61,7 +69,7 @@ test("speaking changes only the mouth: one master portrait plus a small patch", 
 });
 
 test("expressions without dedicated art borrow the nearest approved pose", () => {
-  assert.equal(resolveConversationVisual({ character: "sophie", expression: "happy" })?.expression, "encouraging");
+  assert.equal(resolveConversationVisual({ character: "sophie", expression: "happy" })?.expression, "pleased");
   assert.equal(resolveConversationVisual({ character: "sophie", expression: "confused" })?.expression, "question");
   assert.equal(resolveConversationVisual({ character: "sophie" })?.expression, "neutral");
   assert.equal(resolveConversationVisual({ character: "sophie" })?.activity, "closed");
@@ -188,4 +196,15 @@ test("no source file refers to assets by Ren'Py names or to the previous guide",
   };
   visit("src");
   assert.deepEqual(offenders, []);
+});
+
+test("Sophie blinks now and then in her standing poses, and the patch matches its place", () => {
+  for (const expression of ["neutral", "talking"] as const) {
+    const visual = resolveConversationVisual({ character: "sophie", expression })!;
+    const blink = characterVisuals.sophie.conversation!.expressions[expression]!.blink!;
+    assert.ok(visual.blinkOverlay, expression);
+    assert.deepEqual(pngSize(blink.path), { width: blink.rect.width, height: blink.rect.height });
+  }
+  assert.ok(listCharacterAssetPaths("sophie").includes("characters/sophie/conversation/neutral/blink.png"));
+  assert.equal(resolveConversationVisual({ character: "sophie", expression: "excellent" })?.blinkOverlay, undefined);
 });

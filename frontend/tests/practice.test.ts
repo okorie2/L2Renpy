@@ -170,3 +170,16 @@ test("recorded lines are traced with the word timings the pack holds for them", 
   const speech = await provider.synthesize({ text: "Hi! I'm Sophie.", languageCode: "en", speakerId: "sophie" });
   assert.deepEqual(speech.words?.map((word) => "Hi! I'm Sophie.".slice(word.start, word.end)), ["Hi!", "I'm", "Sophie."]);
 });
+
+import { practiceExpression } from "../src/speech/practice";
+
+test("Sophie's gesture follows what she says during practice, and she listens on the learner's turn", () => {
+  assert.equal(practiceExpression(undefined, "fr"), "listening");
+  assert.equal(practiceExpression({ text: "Je m'appelle Ella.", languageCode: "fr" }, "fr"), "speaking-french");
+  assert.equal(practiceExpression({ text: PRACTICE_PHRASES.excellent[0], languageCode: "en" }, "fr"), "excellent");
+  assert.equal(practiceExpression({ text: PRACTICE_PHRASES.clear[1], languageCode: "en" }, "fr"), "well-done");
+  assert.equal(practiceExpression({ text: PRACTICE_PHRASES.close[0], languageCode: "en" }, "fr"), "close");
+  assert.equal(practiceExpression({ text: PRACTICE_PHRASES.goodTry[0], languageCode: "en" }, "fr"), "good-try");
+  assert.equal(practiceExpression({ text: PRACTICE_PHRASES.sayAgain[0], languageCode: "en" }, "fr"), "beckoning");
+  assert.equal(practiceExpression({ text: "Something new", languageCode: "en" }, "fr"), "talking");
+});

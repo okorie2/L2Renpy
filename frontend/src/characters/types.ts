@@ -7,13 +7,19 @@
 export type WorldPose = "idle" | "walking" | "waving";
 
 /** Close-up states used by the conversation presentation. */
-export type CharacterExpression = "neutral" | "question" | "explaining" | "encouraging" | "happy" | "confused";
+export type CharacterExpression =
+  | "neutral" | "question" | "explaining" | "encouraging" | "happy" | "confused"
+  // Sophie's gestures for particular moments.
+  | "talking" | "presenting" | "playful" | "pinching" | "speaking-french" | "listening"
+  | "excellent" | "well-done" | "close" | "good-try" | "beckoning" | "pleased" | "inviting" | "goodbye";
 
 /** Mouth state within an expression; `speaking` is shown only while a line is being voiced. */
 export type CharacterActivity = "closed" | "speaking";
 
 export const CHARACTER_EXPRESSIONS: CharacterExpression[] = [
-  "neutral", "question", "explaining", "encouraging", "happy", "confused"
+  "neutral", "question", "explaining", "encouraging", "happy", "confused",
+  "talking", "presenting", "playful", "pinching", "speaking-french", "listening",
+  "excellent", "well-done", "close", "good-try", "beckoning", "pleased", "inviting", "goodbye"
 ];
 export const WORLD_POSES: WorldPose[] = ["idle", "walking", "waving"];
 
@@ -40,6 +46,10 @@ export interface ExpressionAsset {
    * mouth is replaced, nothing else in the portrait can shift between the two states.
    */
   mouthOpen?: string;
+  /** Where this pose's mouth patch sits, when its head is not where the others' is. */
+  mouthRect?: CanvasRect;
+  /** A shut-eyes patch, shown for a moment now and then so a still portrait does not stare. */
+  blink?: { path: string; rect: CanvasRect };
 }
 
 /** A rectangle in the pixels of a portrait canvas. */
@@ -97,6 +107,8 @@ export interface ConversationVisual {
   path: string;
   /** Present only while speaking, and only when the expression has a mouth patch. */
   mouthOverlay?: PortraitOverlay;
+  /** Shut eyes for blinking, when the expression has them. */
+  blinkOverlay?: PortraitOverlay;
   aspectRatio: number;
 }
 

@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { PracticeRequestError, type PracticeClient } from "../../speech/httpPractice";
 import {
-  createPhrasePicker, practiceSpeech, practiceTarget, recordAttempt, startPractice,
+  createPhrasePicker, practiceExpression, practiceSpeech, practiceTarget, recordAttempt, startPractice,
   type PracticeState, type PracticeUtterance, type PracticeWord
 } from "../../speech/practice";
+import type { CharacterExpression } from "../../characters/types";
 import type { SpeechRate } from "../../speech/types";
 import { icons } from "../icons";
 import { RecordingError, startRecording, type Recording } from "../recorder";
@@ -30,6 +31,8 @@ type Props = {
   speaking: SpeakerState | null;
   speak: (items: SpokenItem[]) => Promise<void>;
   onDone: () => void;
+  /** How Sophie should look right now: a gesture for what she is saying, or listening. */
+  onExpression?: (expression: CharacterExpression) => void;
 };
 
 type Status =
@@ -56,7 +59,7 @@ function WordMarks({ words, languageCode }: { words: PracticeWord[]; languageCod
  * practise this part.") and says the next thing to copy. Attempts are finite, so
  * the practice always ends, and how it went never decides progress.
  */
-export function Practice({ lines, excluded, languageCode, interfaceLanguageCode, speakerId, practice, canPractise, speaking, speak, onDone }: Props) {
+export function Practice({ lines, excluded, languageCode, interfaceLanguageCode, speakerId, practice, canPractise, speaking, speak, onDone, onExpression }: Props) {
   const [state, setState] = useState<PracticeState>(startPractice);
   const [status, setStatus] = useState<Status>({ kind: "idle" });
   // What Sophie last said to steer the practice, shown as a caption.
@@ -92,6 +95,10 @@ export function Practice({ lines, excluded, languageCode, interfaceLanguageCode,
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Her gesture follows what she says; while the learner speaks, she listens.
+  const expression = practiceExpression(status.kind === "recording" || status.kind === "checking" ? undefined : speaking?.item, languageCode);
+  useEffect(() => onExpression?.(expression), [expression, onExpression]);
 
   if (!canPractise) {
     return (

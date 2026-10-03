@@ -26,22 +26,22 @@ export function resolveConversationVisual(
   const asset = expressions[expression];
   if (!asset) return undefined;
 
-  const canSpeak = request.activity === "speaking" && asset.mouthOpen !== undefined && mouthRect !== undefined;
+  const rect = asset.mouthRect ?? mouthRect;
+  const canSpeak = request.activity === "speaking" && asset.mouthOpen !== undefined && rect !== undefined;
+  const fractions = (area: { x: number; y: number; width: number; height: number }) => ({
+    left: area.x / canvas.width,
+    top: area.y / canvas.height,
+    width: area.width / canvas.width,
+    height: area.height / canvas.height
+  });
   return {
     character: definition.id,
     requestedExpression,
     expression,
     activity: canSpeak ? "speaking" : "closed",
     path: asset.closed,
-    mouthOverlay: canSpeak && asset.mouthOpen && mouthRect
-      ? {
-          path: asset.mouthOpen,
-          left: mouthRect.x / canvas.width,
-          top: mouthRect.y / canvas.height,
-          width: mouthRect.width / canvas.width,
-          height: mouthRect.height / canvas.height
-        }
-      : undefined,
+    mouthOverlay: canSpeak && asset.mouthOpen && rect ? { path: asset.mouthOpen, ...fractions(rect) } : undefined,
+    blinkOverlay: asset.blink ? { path: asset.blink.path, ...fractions(asset.blink.rect) } : undefined,
     aspectRatio: canvas.width / canvas.height
   };
 }
@@ -73,6 +73,7 @@ export function listCharacterAssetPaths(character: string, catalog: Catalog = ch
   for (const expression of Object.values(definition.conversation?.expressions ?? {})) {
     paths.add(expression.closed);
     if (expression.mouthOpen) paths.add(expression.mouthOpen);
+    if (expression.blink) paths.add(expression.blink.path);
   }
   return [...paths];
 }
