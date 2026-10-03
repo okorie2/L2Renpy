@@ -8,11 +8,13 @@ import { resolveDialogueLine, resolveTemplate, type ResolvedLine, type ResolvedT
 import type { AssistanceKind, SupportLevel } from "../../learning/models";
 import { supportPolicy } from "../../learning/support";
 import type { PracticeClient } from "../../speech/httpPractice";
-import type { AudioClip, SpeechCapability, SpeechRate } from "../../speech/types";
+import type { AudioClip, SpeechCapability } from "../../speech/types";
 import type { VoiceLibrary } from "../../speech/voiceLibrary";
+import { SHOW_NEXT_BUTTON } from "../flags";
 import { useKeyboardInset, useSpeakingPulse } from "../hooks";
 import { icons } from "../icons";
-import { playText, useLineVoice, type AudioSettings, type LineVoice } from "../voice";
+import { useLineVoice, useSpeaker, type AudioSettings, type LineVoice, type SpeakerState, type SpokenItem } from "../voice";
+import { traceText } from "./TracedText";
 import { CharacterPortrait } from "./CharacterPortrait";
 import { Practice } from "./Practice";
 import { SAID_LABEL, SaidText, saidSummary } from "./Said";
@@ -94,7 +96,11 @@ type LineProps = Pick<Props, "languageCode" | "profile" | "supportLevel" | "spee
   lineLanguage: string;
   /** Who taught the line being practised; their voice is the model. */
   partnerId?: string;
-  onHear: (text: string, rate: SpeechRate) => void;
+  interfaceLanguageCode: string;
+  speaking: SpeakerState | null;
+  speak: (items: SpokenItem[]) => Promise<void>;
+  /** Move on by itself once the line has been heard or read. */
+  autoAdvance: boolean;
   node: DialogueNode;
   /** The words of this line: scripted, or the speaker's reaction to what was said. */
   line: ResolvedLine;
@@ -155,6 +161,22 @@ function DialogueLine(props: LineProps) {
   /** What the engine needs to tell listening from reading. */
   const heardAs = () => ({ heard: !isSay && voice.wasHeard(), textVisible: !textHidden });
   const canHear = voice.canPlay && modelVisible;
+  // English lines are recordings or plain prompts; "Slower" is for the language being learned.
+  const canSlow = canHear && node.language !== "interface";
+
+  // A line with nothing to answer moves on once it has been heard, or read in silence.
+  useEffect(() => {
+    if (!props.autoAdvance || response || thinking) return;
+    const silent = voice.status === "off" || voice.status === "unavailable";
+    if (voice.status !== "finished" && !silent) return;
+    const readingTime = silent ? Math.max(1800, line.target.text.length * 55) : 700;
+    const timer = window.setTimeout(() => onInput({ type: "CONTINUE", assistance: assistance(), ...heardAs() }), readingTime);
+    return () => window.clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.autoAdvance, voice.status, node.id]);
+
+  // While the line is spoken, the words light up as they are said.
+  const tracing = voice.status === "playing" && !isSay;
 
   const submitProfileText = (event: FormEvent) => {
     event.preventDefault();
@@ -188,10 +210,12 @@ function DialogueLine(props: LineProps) {
             lines={lines}
             excluded={excluded}
             languageCode={languageCode}
+            interfaceLanguageCode={props.interfaceLanguageCode}
             speakerId={props.partnerId}
             practice={props.practice}
             canPractise={props.practiceAvailable && Boolean(props.practice)}
-            onHear={props.onHear}
+            speaking={props.speaking}
+            speak={props.speak}
             onDone={() => onInput({ type: "PRACTICED", assistance: [] })}
           />
         </div>
@@ -216,15 +240,19 @@ function DialogueLine(props: LineProps) {
         {lastSaid && <SaidFeedback line={lastSaid} languageCode={languageCode} />}
         {isSay && <p className="turn-prompt">{retrying ? "Try again. " : ""}{response.prompt}</p>}
         {textHidden && <p className="listen-placeholder" role="status">Listen…</p>}
-        {modelVisible && !textHidden && <p className="target-language" lang={lineLanguage}>{renderText(line.target, isSay)}</p>}
+        {modelVisible && !textHidden && (
+          <p className="target-language" lang={lineLanguage}>
+            {tracing && voice.words ? traceText(line.target.text, voice.words, voice.activeWord) : renderText(line.target, isSay)}
+          </p>
+        )}
         {translationVisible && line.translation && <p className="translation">{line.translation.text}</p>}
         {hintRevealed && node.hint && <p className="hint-text" lang={languageCode}>{node.hint}</p>}
         {hasUnscored && <p className="assessment-note">Underlined words are yours and aren't graded.</p>}
 
-        {(textHidden || canHear || canRevealTranslation || canRevealHint || canRevealAnswer || needsHelpButton) && (
+        {(textHidden || canSlow || canRevealTranslation || canRevealHint || canRevealAnswer || needsHelpButton) && (
           <div className={`assist-row${response ? "" : " beside-next"}`}>
             {textHidden && <button className="assist-chip" onClick={() => setTextRevealed(true)}>Show text</button>}
-            {canHear && (
+            {canSlow && (
               <button className="assist-chip" onClick={() => { setSlowed(true); voice.play("slow"); }}>Slower</button>
             )}
             {canRevealTranslation && (
@@ -349,7 +377,7 @@ function DialogueLine(props: LineProps) {
         )}
       </div>
 
-      {!response && (
+      {!response && SHOW_NEXT_BUTTON && (
         <button
           className="round-button next"
           onClick={() => onInput({ type: "CONTINUE", assistance: assistance(), ...heardAs() })}
@@ -445,9 +473,11 @@ export function Conversation({ dialogue, session, speakers, voiceLibrary, audioS
     autoplay: !playerTurn
   });
   const silent = voice.status === "off" || voice.status === "unavailable";
+  // Sequences of prompts and lines, such as during pronunciation practice.
+  const speaker = useSpeaker(voiceLibrary, audioSettings);
   // The partner's mouth follows the voice, or a timed flap when there is no sound.
   const flap = useSpeakingPulse(lineKey, spoken, silent && !playerTurn);
-  const speaking = !playerTurn && (silent ? flap : voice.mouthOpen);
+  const speaking = speaker.speaking ? speaker.speaking.mouthOpen : !playerTurn && (silent ? flap : voice.mouthOpen);
   const hasPortrait = Boolean(partner?.characterId && resolveConversationVisual({ character: partner.characterId }));
   const failures = session.failedAttempts[node.id] ?? 0;
   // On the line that follows the player's answer, show what was taken in and how it went.
@@ -501,7 +531,10 @@ export function Conversation({ dialogue, session, speakers, voiceLibrary, audioS
           lastSaid={lastSaid}
           lineLanguage={lineLanguage}
           partnerId={session.npcId}
-          onHear={(text, rate) => playText(voiceLibrary, audioSettings, { text, languageCode: lineProps.languageCode, speakerId: session.npcId, rate })}
+          interfaceLanguageCode={interfaceLanguageCode}
+          speaking={speaker.speaking}
+          speak={speaker.speak}
+          autoAdvance={!SHOW_NEXT_BUTTON || Boolean(dialogue.autoAdvance)}
           {...lineProps}
         />
       </div>

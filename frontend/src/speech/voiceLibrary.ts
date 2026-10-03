@@ -40,7 +40,7 @@ export class VoiceLibrary {
       model: "",
       voice: request.speakerId ?? "",
       language: request.languageCode,
-      text: request.text,
+      text: request.context ? `${request.context.before}|${request.text}|${request.context.after}` : request.text,
       rate: request.rate ?? "normal"
     });
     const known = this.lines.get(key);

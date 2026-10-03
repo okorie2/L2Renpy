@@ -1,4 +1,5 @@
 import type { SynthesisRequest, SynthesizedSpeech, TextToSpeechProvider } from "./types";
+import type { VoicePack } from "./voicePack";
 
 /**
  * A line recorded once and shipped with the game, with its lip-sync track. The
@@ -54,21 +55,39 @@ export function withRecordings(
   fallback: TextToSpeechProvider | undefined,
   lines: RecordedLine[],
   urlFor: (path: string) => string,
-  fetchImpl: Fetch = (input, init) => fetch(input, init)
+  fetchImpl: Fetch = (input, init) => fetch(input, init),
+  pack?: VoicePack
 ): TextToSpeechProvider {
+  /** Audio from the app's own files, labelled: iOS will not play a clip whose type it cannot tell. */
+  const shipped = async (url: string, signal: AbortSignal | undefined) => {
+    const response = await fetchImpl(url, { signal });
+    if (!response.ok) return undefined;
+    const mimeType = url.endsWith(".wav") ? "audio/wav" : "audio/mpeg";
+    return { data: new Blob([await response.arrayBuffer()], { type: mimeType }), mimeType };
+  };
   return {
     providerId: fallback ? `${fallback.providerId}+recordings` : "recordings",
     async synthesize(request: SynthesisRequest): Promise<SynthesizedSpeech> {
       const recorded = (request.rate ?? "normal") === "normal" ? findRecording(lines, request) : undefined;
       if (recorded) {
-        const response = await fetchImpl(urlFor(recorded.path), { signal: request.signal });
-        if (response.ok) {
-          // Label the audio explicitly: iOS will not play a clip whose type it cannot tell.
-          const mimeType = recorded.path.endsWith(".wav") ? "audio/wav" : "audio/mpeg";
-          const data = new Blob([await response.arrayBuffer()], { type: mimeType });
+        const audio = await shipped(urlFor(recorded.path), request.signal);
+        if (audio) {
           return {
-            audio: { data, mimeType },
-            mouthTimeline: /^[01]+$/.test(recorded.mouth) ? { frames: recorded.mouth, framesPerSecond: MOUTH_FPS } : undefined
+            audio,
+            mouthTimeline: /^[01]+$/.test(recorded.mouth) ? { frames: recorded.mouth, framesPerSecond: MOUTH_FPS } : undefined,
+            words: await pack?.recordingWords(recorded.path)
+          };
+        }
+      }
+      // Lines generated once and shipped in the voice pack.
+      const packed = await pack?.find(request);
+      if (packed) {
+        const audio = await shipped(pack!.url(packed), request.signal);
+        if (audio) {
+          return {
+            audio,
+            mouthTimeline: packed.mouth && /^[01]+$/.test(packed.mouth) ? { frames: packed.mouth, framesPerSecond: MOUTH_FPS } : undefined,
+            words: packed.words?.length ? packed.words.map(([start, end, from, to]) => ({ start, end, from: from / 1000, to: to / 1000 })) : undefined
           };
         }
       }

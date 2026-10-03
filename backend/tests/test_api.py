@@ -191,3 +191,19 @@ def test_pronunciation_needs_both_recordings_and_reference_text():
     assert response.status_code == 400
     response = client.post("/speech/pronunciation", data={"reference_text": " "}, files={"learner_audio": ("a.wav", b"x")})
     assert response.status_code == 400
+
+
+def test_word_timings_travel_with_the_line_and_survive_the_cache():
+    class Timed(FakeProvider):
+        def synthesize(self, text, language, voice, rate):
+            self.calls.append(text)
+            return tts.SynthesizedAudio(spoken_wav(), "audio/wav", ".wav", words=[(0, 7, 0.0, 0.42), (8, 13, 0.5, 0.9)])
+
+    provider = Timed()
+    with with_voice(provider):
+        first = client.post("/speech/synthesize", json={"text": "Bonjour Sophie", "languageCode": "fr"}, headers={"Origin": "capacitor://localhost"})
+        second = client.post("/speech/synthesize", json={"text": "Bonjour Sophie", "languageCode": "fr"})
+    assert first.headers["x-word-timings"] == "0:7:0:420;8:13:500:900"
+    assert second.headers["x-speech-cache"] == "hit"
+    assert second.headers["x-word-timings"] == first.headers["x-word-timings"]
+    assert "x-word-timings" in first.headers["access-control-expose-headers"].lower()

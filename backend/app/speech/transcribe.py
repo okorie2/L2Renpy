@@ -211,13 +211,16 @@ class FasterWhisperSTTProvider:
 
 
 def stt_provider_name() -> str:
-    return os.getenv("LANGUAGE_APP_STT_PROVIDER", "faster-whisper").strip().lower()
+    # ElevenLabs Scribe when there is a key; local Whisper otherwise.
+    default = "elevenlabs" if os.getenv("ELEVENLABS_API_KEY", "").strip() else "faster-whisper"
+    return os.getenv("LANGUAGE_APP_STT_PROVIDER", default).strip().lower()
 
 
 def get_stt_provider():
     """The provider chosen by LANGUAGE_APP_STT_PROVIDER.
 
-    "faster-whisper" (the default) runs locally; "elevenlabs" uses Scribe.
+    "elevenlabs" (Scribe, the default when ELEVENLABS_API_KEY is set) or
+    "faster-whisper" (local, the default otherwise).
     """
 
     name = stt_provider_name()

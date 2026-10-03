@@ -267,6 +267,7 @@ export const french: LanguagePack = {
     meetSophie: {
       id: "meetSophie",
       startNodeId: "hello",
+      autoAdvance: true,
       // Sophie welcomes the player in English, with her recorded voice, as in the
       // Ren'Py prototype; she switches to French to teach the introduction.
       nodes: {

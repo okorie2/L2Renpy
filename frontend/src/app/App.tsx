@@ -26,6 +26,7 @@ import { createHttpSpeechToText, fetchSpeechCapabilities } from "../speech/httpS
 import { createHttpTextToSpeech } from "../speech/httpTts";
 import { createHttpPractice } from "../speech/httpPractice";
 import { findRecording, RECORDED_LINES, withRecordings } from "../speech/recordings";
+import { createVoicePack } from "../speech/voicePack";
 import type { AudioClip, SpeechCapability } from "../speech/types";
 import { canRecord } from "./recorder";
 import { VoiceLibrary } from "../speech/voiceLibrary";
@@ -78,11 +79,13 @@ for (const appearanceId of ["player", ...chapterOneNpcs.map((npc) => npc.appeara
 // Voiced lines come from the application backend, except the recordings shipped with
 // the game (Sophie's welcome). Without a backend only those play.
 const apiUrl = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? "http://localhost:3000" : undefined);
+// Every line that is the same for everyone is shipped in the voice pack; the backend makes the rest.
+const voicePack = createVoicePack(assetUrl);
 const voiceLibrary = new VoiceLibrary(
-  withRecordings(apiUrl ? createHttpTextToSpeech(apiUrl) : undefined, RECORDED_LINES, assetUrl),
+  withRecordings(apiUrl ? createHttpTextToSpeech(apiUrl) : undefined, RECORDED_LINES, assetUrl, undefined, voicePack),
   {
     onEvict: releaseSpeech,
-    isLocal: (request) => (request.rate ?? "normal") === "normal" && findRecording(RECORDED_LINES, request) !== undefined
+    isLocal: (request) => ((request.rate ?? "normal") === "normal" && findRecording(RECORDED_LINES, request) !== undefined) || voicePack.has(request)
   }
 );
 // Pronunciation practice: the backend compares the learner with the character's own voice.
@@ -95,7 +98,8 @@ const OPENING_ART: OpeningArt = {
   backdrop: assetUrl("locations/park.webp"),
   idle: assetUrl("characters/sophie/opening/idle.webp"),
   waving: assetUrl("characters/sophie/opening/waving.webp"),
-  walking: [1, 2, 3, 4, 5, 6].map((frame) => assetUrl(`characters/sophie/opening/walking-${frame}.webp`))
+  // Two poses, one stride on each foot.
+  walking: [2, 5].map((frame) => assetUrl(`characters/sophie/opening/walking-${frame}.webp`))
 };
 /** How long the park takes to fade into the street. */
 const OPENING_FADE_MS = 700;

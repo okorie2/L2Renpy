@@ -453,7 +453,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--blue); outl
   line-height: 1.25;
   text-wrap: pretty;
 }
-.translation { margin: 10px 0 0; font-size: 16px; line-height: 1.35; color: var(--text-secondary); }
+.translation { margin: 10px 0 0; font-size: 18px; line-height: 1.4; color: var(--text-secondary); white-space: pre-line; }
 .unscored { text-decoration: underline dotted var(--blue); text-underline-offset: 4px; }
 .assessment-note, .field-note { margin: 8px 0 0; font-size: 13px; color: var(--text-secondary); }
 
@@ -822,7 +822,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--blue); outl
   object-fit: cover;
   object-position: 50% 50%;
 }
-/* Far up the path, small; then close to the camera, as in the Ren'Py opening. */
+/* Far up the path, small; then close to the camera, as in the Ren'Py opening.
+   The figure's feet sit on its bottom edge, so the shadow below pins them to the path. */
 .opening-sophie {
   position: absolute;
   left: 47%;
@@ -833,9 +834,49 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--blue); outl
   opacity: 0;
   transition-property: left, bottom, height, opacity;
   transition-timing-function: linear, linear, linear, ease;
-  filter: drop-shadow(0 6px 6px rgba(31, 42, 68, .25));
 }
-.opening-sophie.near { left: 40%; bottom: 2%; height: 60%; }
+.opening-sophie.near { left: 40%; bottom: 1%; height: 60%; }
 .opening-sophie.visible { opacity: 1; }
+.opening-shadow {
+  position: absolute;
+  left: 47%;
+  bottom: 35.4%;
+  width: 7%;
+  height: 1.2%;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(40, 32, 20, .45), rgba(40, 32, 20, 0) 70%);
+  opacity: 0;
+  transition-property: left, bottom, width, height, opacity;
+  transition-timing-function: linear, linear, linear, linear, ease;
+}
+.opening-shadow.near { left: 40%; bottom: -0.6%; width: 22%; height: 3.4%; }
+.opening-shadow.visible { opacity: 1; }
 .opening-card.compact { padding: 14px; }
 .opening-scene .opening-card { z-index: 2; }
+
+/* Word tracing: each word lights up as Sophie says it. */
+.traced { border-radius: 4px; transition: background-color .08s ease, box-shadow .08s ease; }
+.traced.current { background: #ffe08a; box-shadow: 0 0 0 2px #ffe08a; }
+
+/* Buttons that say they are working: pressed and playing. */
+.assist-chip.active {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: white;
+  animation: chip-pulse 1s ease-in-out infinite;
+}
+.assist-chip:active { transform: scale(.96); }
+@keyframes chip-pulse { 50% { box-shadow: 0 0 0 5px rgba(79, 140, 255, .22); } }
+
+/* Practice: compact, with the controls on one row. */
+.practice { gap: 6px; }
+.practice-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.practice-caption { font-size: 14px; font-weight: 700; color: var(--navy); }
+.practice .translation { margin-top: 4px; }
+.practice .hint-text { margin-top: 6px; padding: 6px 12px; }
+.practice-controls { display: flex; align-items: center; justify-content: center; gap: 18px; margin-top: 6px; }
+.practice-controls .assist-chip { min-width: 84px; }
+.practice-controls .primary-pill { flex: 1; }
+.practice .speech-status { font-size: 13px; }
+.translation.small { display: block; margin: 2px 0 0; font-size: 15px; }

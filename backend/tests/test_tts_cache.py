@@ -121,6 +121,22 @@ class TTSCacheTests(unittest.TestCase):
 
         self.assertEqual(list(Path(self.temp_dir.name).iterdir()), [])
 
+    def test_a_word_in_another_sentence_is_another_line(self):
+        calls = []
+
+        class WithContext(FakeProvider):
+            def synthesize(self, text, language, voice, rate, context=None):
+                calls.append((text, context))
+                return super().synthesize(text, language, voice, rate)
+
+        provider = WithContext()
+        with patch.object(tts_module, "get_tts_provider", return_value=provider):
+            synthesize_speech("Je", "fr", None, "normal", ("", "m'appelle Ella."))
+            synthesize_speech("Je", "fr", None, "normal", ("", "m'appelle Ella."))
+            synthesize_speech("Je", "fr", None, "normal", ("", "voudrais un café."))
+            synthesize_speech("Je", "fr", None, "normal", ("  ", ""))
+        self.assertEqual(calls, [("Je", ("", "m'appelle Ella.")), ("Je", ("", "voudrais un café.")), ("Je", None)])
+
     def test_requests_are_checked_before_anything_is_generated(self):
         provider = FakeProvider()
         for text, language, rate in [("", "fr", "normal"), ("x" * 301, "fr", "normal"), ("Bonjour.", "de", "normal"), ("Bonjour.", "fr", "fast")]:

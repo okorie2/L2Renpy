@@ -1,0 +1,38 @@
+[
+ {
+  "path": "voices/sophie/en/hi-im-sophie.mp3",
+  "text": "Hi! I'm Sophie."
+ },
+ {
+  "path": "voices/sophie/en/nice-to-meet-you.mp3",
+  "text": "It's really nice to meet you."
+ },
+ {
+  "path": "voices/sophie/en/whats-your-name.wav",
+  "text": "What's your name?"
+ },
+ {
+  "path": "voices/sophie/en/french-level-question.mp3",
+  "text": "First, how much French do you already know?"
+ },
+ {
+  "path": "voices/sophie/en/why-learn-french.mp3",
+  "text": "And why do you want to learn French?"
+ },
+ {
+  "path": "voices/sophie/en/great.mp3",
+  "text": "Great."
+ },
+ {
+  "path": "voices/sophie/en/how-i-would-introduce-myself.mp3",
+  "text": "With the details you've given me, this is how you could introduce yourself in French."
+ },
+ {
+  "path": "voices/sophie/en/mouthful.mp3",
+  "text": "I know, it's a mouthful!"
+ },
+ {
+  "path": "voices/sophie/en/bit-by-bit.mp3",
+  "text": "So we'll take it bit by bit."
+ }
+]

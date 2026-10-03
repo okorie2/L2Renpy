@@ -12,6 +12,8 @@ export interface PracticeAttempt {
   speakerId?: string;
   /** Words that are not graded, such as the learner's own name. */
   excluded: string[];
+  /** For a single word: the sentence around it, as the reference was said. */
+  context?: { before: string; after: string };
   signal?: AbortSignal;
 }
 
@@ -44,13 +46,17 @@ function readWord(value: unknown): PracticeWord | null {
 export function createHttpPractice(baseUrl: string, fetchImpl: Fetch = (input, init) => fetch(input, init)): PracticeClient {
   const endpoint = `${baseUrl.replace(/\/+$/, "")}/speech/practice`;
   return {
-    async attempt({ audio, text, languageCode, speakerId, excluded, signal }) {
+    async attempt({ audio, text, languageCode, speakerId, excluded, context, signal }) {
       const form = new FormData();
       form.append("audio", audio.data, `attempt.${EXTENSIONS[audio.mimeType.split(";")[0]] ?? "audio"}`);
       form.append("text", text);
       form.append("languageCode", languageCode);
       if (speakerId) form.append("speakerId", speakerId);
       form.append("excluded", JSON.stringify(excluded));
+      if (context) {
+        form.append("contextBefore", context.before);
+        form.append("contextAfter", context.after);
+      }
       const response = await fetchImpl(endpoint, { method: "POST", body: form, signal });
       if (!response.ok) throw new PracticeRequestError(response.status);
       const body = await response.json() as Record<string, unknown>;

@@ -1,4 +1,16 @@
-import type { SynthesisRequest, SynthesizedSpeech, TextToSpeechProvider } from "./types";
+import type { SynthesisRequest, SynthesizedSpeech, TextToSpeechProvider, WordTiming } from "./types";
+
+/** "start:end:fromMs:toMs;..." from the backend, or undefined when absent or malformed. */
+export function readWordTimings(header: string | null, textLength: number): WordTiming[] | undefined {
+  if (!header) return undefined;
+  const words: WordTiming[] = [];
+  for (const part of header.split(";")) {
+    const [start, end, from, to] = part.split(":").map(Number);
+    if (![start, end, from, to].every(Number.isFinite) || start < 0 || end <= start || end > textLength || to < from) return undefined;
+    words.push({ start, end, from: from / 1000, to: to / 1000 });
+  }
+  return words.length ? words : undefined;
+}
 
 type Fetch = (input: string, init?: RequestInit) => Promise<Response>;
 
@@ -18,7 +30,8 @@ export function createHttpTextToSpeech(baseUrl: string, fetchImpl: Fetch = (inpu
           text: request.text,
           languageCode: request.languageCode,
           speakerId: request.speakerId,
-          rate: request.rate ?? "normal"
+          rate: request.rate ?? "normal",
+          ...(request.context ? { context: request.context } : {})
         }),
         signal: request.signal
       });
@@ -29,7 +42,8 @@ export function createHttpTextToSpeech(baseUrl: string, fetchImpl: Fetch = (inpu
       const framesPerSecond = Number(response.headers.get("X-Mouth-Fps"));
       return {
         audio: { data, mimeType: response.headers.get("Content-Type") ?? data.type },
-        mouthTimeline: frames && /^[01]+$/.test(frames) && framesPerSecond > 0 ? { frames, framesPerSecond } : undefined
+        mouthTimeline: frames && /^[01]+$/.test(frames) && framesPerSecond > 0 ? { frames, framesPerSecond } : undefined,
+        words: readWordTimings(response.headers.get("X-Word-Timings"), request.text.length)
       };
     }
   };

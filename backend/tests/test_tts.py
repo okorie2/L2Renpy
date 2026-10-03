@@ -36,10 +36,23 @@ class ElevenLabsTTSProviderTests(unittest.TestCase):
             with self.assertRaises(TTSConfigurationError):
                 get_tts_provider()
 
-    def test_synthesis_passes_exact_text_and_the_speakers_voice_and_model(self):
-        client = Mock()
-        client.text_to_speech.convert.return_value = iter([b"mp3-part-1", b"", b"mp3-part-2"])
+    def client(self, audio=b"mp3-bytes", text=None):
+        import base64
+        from types import SimpleNamespace
 
+        client = Mock()
+        alignment = None
+        if text is not None:
+            starts = [index * 0.1 for index in range(len(text))]
+            alignment = SimpleNamespace(characters=list(text), character_start_times_seconds=starts, character_end_times_seconds=[t + 0.1 for t in starts])
+        client.text_to_speech.convert_with_timestamps.return_value = SimpleNamespace(
+            audio_base_64=base64.b64encode(audio).decode(), alignment=alignment
+        )
+        client.voices.settings.get.return_value = __import__("elevenlabs").VoiceSettings(stability=0.4, similarity_boost=0.8, speed=1.0)
+        return client
+
+    def test_synthesis_passes_exact_text_and_the_speakers_voice_and_model(self):
+        client = self.client()
         with patch.dict(os.environ, ENVIRONMENT, clear=False):
             with patch("elevenlabs.client.ElevenLabs", return_value=client) as factory:
                 provider = ElevenLabsTTSProvider()
@@ -48,13 +61,13 @@ class ElevenLabsTTSProviderTests(unittest.TestCase):
                 audio = provider.synthesize(text, "fr", voice, "normal")
 
         factory.assert_called_once_with(api_key="test-api-key")
-        client.text_to_speech.convert.assert_called_once_with(
-            text=text,
-            voice_id="sophie-test-voice",
-            model_id="sophie-test-model",
-            output_format="mp3_44100_128",
-        )
-        self.assertEqual(audio, SynthesizedAudio(b"mp3-part-1mp3-part-2", "audio/mpeg", ".mp3"))
+        call = client.text_to_speech.convert_with_timestamps.call_args
+        self.assertEqual(call.args, ("sophie-test-voice",))
+        self.assertEqual(call.kwargs["text"], text)
+        self.assertEqual(call.kwargs["model_id"], "sophie-test-model")
+        self.assertEqual(call.kwargs["output_format"], "mp3_44100_128")
+        self.assertEqual(audio.content, b"mp3-bytes")
+        self.assertEqual(audio.media_type, "audio/mpeg")
 
     def test_each_character_can_have_their_own_voice(self):
         environment = dict(ENVIRONMENT, ELEVENLABS_VOICES='{"sophie": "voice-s", "baker": "voice-b"}')
@@ -67,15 +80,50 @@ class ElevenLabsTTSProviderTests(unittest.TestCase):
         self.assertEqual(provider.voice_for("fr", "neighbor"), "sophie-test-voice")
         self.assertEqual(provider.voice_for("fr", None), "sophie-test-voice")
 
-    def test_slower_playback_asks_for_a_slower_voice(self):
-        client = Mock()
-        client.text_to_speech.convert.return_value = b"mp3"
+    def test_speed_is_slower_than_natural_and_keeps_the_voices_own_settings(self):
+        client = self.client()
         with patch.dict(os.environ, ENVIRONMENT, clear=False), patch("elevenlabs.client.ElevenLabs", return_value=client):
-            ElevenLabsTTSProvider().synthesize("Bonjour.", "fr", "v", "slow")
+            provider = ElevenLabsTTSProvider()
+            provider.synthesize("Bonjour.", "fr", "v", "normal")
+            normal = client.text_to_speech.convert_with_timestamps.call_args.kwargs["voice_settings"]
+            provider.synthesize("Bonjour.", "fr", "v", "slow")
+            slow = client.text_to_speech.convert_with_timestamps.call_args.kwargs["voice_settings"]
 
-        settings = client.text_to_speech.convert.call_args.kwargs["voice_settings"]
-        self.assertLess(settings.speed, 1.0)
-        self.assertGreaterEqual(settings.speed, 0.7)
+        self.assertEqual(normal.speed, 0.9)
+        self.assertEqual(slow.speed, 0.75)
+        self.assertEqual((normal.stability, normal.similarity_boost), (0.4, 0.8), "the voice's saved settings are kept")
+        client.voices.settings.get.assert_called_once_with("v")
+
+        with patch.dict(os.environ, dict(ENVIRONMENT, ELEVENLABS_SPEED="2"), clear=False), patch("elevenlabs.client.ElevenLabs", return_value=client):
+            self.assertEqual(ElevenLabsTTSProvider().speeds["normal"], 1.2, "speeds stay within what ElevenLabs accepts")
+
+    def test_words_are_timed_so_the_game_can_trace_them(self):
+        text = "Je m'appelle Ella."
+        client = self.client(text=text)
+        with patch.dict(os.environ, ENVIRONMENT, clear=False), patch("elevenlabs.client.ElevenLabs", return_value=client):
+            audio = ElevenLabsTTSProvider().synthesize(text, "fr", "v", "normal")
+
+        self.assertEqual([text[start:end] for start, end, _, _ in audio.words], ["Je", "m'appelle", "Ella"])
+        self.assertEqual(audio.words[1], (3, 12, 0.3, 1.2))
+
+    def test_a_single_word_is_said_with_its_sentence_around_it(self):
+        client = self.client()
+        with patch.dict(os.environ, ENVIRONMENT, clear=False), patch("elevenlabs.client.ElevenLabs", return_value=client):
+            provider = ElevenLabsTTSProvider()
+            provider.synthesize("m'appelle", "fr", "v", "normal", ("Je", "Ella."))
+            with_context = client.text_to_speech.convert_with_timestamps.call_args.kwargs
+            provider.synthesize("Bonjour.", "fr", "v", "normal")
+            plain = client.text_to_speech.convert_with_timestamps.call_args.kwargs
+
+        self.assertEqual((with_context["text"], with_context["previous_text"], with_context["next_text"]), ("m'appelle", "Je", "Ella."))
+        self.assertNotIn("previous_text", plain)
+        self.assertNotIn("language_code", plain, "multilingual v2 works the language out itself")
+
+    def test_models_that_accept_a_language_are_told_it(self):
+        client = self.client()
+        with patch.dict(os.environ, dict(ENVIRONMENT, ELEVENLABS_MODEL_ID="eleven_flash_v2_5"), clear=False), patch("elevenlabs.client.ElevenLabs", return_value=client):
+            ElevenLabsTTSProvider().synthesize("Je", "fr", "v", "normal")
+        self.assertEqual(client.text_to_speech.convert_with_timestamps.call_args.kwargs["language_code"], "fr")
 
     def test_missing_elevenlabs_configuration_is_provider_unavailable(self):
         with patch.dict(os.environ, dict(ENVIRONMENT, ELEVENLABS_API_KEY=""), clear=False):
@@ -83,9 +131,8 @@ class ElevenLabsTTSProviderTests(unittest.TestCase):
                 ElevenLabsTTSProvider()
 
     def test_provider_failure_is_not_exposed_as_raw_sdk_exception(self):
-        client = Mock()
-        client.text_to_speech.convert.side_effect = RuntimeError("provider detail")
-
+        client = self.client()
+        client.text_to_speech.convert_with_timestamps.side_effect = RuntimeError("provider detail")
         with patch.dict(os.environ, ENVIRONMENT, clear=False):
             with patch("elevenlabs.client.ElevenLabs", return_value=client):
                 provider = ElevenLabsTTSProvider()
@@ -93,9 +140,7 @@ class ElevenLabsTTSProviderTests(unittest.TestCase):
                     provider.synthesize("Bonjour.", "fr", "v", "normal")
 
     def test_empty_provider_audio_is_rejected(self):
-        client = Mock()
-        client.text_to_speech.convert.return_value = iter([b"", b""])
-
+        client = self.client(audio=b"")
         with patch.dict(os.environ, ENVIRONMENT, clear=False):
             with patch("elevenlabs.client.ElevenLabs", return_value=client):
                 provider = ElevenLabsTTSProvider()

@@ -77,7 +77,7 @@ app.add_middleware(
     allow_methods=["GET", "POST"],
     allow_headers=["Content-Type"],
     # The client reads the lip-sync track and cache status from these.
-    expose_headers=["X-Speech-Cache", "X-Speech-Key", "X-Mouth-Timeline", "X-Mouth-Fps"],
+    expose_headers=["X-Speech-Cache", "X-Speech-Key", "X-Mouth-Timeline", "X-Mouth-Fps", "X-Word-Timings"],
 )
 
 
@@ -128,6 +128,11 @@ def speech_capabilities() -> dict:
     }
 
 
+class WordContextModel(BaseModel):
+    before: str = ""
+    after: str = ""
+
+
 class SynthesizeRequest(BaseModel):
     """What is said and who says it. Vendor, model, voice and credentials are the server's business."""
 
@@ -135,6 +140,8 @@ class SynthesizeRequest(BaseModel):
     languageCode: str = "fr"
     speakerId: str | None = None
     rate: str = "normal"
+    # For a single word: the sentence around it, so it is said as it sounds there.
+    context: WordContextModel | None = None
 
 
 @app.post("/speech/synthesize")
@@ -142,7 +149,8 @@ def synthesize(request: SynthesizeRequest) -> Response:
     """Voice one line. Returns the audio, with a mouth timeline for lip sync in the headers."""
 
     try:
-        result = tts.synthesize_speech(request.text, request.languageCode, request.speakerId, request.rate)
+        context = (request.context.before, request.context.after) if request.context else None
+        result = tts.synthesize_speech(request.text, request.languageCode, request.speakerId, request.rate, context)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except tts.TTSConfigurationError as exc:
@@ -161,6 +169,11 @@ def synthesize(request: SynthesizeRequest) -> Response:
     if result.mouth_timeline:
         headers["X-Mouth-Timeline"] = result.mouth_timeline
         headers["X-Mouth-Fps"] = str(FRAMES_PER_SECOND)
+    if result.audio.words:
+        # "start:end:fromMs:toMs" per word, ";"-separated: character offsets in the text, then milliseconds.
+        headers["X-Word-Timings"] = ";".join(
+            "{}:{}:{}:{}".format(start, end, round(t0 * 1000), round(t1 * 1000)) for start, end, t0, t1 in result.audio.words
+        )
     return Response(content=result.audio.content, media_type=result.audio.media_type, headers=headers)
 
 
@@ -210,6 +223,8 @@ def practice_attempt(
     languageCode: str = Form("fr"),
     speakerId: str | None = Form(None),
     excluded: str = Form("[]"),
+    contextBefore: str = Form(""),
+    contextAfter: str = Form(""),
 ) -> dict:
     """One pronunciation-practice attempt: the learner's recording of `text`,
     compared with the character's own voice saying it. Returns which words may
@@ -232,7 +247,8 @@ def practice_attempt(
     if len(data) > config.MAX_AUDIO_BYTES:
         raise HTTPException(status_code=413, detail="audio must be at most {} bytes".format(config.MAX_AUDIO_BYTES))
     try:
-        result = practice.evaluate_attempt(data, text, languageCode, speakerId, excluded_words)
+        context = (contextBefore, contextAfter) if contextBefore or contextAfter else None
+        result = practice.evaluate_attempt(data, text, languageCode, speakerId, excluded_words, context=context)
         _pronunciation.update(loaded=True, reason=None)
         return result
     except AudioError as exc:

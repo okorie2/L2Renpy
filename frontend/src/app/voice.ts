@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { mouthOpenAt } from "../speech/mouth";
-import type { MouthTimeline, SpeechRate, SynthesizedSpeech } from "../speech/types";
+import type { MouthTimeline, SpeechRate, SynthesizedSpeech, WordTiming } from "../speech/types";
 import type { VoiceLibrary } from "../speech/voiceLibrary";
 
 export interface AudioSettings {
@@ -104,8 +104,23 @@ export interface SpokenLine {
 
 export type VoiceStatus = "off" | "loading" | "playing" | "finished" | "unavailable";
 
+/** The word being heard at `time`, as an index into `words`; after the last word, the last one. */
+export function wordAt(words: WordTiming[] | undefined, time: number): number | undefined {
+  if (!words?.length || time < words[0].from) return undefined;
+  let current: number | undefined;
+  for (let index = 0; index < words.length; index++) {
+    if (words[index].from <= time) current = index;
+    else break;
+  }
+  return current;
+}
+
 export interface LineVoice {
   status: VoiceStatus;
+  /** When each word is spoken, for tracing the text as it is heard. */
+  words?: WordTiming[];
+  /** The word being spoken now, while the line plays. */
+  activeWord?: number;
   /** A voice can be requested for this line right now. */
   canPlay: boolean;
   mouthOpen: boolean;
@@ -125,6 +140,8 @@ export function useLineVoice(library: VoiceLibrary | undefined, settings: AudioS
   const enabled = Boolean(library) && settings.voice;
   const [status, setStatus] = useState<VoiceStatus>("off");
   const [mouthOpen, setMouthOpen] = useState(false);
+  const [words, setWords] = useState<WordTiming[] | undefined>(undefined);
+  const [activeWord, setActiveWord] = useState<number | undefined>(undefined);
   const heard = useRef(false);
   const request = useRef(0);
   const timeline = useRef<MouthTimeline | undefined>(undefined);
@@ -145,6 +162,7 @@ export function useLineVoice(library: VoiceLibrary | undefined, settings: AudioS
         return;
       }
       timeline.current = speech.mouthTimeline;
+      setWords(speech.words);
       audio.src = urlFor(speech);
       audio.currentTime = 0;
       audio.play().then(
@@ -159,6 +177,8 @@ export function useLineVoice(library: VoiceLibrary | undefined, settings: AudioS
   useEffect(() => {
     heard.current = false;
     setMouthOpen(false);
+    setWords(undefined);
+    setActiveWord(undefined);
     setStatus("off");
     if (enabled && line?.autoplay) play("normal");
     return () => {
@@ -176,6 +196,7 @@ export function useLineVoice(library: VoiceLibrary | undefined, settings: AudioS
   useEffect(() => {
     if (status !== "playing") {
       setMouthOpen(false);
+      if (status !== "finished") setActiveWord(undefined);
       return;
     }
     const audio = audioElement();
@@ -183,6 +204,7 @@ export function useLineVoice(library: VoiceLibrary | undefined, settings: AudioS
     const tick = () => {
       if (audio.duration > 0 && audio.currentTime / audio.duration >= HEARD_SHARE) heard.current = true;
       if (!still) setMouthOpen(mouthOpenAt(timeline.current, audio.currentTime));
+      setActiveWord(wordAt(words, audio.currentTime));
     };
     const finish = () => {
       heard.current = true;
@@ -194,13 +216,93 @@ export function useLineVoice(library: VoiceLibrary | undefined, settings: AudioS
       window.clearInterval(timer);
       audio.removeEventListener("ended", finish);
     };
-  }, [status]);
+  }, [status, words]);
 
   return {
     status,
+    words,
+    activeWord: status === "playing" ? activeWord : undefined,
     canPlay: enabled && Boolean(line) && (library?.available ?? false),
     mouthOpen,
     play,
     wasHeard: () => heard.current
   };
+}
+
+/** One thing a character says in a sequence: a prompt in the learner's language, or a line to learn. */
+export interface SpokenItem {
+  text: string;
+  languageCode: string;
+  speakerId?: string;
+  rate?: SpeechRate;
+  /** For a single word: the sentence around it, so it is said as it sounds there. */
+  context?: { before: string; after: string };
+}
+
+export interface SpeakerState {
+  /** Which item of the sequence is playing. */
+  item: SpokenItem;
+  words?: WordTiming[];
+  activeWord?: number;
+  mouthOpen: boolean;
+}
+
+/**
+ * Say several things in a row in one voice, such as "That was a good try. Let's
+ * practise this part." followed by the word. Each item is fetched, played to the
+ * end, and traced word by word when timings exist. A new sequence replaces the
+ * one playing. Resolves when the sequence ends or is replaced.
+ */
+export function useSpeaker(library: VoiceLibrary | undefined, settings: AudioSettings) {
+  const [state, setState] = useState<SpeakerState | null>(null);
+  const ticket = useRef(0);
+
+  const stop = useCallback(() => {
+    ticket.current++;
+    audioElement().pause();
+    setState(null);
+  }, []);
+  useEffect(() => stop, [stop]);
+
+  const speak = useCallback(async (items: SpokenItem[]): Promise<void> => {
+    const current = ++ticket.current;
+    const audio = audioElement();
+    audio.pause();
+    if (!library || !settings.voice) {
+      setState(null);
+      return;
+    }
+    audio.volume = settings.volume;
+    for (const item of items) {
+      if (current !== ticket.current) return;
+      const speech = await library.get({ text: item.text, languageCode: item.languageCode, speakerId: item.speakerId, rate: item.rate ?? "normal", ...(item.context ? { context: item.context } : {}) });
+      if (current !== ticket.current) return;
+      if (!speech) continue;
+      setState({ item, words: speech.words, mouthOpen: false });
+      audio.src = urlFor(speech);
+      audio.currentTime = 0;
+      await new Promise<void>((resolve) => {
+        const timer = window.setInterval(() => {
+          if (current !== ticket.current) return finish();
+          setState({ item, words: speech.words, activeWord: wordAt(speech.words, audio.currentTime), mouthOpen: mouthOpenAt(speech.mouthTimeline, audio.currentTime) });
+        }, MOUTH_INTERVAL_MS);
+        const finish = () => {
+          window.clearInterval(timer);
+          audio.removeEventListener("ended", finish);
+          audio.removeEventListener("pause", finish);
+          audio.removeEventListener("error", finish);
+          resolve();
+        };
+        audio.addEventListener("ended", finish);
+        audio.addEventListener("pause", finish);
+        audio.addEventListener("error", finish);
+        audio.play().catch(finish);
+      });
+      // A short breath between one thing said and the next.
+      if (current === ticket.current) await new Promise((resolve) => window.setTimeout(resolve, 250));
+    }
+    if (current === ticket.current) setState(null);
+  }, [library, settings.voice, settings.volume]);
+
+  return { speaking: state, speak, stop };
 }

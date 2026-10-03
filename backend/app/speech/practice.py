@@ -76,6 +76,7 @@ def evaluate_attempt(
     speaker_id: str | None = None,
     excluded: list[str] | None = None,
     evaluate: Callable[..., dict] | None = None,
+    context: tuple[str, str] | None = None,
 ) -> dict:
     """Compare a learner's recording of `text` with the character's own voice saying it."""
 
@@ -97,7 +98,8 @@ def evaluate_attempt(
     if len(learner) / SAMPLE_RATE > config.MAX_AUDIO_SECONDS:
         raise AudioError("The recording is too long.")
     # The reference is the line as the learner heard it, from the voice cache.
-    reference = tts.synthesize_speech(text, language, speaker_id, "normal")
+    # (For a single word, with the same sentence around it as when it was said to the learner.)
+    reference = tts.synthesize_speech(text, language, speaker_id, "normal", context)
     reference_samples = decode_audio(io.BytesIO(reference.audio.content))
 
     evaluate = evaluate or _default_evaluator()

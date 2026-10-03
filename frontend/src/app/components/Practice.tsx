@@ -1,10 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { PracticeRequestError, type PracticeClient } from "../../speech/httpPractice";
-import { feedbackText, practiceTarget, recordAttempt, skipLine, startPractice, type PracticeWord } from "../../speech/practice";
+import {
+  createPhrasePicker, practiceSpeech, practiceTarget, recordAttempt, startPractice,
+  type PracticeState, type PracticeUtterance, type PracticeWord
+} from "../../speech/practice";
 import type { SpeechRate } from "../../speech/types";
 import { icons } from "../icons";
 import { RecordingError, startRecording, type Recording } from "../recorder";
-import { stopVoice } from "../voice";
+import type { SpeakerState, SpokenItem } from "../voice";
+import { traceText } from "./TracedText";
 
 export interface PracticeLine {
   text: string;
@@ -16,12 +20,15 @@ type Props = {
   /** Words that are not graded, such as the learner's own name. */
   excluded: string[];
   languageCode: string;
+  /** The learner's own language, for Sophie's prompts. */
+  interfaceLanguageCode: string;
   /** Whose voice is the model: the character who taught the line. */
   speakerId?: string;
   practice?: PracticeClient;
   /** The microphone and the backend's pronunciation check are both available. */
   canPractise: boolean;
-  onHear: (text: string, rate: SpeechRate) => void;
+  speaking: SpeakerState | null;
+  speak: (items: SpokenItem[]) => Promise<void>;
   onDone: () => void;
 };
 
@@ -35,10 +42,7 @@ function WordMarks({ words, languageCode }: { words: PracticeWord[]; languageCod
   return (
     <p className="practice-words" lang={languageCode}>
       {words.map((word) => (
-        <span
-          key={`${word.index}-${word.word}`}
-          className={!word.scored ? "word-unscored" : word.needsPractice ? "word-practise" : "word-clear"}
-        >
+        <span key={`${word.index}-${word.word}`} className={!word.scored ? "word-unscored" : word.needsPractice ? "word-practise" : "word-clear"}>
           {word.word}
         </span>
       ))}
@@ -47,13 +51,17 @@ function WordMarks({ words, languageCode }: { words: PracticeWord[]; languageCod
 }
 
 /**
- * Pronunciation practice on the lines Sophie just taught: listen, say it, work on
- * the word that needs it most, then the whole line once more. Every attempt is
- * finite, the learner can always move on, and nothing here decides progress.
+ * Pronunciation practice on the lines Sophie just taught. She says each line;
+ * the learner says it back; she answers ("Great!", "That was a good try. Let's
+ * practise this part.") and says the next thing to copy. Attempts are finite, so
+ * the practice always ends, and how it went never decides progress.
  */
-export function Practice({ lines, excluded, languageCode, speakerId, practice, canPractise, onHear, onDone }: Props) {
-  const [state, setState] = useState(startPractice);
+export function Practice({ lines, excluded, languageCode, interfaceLanguageCode, speakerId, practice, canPractise, speaking, speak, onDone }: Props) {
+  const [state, setState] = useState<PracticeState>(startPractice);
   const [status, setStatus] = useState<Status>({ kind: "idle" });
+  // What Sophie last said to steer the practice, shown as a caption.
+  const [caption, setCaption] = useState<string | undefined>(undefined);
+  const [pick] = useState(() => createPhrasePicker());
   const recording = useRef<Recording | undefined>(undefined);
   const request = useRef<AbortController | undefined>(undefined);
   const turn = useRef(0);
@@ -61,42 +69,55 @@ export function Practice({ lines, excluded, languageCode, speakerId, practice, c
   const target = practiceTarget(state, texts);
   const line = lines[state.lineIndex];
 
-  const abandon = () => {
-    turn.current++;
-    recording.current?.cancel();
-    recording.current = undefined;
-    request.current?.abort();
-  };
-  useEffect(() => abandon, []);
-
-  // Each new line or word is heard first.
-  const targetKey = target ? `${state.lineIndex}:${target.mode}:${target.text}` : "done";
-  useEffect(() => {
-    if (target && canPractise) onHear(target.text, "normal");
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [targetKey]);
+  const say = (utterances: PracticeUtterance[], rate: SpeechRate = "normal") => speak(utterances.map((item) => ({
+    text: item.text,
+    languageCode: item.kind === "prompt" ? interfaceLanguageCode : languageCode,
+    speakerId,
+    rate: item.kind === "target" ? rate : "normal",
+    ...(item.kind === "target" && item.context ? { context: item.context } : {})
+  })));
+  const captionOf = (utterances: PracticeUtterance[]) => utterances.filter((item) => item.kind === "prompt").map((item) => item.text).join(" ") || undefined;
 
   useEffect(() => {
-    if (state.done) onDone();
+    // Begin by hearing the first line.
+    if (canPractise && lines[0]) {
+      const opening: PracticeUtterance[] = [{ kind: "prompt", text: pick("listenFirst") }, { kind: "target", text: lines[0].text }];
+      setCaption(captionOf(opening));
+      void say(opening);
+    }
+    return () => {
+      turn.current++;
+      recording.current?.cancel();
+      request.current?.abort();
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.done]);
+  }, []);
 
   if (!canPractise) {
     return (
       <div className="practice">
         <p className="turn-prompt">Listen to each line and say it aloud.</p>
         <ol className="practice-list">
-          {lines.map((item) => (
-            <li key={item.text}>
-              <button className="assist-chip" onClick={() => onHear(item.text, "normal")} aria-label={`Hear: ${item.text}`}>▶</button>
-              <span>
-                <span className="target-language small" lang={languageCode}>{item.text}</span>
-                {item.translation && <small>{item.translation}</small>}
-              </span>
-            </li>
-          ))}
+          {lines.map((item) => {
+            const playing = speaking?.item.text === item.text;
+            return (
+              <li key={item.text}>
+                <button
+                  className={`assist-chip${playing ? " active" : ""}`}
+                  aria-pressed={playing}
+                  onClick={() => void say([{ kind: "target", text: item.text }])}
+                  aria-label={`Hear: ${item.text}`}
+                >
+                  ▶
+                </button>
+                <span>
+                  <span className="target-language small" lang={languageCode}>{playing ? traceText(item.text, speaking?.words, speaking?.activeWord) : item.text}</span>
+                  {item.translation && <span className="translation small">{item.translation}</span>}
+                </span>
+              </li>
+            );
+          })}
         </ol>
-        <p className="field-note">Pronunciation feedback isn't available right now.</p>
         <button className="primary-pill" onClick={onDone}>Continue</button>
       </div>
     );
@@ -114,10 +135,15 @@ export function Practice({ lines, excluded, languageCode, speakerId, practice, c
       const clip = await active.stop();
       const controller = new AbortController();
       request.current = controller;
-      const result = await practice.attempt({ audio: clip, text: target.text, languageCode, speakerId, excluded, signal: controller.signal });
+      const result = await practice.attempt({ audio: clip, text: target.text, languageCode, speakerId, excluded, context: target.context, signal: controller.signal });
       if (current !== turn.current) return;
       setStatus({ kind: "idle" });
-      setState((previous) => recordAttempt(previous, result, lines.length));
+      const next = recordAttempt(state, result, lines.length, texts);
+      setState(next);
+      const reply = practiceSpeech(next, texts, pick);
+      setCaption(captionOf(reply));
+      await say(reply);
+      if (next.done && current === turn.current) onDone();
     } catch (error) {
       if (current !== turn.current) return;
       if (error instanceof RecordingError) {
@@ -133,7 +159,8 @@ export function Practice({ lines, excluded, languageCode, speakerId, practice, c
 
   const begin = async () => {
     const current = ++turn.current;
-    stopVoice();
+    // Sophie stops talking when the learner starts.
+    void speak([]);
     try {
       const started = await startRecording(() => void finish());
       if (current !== turn.current) {
@@ -152,35 +179,40 @@ export function Practice({ lines, excluded, languageCode, speakerId, practice, c
 
   const recordingNow = status.kind === "recording";
   const checking = status.kind === "checking";
+  const targetPlaying = speaking?.item.text === target.text && speaking.item.languageCode === languageCode;
+  const playingRate = targetPlaying ? speaking?.item.rate ?? "normal" : undefined;
+  const sophieTalking = speaking !== null;
 
   return (
     <div className="practice">
-      <p className="eyebrow practice-step">
-        {target.mode === "word" ? "Practise this word" : `Line ${state.lineIndex + 1} of ${lines.length}`}
-        {state.finalPhrase && target.mode === "phrase" ? " · once more" : ""}
-      </p>
-      {state.feedback && (
-        <div className="practice-feedback" role="status">
-          {state.lastWords && state.lastWords.length > 0 && <WordMarks words={state.lastWords} languageCode={languageCode} />}
-          <p>{feedbackText(state.feedback)}</p>
-        </div>
+      <div className="practice-head">
+        {target.mode === "phrase" && <span className="eyebrow">{`LINE ${state.lineIndex + 1} OF ${lines.length}`}</span>}
+        {caption && <span className="practice-caption" role="status">{caption}</span>}
+      </div>
+      {state.lastWords && state.lastWords.length > 0 && target.mode === "phrase" && state.feedback?.kind !== "clear" && (
+        <WordMarks words={state.lastWords} languageCode={languageCode} />
       )}
-      <p className="target-language" lang={languageCode}>{target.text}</p>
+      <p className="target-language" lang={languageCode}>
+        {targetPlaying ? traceText(target.text, speaking?.words, speaking?.activeWord) : target.text}
+      </p>
       {target.mode === "phrase" && line?.translation && <p className="translation">{line.translation}</p>}
       {target.guide && <p className="hint-text">Sounds like: <strong>{target.guide}</strong></p>}
 
-      <div className="assist-row">
-        <button className="assist-chip" onClick={() => onHear(target.text, "normal")} disabled={recordingNow}>Listen</button>
-        <button className="assist-chip" onClick={() => onHear(target.text, "slow")} disabled={recordingNow}>Slower</button>
-      </div>
-
       {status.kind === "error" && status.fatal ? (
-        <div className="speech-control">
+        <div className="practice-controls">
           <p className="speech-status" role="status">{status.message}</p>
           <button className="primary-pill" onClick={onDone}>Continue</button>
         </div>
       ) : (
-        <div className="speech-control" role="group" aria-label="Say it">
+        <div className="practice-controls">
+          <button
+            className={`assist-chip${playingRate === "normal" ? " active" : ""}`}
+            aria-pressed={playingRate === "normal"}
+            onClick={() => void say([{ kind: "target", text: target.text, context: target.context }])}
+            disabled={recordingNow || checking}
+          >
+            {playingRate === "normal" ? "Playing…" : "Listen"}
+          </button>
           <button
             className={`mic-button${recordingNow ? " recording" : ""}`}
             onClick={() => (recordingNow ? void finish() : void begin())}
@@ -189,21 +221,25 @@ export function Practice({ lines, excluded, languageCode, speakerId, practice, c
           >
             <img src={recordingNow ? icons.stop : icons.microphone} alt="" />
           </button>
-          <p className="speech-status" role="status">
-            {status.kind === "error" ? status.message
-              : recordingNow ? "Listening… tap when you've finished."
-              : checking ? "Listening back…"
-              : "Tap and say it."}
-          </p>
+          <button
+            className={`assist-chip${playingRate === "slow" ? " active" : ""}`}
+            aria-pressed={playingRate === "slow"}
+            onClick={() => void say([{ kind: "target", text: target.text, context: target.context }], "slow")}
+            disabled={recordingNow || checking}
+          >
+            {playingRate === "slow" ? "Playing…" : "Slower"}
+          </button>
         </div>
       )}
-
-      <div className="practice-actions">
-        <button className="text-button" onClick={() => { abandon(); setStatus({ kind: "idle" }); setState((previous) => skipLine(previous, lines.length)); }}>
-          {state.lineIndex + 1 < lines.length ? "Skip this line" : "Finish"}
-        </button>
-        <button className="text-button" onClick={() => { abandon(); onDone(); }}>Stop practising</button>
-      </div>
+      {!(status.kind === "error" && status.fatal) && (
+        <p className="speech-status" role="status">
+          {status.kind === "error" ? status.message
+            : recordingNow ? "Listening… tap when you've finished."
+            : checking ? "Listening back…"
+            : sophieTalking ? "Sophie is speaking…"
+            : "Tap the microphone and say it."}
+        </p>
+      )}
     </div>
   );
 }

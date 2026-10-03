@@ -29,6 +29,11 @@ export interface SynthesisRequest {
   /** Who is speaking, as a game ID. Choosing an actual voice is the provider's business. */
   speakerId?: string;
   rate?: SpeechRate;
+  /**
+   * The sentence around a single word, so it is said as it sounds there and in
+   * the right language. Only the word itself is spoken.
+   */
+  context?: { before: string; after: string };
   signal?: AbortSignal;
 }
 
@@ -38,9 +43,19 @@ export interface MouthTimeline {
   frames: string;
 }
 
+/** When one word of the line is heard: its place in the text (end exclusive) and its time in seconds. */
+export interface WordTiming {
+  start: number;
+  end: number;
+  from: number;
+  to: number;
+}
+
 export interface SynthesizedSpeech {
   audio: AudioClip;
   mouthTimeline?: MouthTimeline;
+  /** Present when the voice provider says when each word is spoken. */
+  words?: WordTiming[];
 }
 
 export interface TextToSpeechProvider {

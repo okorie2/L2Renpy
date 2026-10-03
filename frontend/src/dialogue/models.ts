@@ -112,5 +112,10 @@ export interface DialogueNode {
 export interface Dialogue {
   id: string;
   startNodeId: string;
+  /**
+   * Lines without an answer move on by themselves once they have been heard
+   * (or, in silence, read), so a scene flows without tapping "next".
+   */
+  autoAdvance?: boolean;
   nodes: Record<string, DialogueNode>;
 }

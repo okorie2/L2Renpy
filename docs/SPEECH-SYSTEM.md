@@ -136,13 +136,25 @@ The server and content system own the expected text, phonemes, canonical audio, 
 
 Names, places, brands, foreign words and dynamic story values are excluded from pronunciation assessment through `assessment.excludedSpans` on the line (see `CONTENT-SCHEMA.md`).
 
+## Word tracing, speed and flow (2026-10-02)
+
+- **Tracing.** While a line plays, the word being said is highlighted, one word at a time, in whichever language Sophie is speaking. Generated lines carry word timings from ElevenLabs (`X-Word-Timings`); Sophie's recorded English lines are timed once by ElevenLabs forced alignment when the voice pack is built (`voices/pack/recordings.json`). The written translation is not spoken, so it is not highlighted.
+- **Speed.** ElevenLabs speaks at 0.9 by default and 0.75 for "Slower" (`ELEVENLABS_SPEED`, `ELEVENLABS_SLOW_SPEED`). Changing a speed regenerates lines, because it is part of the cache key.
+- **Flow.** A dialogue marked `autoAdvance` (Sophie's welcome) moves on by itself 0.7 s after each line has been heard, or after a reading pause in silence. "Next" is still there for the impatient.
+- **"Slower"** is offered only on lines in the language being learned, not on English ones.
+- **Speech-to-text** is ElevenLabs Scribe when an ElevenLabs key is set; local Whisper otherwise.
+- **Voice pack.** Lines that are the same for everyone are shipped as files (`frontend/public/assets/voices/pack/`, listed by `frontend/src/speech/voicePack.ts`, built by `backend/tools/build_voice_pack.py`), with their lip-sync and word timings. The game plays recordings first, then the pack, and asks the backend only for lines with the player's name in them (or anything the pack lacks).
+
 ## Pronunciation practice in the opening
 
 The first pronunciation practice is built: at the end of Sophie's welcome the learner practises the introduction she just taught, line by line (`meetSophie.practice`, a `practice` response).
 
 - `frontend/src/speech/practice.ts` is the loop as pure functions, with the Ren'Py thresholds: a line is clear at 0.85; otherwise the weakest word is practised (clear at 0.80, at most three tries, a sound-it-out guide on the third), then the whole line once more, then on regardless.
 - `POST /speech/practice` takes the learner's audio, the line, the speaker and the words not to grade (the learner's name). The server makes the reference from the speaker's cached voice for that line, so the learner is compared with exactly what they heard.
-- The learner sees words marked clear or worth practising, never a number. "Skip this line" and "Stop practising" are always there; without a microphone or the pronunciation model, the lines are shown to listen to and repeat, and the game continues.
+- Sophie talks the learner through it in her own voice: feedback, what to do next, then the French to copy. Feedback depends on how close the attempt was (`feedbackKind`: excellent at 0.95 and above, clear once it passes, close within 0.12 of passing, a good try from 0.45, tricky below), and each kind has several wordings (`PRACTICE_PHRASES`). She picks one at random without repeating herself (`createPhrasePicker`). All the phrases are in the voice pack.
+- A single word to practise is voiced with its sentence around it as context (ElevenLabs `previous_text`/`next_text`), so it is said in French and as it sounds in the sentence, and the pronunciation reference is made the same way. Models that accept a language (v2.5 Flash/Turbo, v3) are also told to speak French.
+- The learner sees words marked clear or worth practising, never a number. The attempts are finite, so the practice always ends; there is no skip button. Without a microphone or the pronunciation model, the lines are shown to listen to and repeat, with Continue.
+- "Listen" and "Slower" show that they are playing while they play.
 - Practice records no learning evidence yet and never affects quests.
 
 Lines in the learner's own language (`language: "interface"` on a node, such as Sophie's welcome) are voiced in English: from a recording shipped with the game when there is one (`frontend/src/speech/recordings.ts`), otherwise by the backend, whose `VOICE_LANGUAGES` adds English to the voiced languages.

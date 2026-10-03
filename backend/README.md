@@ -93,7 +93,21 @@ Everything lives in `backend/.env` (never committed). Every value has a default.
 ELEVENLABS_VOICES={"sophie":"<voice-id>","barista":"<voice-id>","baker":"<voice-id>","neighbor":"<voice-id>"}
 ```
 
-Anyone not listed, including the player's model answers, uses `ELEVENLABS_VOICE_ID`, which was Sophie's voice in the Ren'Py `.env`. With only that set, everyone sounds like Sophie. "Slower" asks ElevenLabs for speed 0.8.
+Anyone not listed, including the player's model answers, uses `ELEVENLABS_VOICE_ID`, which was Sophie's voice in the Ren'Py `.env`. With only that set, everyone sounds like Sophie.
+
+**Speed.** Characters speak a little slower than natural (`ELEVENLABS_SPEED`, default 0.9) and "Slower" slower still (`ELEVENLABS_SLOW_SPEED`, 0.75). The voice's own saved settings (stability, similarity) are read once and kept; only the speed changes.
+
+**Voice pack.** Every line that is the same for every player is generated once and shipped with the game in `frontend/public/assets/voices/pack/`, so it is never generated again and survives any cache being cleared. That covers what characters say in every dialogue (and their "Slower" versions), the player's model answers, the practice lines for every level and reason, each word that may be practised on its own, Sophie's practice prompts and the phrasebook words. Lines containing the player's name are left out and made live. To (re)build it, after changing dialogue, voices or speed:
+
+```bash
+cd frontend && npm run voices:list
+cd ../backend && .venv/bin/python tools/build_voice_pack.py --dry-run   # how many characters it will cost
+.venv/bin/python tools/build_voice_pack.py                              # then commit frontend/public/assets/voices/pack
+```
+
+Lines already in `.tts_cache` are reused for free. The tool never deletes pack files unless given `--prune`.
+
+**Word tracing.** ElevenLabs lines are made with per-character timing, turned into word timings and sent as `X-Word-Timings` (`start:end:fromMs:toMs` per word, `;`-separated), so the game lights the words up as they are said. The macOS and Chatterbox voices have no timings, so their lines are not traced.
 
 **macOS voices.** Out of the box the female voice is `Amélie`, which has a Canadian accent. For a France-French voice, download `Audrey` (free): **System Settings → Accessibility → Spoken Content → System Voice → Manage Voices → French**. Restart the backend and it is picked up. `SYSTEM_VOICES` overrides the whole table as JSON.
 
@@ -103,7 +117,7 @@ Anyone not listed, including the player's model answers, uses `ELEVENLABS_VOICE_
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
-| `LANGUAGE_APP_STT_PROVIDER` | `faster-whisper` | `faster-whisper` (local), `elevenlabs` (Scribe; needs the key) or `none` |
+| `LANGUAGE_APP_STT_PROVIDER` | `elevenlabs` when `ELEVENLABS_API_KEY` is set, else `faster-whisper` | `elevenlabs` (Scribe), `faster-whisper` (local Whisper) or `none` |
 | `FASTER_WHISPER_MODEL` | `large-v3-turbo` | `small` is quicker on a laptop (about 1 s an answer) but copes less well with accents |
 | `FASTER_WHISPER_DEVICE` | `auto` | GPU when there is one, else CPU |
 | `FASTER_WHISPER_COMPUTE_TYPE` | `auto` | `int8` is a good choice on CPU |

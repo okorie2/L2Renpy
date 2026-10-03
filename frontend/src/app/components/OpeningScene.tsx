@@ -23,7 +23,8 @@ type Props = {
 
 /** As in the Ren'Py opening: 1.8 s walking toward the camera, then a wave. */
 const WALK_MS = 1800;
-const STEP_MS = 120;
+/** Two unhurried strides: each foot forward once, then she arrives. */
+const STEP_MS = 450;
 const WAVE_MS = 900;
 
 /**
@@ -75,6 +76,11 @@ export function OpeningScene({ stage, art, onStart, onArrived, onTalk, title }: 
   return (
     <div className={`opening-scene${stage === "leaving" ? " leaving" : ""}`}>
       <img className="opening-backdrop" src={art.backdrop} alt="" />
+      {/* Her shadow on the path keeps her feet on the ground as she comes closer. */}
+      <div
+        className={`opening-shadow${near ? " near" : ""}${figureVisible ? " visible" : ""}`}
+        style={{ transitionDuration: `${WALK_MS}ms, ${WALK_MS}ms, ${WALK_MS}ms, 300ms` }}
+      />
       <img
         className={`opening-sophie${near ? " near" : ""}${figureVisible ? " visible" : ""}`}
         src={source}

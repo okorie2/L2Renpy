@@ -1,0 +1,1461 @@
+[
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "Je",
+  "context": {
+   "before": "",
+   "after": "m'appelle Marie."
+  },
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "Je",
+  "context": {
+   "before": "",
+   "after": "m'appelle Marie."
+  },
+  "rate": "slow"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "m'appelle",
+  "context": {
+   "before": "Je",
+   "after": "Marie."
+  },
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "m'appelle",
+  "context": {
+   "before": "Je",
+   "after": "Marie."
+  },
+  "rate": "slow"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "Je voudrais apprendre à parler français pour mes études.",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "Je voudrais apprendre à parler français pour mes études.",
+  "rate": "slow"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "voudrais",
+  "context": {
+   "before": "Je",
+   "after": "apprendre à parler français pour mes études."
+  },
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "voudrais",
+  "context": {
+   "before": "Je",
+   "after": "apprendre à parler français pour mes études."
+  },
+  "rate": "slow"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "apprendre",
+  "context": {
+   "before": "Je voudrais",
+   "after": "à parler français pour mes études."
+  },
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "apprendre",
+  "context": {
+   "before": "Je voudrais",
+   "after": "à parler français pour mes études."
+  },
+  "rate": "slow"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "à",
+  "context": {
+   "before": "Je voudrais apprendre",
+   "after": "parler français pour mes études."
+  },
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "à",
+  "context": {
+   "before": "Je voudrais apprendre",
+   "after": "parler français pour mes études."
+  },
+  "rate": "slow"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "parler",
+  "context": {
+   "before": "Je voudrais apprendre à",
+   "after": "français pour mes études."
+  },
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "parler",
+  "context": {
+   "before": "Je voudrais apprendre à",
+   "after": "français pour mes études."
+  },
+  "rate": "slow"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "français",
+  "context": {
+   "before": "Je voudrais apprendre à parler",
+   "after": "pour mes études."
+  },
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "français",
+  "context": {
+   "before": "Je voudrais apprendre à parler",
+   "after": "pour mes études."
+  },
+  "rate": "slow"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "pour",
+  "context": {
+   "before": "Je voudrais apprendre à parler français",
+   "after": "mes études."
+  },
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "pour",
+  "context": {
+   "before": "Je voudrais apprendre à parler français",
+   "after": "mes études."
+  },
+  "rate": "slow"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "mes",
+  "context": {
+   "before": "Je voudrais apprendre à parler français pour",
+   "after": "études."
+  },
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "mes",
+  "context": {
+   "before": "Je voudrais apprendre à parler français pour",
+   "after": "études."
+  },
+  "rate": "slow"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "études",
+  "context": {
+   "before": "Je voudrais apprendre à parler français pour mes",
+   "after": "."
+  },
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "études",
+  "context": {
+   "before": "Je voudrais apprendre à parler français pour mes",
+   "after": "."
+  },
+  "rate": "slow"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "Je voudrais apprendre à parler français pour ma carrière.",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "Je voudrais apprendre à parler français pour ma carrière.",
+  "rate": "slow"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "ma",
+  "context": {
+   "before": "Je voudrais apprendre à parler français pour",
+   "after": "carrière."
+  },
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "ma",
+  "context": {
+   "before": "Je voudrais apprendre à parler français pour",
+   "after": "carrière."
+  },
+  "rate": "slow"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "carrière",
+  "context": {
+   "before": "Je voudrais apprendre à parler français pour ma",
+   "after": "."
+  },
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "carrière",
+  "context": {
+   "before": "Je voudrais apprendre à parler français pour ma",
+   "after": "."
+  },
+  "rate": "slow"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "Je voudrais apprendre à parler français pour voyager.",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "Je voudrais apprendre à parler français pour voyager.",
+  "rate": "slow"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "voyager",
+  "context": {
+   "before": "Je voudrais apprendre à parler français pour",
+   "after": "."
+  },
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "voyager",
+  "context": {
+   "before": "Je voudrais apprendre à parler français pour",
+   "after": "."
+  },
+  "rate": "slow"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "Je voudrais apprendre à parler français pour communiquer avec une personne qui compte pour moi.",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "Je voudrais apprendre à parler français pour communiquer avec une personne qui compte pour moi.",
+  "rate": "slow"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "communiquer",
+  "context": {
+   "before": "Je voudrais apprendre à parler français pour",
+   "after": "avec une personne qui compte pour moi."
+  },
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "communiquer",
+  "context": {
+   "before": "Je voudrais apprendre à parler français pour",
+   "after": "avec une personne qui compte pour moi."
+  },
+  "rate": "slow"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "avec",
+  "context": {
+   "before": "Je voudrais apprendre à parler français pour communiquer",
+   "after": "une personne qui compte pour moi."
+  },
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "avec",
+  "context": {
+   "before": "Je voudrais apprendre à parler français pour communiquer",
+   "after": "une personne qui compte pour moi."
+  },
+  "rate": "slow"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "une",
+  "context": {
+   "before": "Je voudrais apprendre à parler français pour communiquer avec",
+   "after": "personne qui compte pour moi."
+  },
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "une",
+  "context": {
+   "before": "Je voudrais apprendre à parler français pour communiquer avec",
+   "after": "personne qui compte pour moi."
+  },
+  "rate": "slow"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "personne",
+  "context": {
+   "before": "Je voudrais apprendre à parler français pour communiquer avec une",
+   "after": "qui compte pour moi."
+  },
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "personne",
+  "context": {
+   "before": "Je voudrais apprendre à parler français pour communiquer avec une",
+   "after": "qui compte pour moi."
+  },
+  "rate": "slow"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "qui",
+  "context": {
+   "before": "Je voudrais apprendre à parler français pour communiquer avec une personne",
+   "after": "compte pour moi."
+  },
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "qui",
+  "context": {
+   "before": "Je voudrais apprendre à parler français pour communiquer avec une personne",
+   "after": "compte pour moi."
+  },
+  "rate": "slow"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "compte",
+  "context": {
+   "before": "Je voudrais apprendre à parler français pour communiquer avec une personne qui",
+   "after": "pour moi."
+  },
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "compte",
+  "context": {
+   "before": "Je voudrais apprendre à parler français pour communiquer avec une personne qui",
+   "after": "pour moi."
+  },
+  "rate": "slow"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "moi",
+  "context": {
+   "before": "Je voudrais apprendre à parler français pour communiquer avec une personne qui compte pour",
+   "after": "."
+  },
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "moi",
+  "context": {
+   "before": "Je voudrais apprendre à parler français pour communiquer avec une personne qui compte pour",
+   "after": "."
+  },
+  "rate": "slow"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "Je voudrais apprendre à parler français pour communiquer au quotidien.",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "Je voudrais apprendre à parler français pour communiquer au quotidien.",
+  "rate": "slow"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "au",
+  "context": {
+   "before": "Je voudrais apprendre à parler français pour communiquer",
+   "after": "quotidien."
+  },
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "au",
+  "context": {
+   "before": "Je voudrais apprendre à parler français pour communiquer",
+   "after": "quotidien."
+  },
+  "rate": "slow"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "quotidien",
+  "context": {
+   "before": "Je voudrais apprendre à parler français pour communiquer au",
+   "after": "."
+  },
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "quotidien",
+  "context": {
+   "before": "Je voudrais apprendre à parler français pour communiquer au",
+   "after": "."
+  },
+  "rate": "slow"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "Mon niveau actuel en français est débutant.",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "Mon niveau actuel en français est débutant.",
+  "rate": "slow"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "Mon",
+  "context": {
+   "before": "",
+   "after": "niveau actuel en français est débutant."
+  },
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "Mon",
+  "context": {
+   "before": "",
+   "after": "niveau actuel en français est débutant."
+  },
+  "rate": "slow"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "niveau",
+  "context": {
+   "before": "Mon",
+   "after": "actuel en français est débutant."
+  },
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "niveau",
+  "context": {
+   "before": "Mon",
+   "after": "actuel en français est débutant."
+  },
+  "rate": "slow"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "actuel",
+  "context": {
+   "before": "Mon niveau",
+   "after": "en français est débutant."
+  },
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "actuel",
+  "context": {
+   "before": "Mon niveau",
+   "after": "en français est débutant."
+  },
+  "rate": "slow"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "en",
+  "context": {
+   "before": "Mon niveau actuel",
+   "after": "français est débutant."
+  },
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "en",
+  "context": {
+   "before": "Mon niveau actuel",
+   "after": "français est débutant."
+  },
+  "rate": "slow"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "est",
+  "context": {
+   "before": "Mon niveau actuel en français",
+   "after": "débutant."
+  },
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "est",
+  "context": {
+   "before": "Mon niveau actuel en français",
+   "after": "débutant."
+  },
+  "rate": "slow"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "débutant",
+  "context": {
+   "before": "Mon niveau actuel en français est",
+   "after": "."
+  },
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "débutant",
+  "context": {
+   "before": "Mon niveau actuel en français est",
+   "after": "."
+  },
+  "rate": "slow"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "Mon niveau actuel en français est intermédiaire.",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "Mon niveau actuel en français est intermédiaire.",
+  "rate": "slow"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "intermédiaire",
+  "context": {
+   "before": "Mon niveau actuel en français est",
+   "after": "."
+  },
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "intermédiaire",
+  "context": {
+   "before": "Mon niveau actuel en français est",
+   "after": "."
+  },
+  "rate": "slow"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "Mon niveau actuel en français est avancé.",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "Mon niveau actuel en français est avancé.",
+  "rate": "slow"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "avancé",
+  "context": {
+   "before": "Mon niveau actuel en français est",
+   "after": "."
+  },
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "avancé",
+  "context": {
+   "before": "Mon niveau actuel en français est",
+   "after": "."
+  },
+  "rate": "slow"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "Salut ! Je m'appelle Sophie. Et toi ?",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "Salut ! Je m'appelle Sophie. Et toi ?",
+  "rate": "slow"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "Pardon ? Comment tu t'appelles ?",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "Pardon ? Comment tu t'appelles ?",
+  "rate": "slow"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "Allez, viens ! Je vais te montrer le quartier.",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "Allez, viens ! Je vais te montrer le quartier.",
+  "rate": "slow"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "Le café est juste là. Vas-y, commande un café !",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "Le café est juste là. Vas-y, commande un café !",
+  "rate": "slow"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "Bravo pour le café ! Maintenant, la boulangerie.",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "Bravo pour le café ! Maintenant, la boulangerie.",
+  "rate": "slow"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "Tu connais Malik ? Il est sur la place.",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "Tu connais Malik ? Il est sur la place.",
+  "rate": "slow"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "Va lui dire bonjour !",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "Va lui dire bonjour !",
+  "rate": "slow"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "Un café, un croissant, un nouvel ami… Bravo !",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "Un café, un croissant, un nouvel ami… Bravo !",
+  "rate": "slow"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "Je t'écris plus tard. À bientôt !",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "Je t'écris plus tard. À bientôt !",
+  "rate": "slow"
+ },
+ {
+  "languageCode": "fr",
+  "text": "Ça va bien, merci !",
+  "rate": "normal"
+ },
+ {
+  "languageCode": "fr",
+  "text": "Ça va bien, merci !",
+  "rate": "slow"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "Pardon ? Ça va bien ?",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "Pardon ? Ça va bien ?",
+  "rate": "slow"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "Super ! Tu veux aller au café demain ?",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "Super ! Tu veux aller au café demain ?",
+  "rate": "slow"
+ },
+ {
+  "languageCode": "fr",
+  "text": "Oui, avec plaisir !",
+  "rate": "normal"
+ },
+ {
+  "languageCode": "fr",
+  "text": "Oui, avec plaisir !",
+  "rate": "slow"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "Pardon ? Oui ou non ?",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "fr",
+  "text": "Pardon ? Oui ou non ?",
+  "rate": "slow"
+ },
+ {
+  "speakerId": "barista",
+  "languageCode": "fr",
+  "text": "Bonjour ! Bienvenue au café.",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "barista",
+  "languageCode": "fr",
+  "text": "Bonjour ! Bienvenue au café.",
+  "rate": "slow"
+ },
+ {
+  "speakerId": "barista",
+  "languageCode": "fr",
+  "text": "Bonjour !",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "barista",
+  "languageCode": "fr",
+  "text": "Bonjour !",
+  "rate": "slow"
+ },
+ {
+  "languageCode": "fr",
+  "text": "Bonjour !",
+  "rate": "normal"
+ },
+ {
+  "languageCode": "fr",
+  "text": "Bonjour !",
+  "rate": "slow"
+ },
+ {
+  "speakerId": "barista",
+  "languageCode": "fr",
+  "text": "Vous désirez ?",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "barista",
+  "languageCode": "fr",
+  "text": "Vous désirez ?",
+  "rate": "slow"
+ },
+ {
+  "languageCode": "fr",
+  "text": "Je voudrais un café, s'il vous plaît.",
+  "rate": "normal"
+ },
+ {
+  "languageCode": "fr",
+  "text": "Je voudrais un café, s'il vous plaît.",
+  "rate": "slow"
+ },
+ {
+  "speakerId": "barista",
+  "languageCode": "fr",
+  "text": "Voilà ! Ça fait trois euros.",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "barista",
+  "languageCode": "fr",
+  "text": "Voilà ! Ça fait trois euros.",
+  "rate": "slow"
+ },
+ {
+  "languageCode": "fr",
+  "text": "Merci !",
+  "rate": "normal"
+ },
+ {
+  "languageCode": "fr",
+  "text": "Merci !",
+  "rate": "slow"
+ },
+ {
+  "speakerId": "barista",
+  "languageCode": "fr",
+  "text": "Merci, bonne journée !",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "barista",
+  "languageCode": "fr",
+  "text": "Merci, bonne journée !",
+  "rate": "slow"
+ },
+ {
+  "speakerId": "barista",
+  "languageCode": "fr",
+  "text": "Pardon ?",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "barista",
+  "languageCode": "fr",
+  "text": "Pardon ?",
+  "rate": "slow"
+ },
+ {
+  "speakerId": "barista",
+  "languageCode": "fr",
+  "text": "Pardon ? Un café ? Un thé ?",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "barista",
+  "languageCode": "fr",
+  "text": "Pardon ? Un café ? Un thé ?",
+  "rate": "slow"
+ },
+ {
+  "speakerId": "barista",
+  "languageCode": "fr",
+  "text": "Non, non. Trois euros, s'il vous plaît.",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "barista",
+  "languageCode": "fr",
+  "text": "Non, non. Trois euros, s'il vous plaît.",
+  "rate": "slow"
+ },
+ {
+  "speakerId": "baker",
+  "languageCode": "fr",
+  "text": "Bonjour ! Entrez, s'il vous plaît.",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "baker",
+  "languageCode": "fr",
+  "text": "Bonjour ! Entrez, s'il vous plaît.",
+  "rate": "slow"
+ },
+ {
+  "speakerId": "baker",
+  "languageCode": "fr",
+  "text": "Bonjour ! Vous désirez ?",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "baker",
+  "languageCode": "fr",
+  "text": "Bonjour ! Vous désirez ?",
+  "rate": "slow"
+ },
+ {
+  "languageCode": "fr",
+  "text": "Bonjour ! Un croissant, s'il vous plaît.",
+  "rate": "normal"
+ },
+ {
+  "languageCode": "fr",
+  "text": "Bonjour ! Un croissant, s'il vous plaît.",
+  "rate": "slow"
+ },
+ {
+  "speakerId": "baker",
+  "languageCode": "fr",
+  "text": "Et voilà. Un euro, s'il vous plaît.",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "baker",
+  "languageCode": "fr",
+  "text": "Et voilà. Un euro, s'il vous plaît.",
+  "rate": "slow"
+ },
+ {
+  "languageCode": "fr",
+  "text": "Merci, au revoir !",
+  "rate": "normal"
+ },
+ {
+  "languageCode": "fr",
+  "text": "Merci, au revoir !",
+  "rate": "slow"
+ },
+ {
+  "speakerId": "baker",
+  "languageCode": "fr",
+  "text": "Au revoir, bonne journée !",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "baker",
+  "languageCode": "fr",
+  "text": "Au revoir, bonne journée !",
+  "rate": "slow"
+ },
+ {
+  "speakerId": "baker",
+  "languageCode": "fr",
+  "text": "Pardon ?",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "baker",
+  "languageCode": "fr",
+  "text": "Pardon ?",
+  "rate": "slow"
+ },
+ {
+  "speakerId": "baker",
+  "languageCode": "fr",
+  "text": "Pardon ? Un croissant ? Une baguette ?",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "baker",
+  "languageCode": "fr",
+  "text": "Pardon ? Un croissant ? Une baguette ?",
+  "rate": "slow"
+ },
+ {
+  "speakerId": "baker",
+  "languageCode": "fr",
+  "text": "Non. Un euro, s'il vous plaît.",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "baker",
+  "languageCode": "fr",
+  "text": "Non. Un euro, s'il vous plaît.",
+  "rate": "slow"
+ },
+ {
+  "speakerId": "neighbor",
+  "languageCode": "fr",
+  "text": "Salut ! Moi, c'est Malik.",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "neighbor",
+  "languageCode": "fr",
+  "text": "Salut ! Moi, c'est Malik.",
+  "rate": "slow"
+ },
+ {
+  "speakerId": "neighbor",
+  "languageCode": "fr",
+  "text": "Bienvenue dans le quartier !",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "neighbor",
+  "languageCode": "fr",
+  "text": "Bienvenue dans le quartier !",
+  "rate": "slow"
+ },
+ {
+  "speakerId": "neighbor",
+  "languageCode": "fr",
+  "text": "Salut ! Ça va ?",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "neighbor",
+  "languageCode": "fr",
+  "text": "Salut ! Ça va ?",
+  "rate": "slow"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "en",
+  "text": "Perfect!",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "en",
+  "text": "Beautiful!",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "en",
+  "text": "That was spot on!",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "en",
+  "text": "Excellent!",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "en",
+  "text": "That sounded really natural!",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "en",
+  "text": "Great!",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "en",
+  "text": "Very good!",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "en",
+  "text": "Nicely done!",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "en",
+  "text": "Well said!",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "en",
+  "text": "That was clear!",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "en",
+  "text": "So close!",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "en",
+  "text": "Almost there!",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "en",
+  "text": "Nearly!",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "en",
+  "text": "Really close!",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "en",
+  "text": "That was a good try.",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "en",
+  "text": "Good effort!",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "en",
+  "text": "Not bad at all.",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "en",
+  "text": "You're getting there.",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "en",
+  "text": "That one's tricky.",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "en",
+  "text": "No worries, it's a hard one.",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "en",
+  "text": "Don't worry, we'll get it together.",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "en",
+  "text": "Let's practise this part.",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "en",
+  "text": "Let's work on this bit.",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "en",
+  "text": "Try just this part.",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "en",
+  "text": "Let's focus on this one.",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "en",
+  "text": "Say this again.",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "en",
+  "text": "Once more.",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "en",
+  "text": "Try it again.",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "en",
+  "text": "One more time.",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "en",
+  "text": "Now the whole sentence again.",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "en",
+  "text": "Now let's put it all together.",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "en",
+  "text": "Now try the full sentence.",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "en",
+  "text": "Let's try the whole thing again.",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "en",
+  "text": "Let's keep going.",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "en",
+  "text": "We'll come back to it later.",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "en",
+  "text": "Let's move on.",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "en",
+  "text": "Listen, then say it after me.",
+  "rate": "normal"
+ },
+ {
+  "speakerId": "sophie",
+  "languageCode": "en",
+  "text": "Listen first, then repeat after me.",
+  "rate": "normal"
+ },
+ {
+  "languageCode": "fr",
+  "text": "salut",
+  "rate": "normal"
+ },
+ {
+  "languageCode": "fr",
+  "text": "s'appeler",
+  "rate": "normal"
+ },
+ {
+  "languageCode": "fr",
+  "text": "enchanté",
+  "rate": "normal"
+ },
+ {
+  "languageCode": "fr",
+  "text": "pardon",
+  "rate": "normal"
+ },
+ {
+  "languageCode": "fr",
+  "text": "café",
+  "rate": "normal"
+ },
+ {
+  "languageCode": "fr",
+  "text": "bonjour",
+  "rate": "normal"
+ },
+ {
+  "languageCode": "fr",
+  "text": "désirer",
+  "rate": "normal"
+ },
+ {
+  "languageCode": "fr",
+  "text": "je voudrais",
+  "rate": "normal"
+ },
+ {
+  "languageCode": "fr",
+  "text": "s'il vous plaît",
+  "rate": "normal"
+ },
+ {
+  "languageCode": "fr",
+  "text": "trois",
+  "rate": "normal"
+ },
+ {
+  "languageCode": "fr",
+  "text": "euro",
+  "rate": "normal"
+ },
+ {
+  "languageCode": "fr",
+  "text": "merci",
+  "rate": "normal"
+ },
+ {
+  "languageCode": "fr",
+  "text": "bonne journée",
+  "rate": "normal"
+ },
+ {
+  "languageCode": "fr",
+  "text": "non",
+  "rate": "normal"
+ },
+ {
+  "languageCode": "fr",
+  "text": "croissant",
+  "rate": "normal"
+ },
+ {
+  "languageCode": "fr",
+  "text": "au revoir",
+  "rate": "normal"
+ },
+ {
+  "languageCode": "fr",
+  "text": "bienvenue",
+  "rate": "normal"
+ },
+ {
+  "languageCode": "fr",
+  "text": "ça va",
+  "rate": "normal"
+ },
+ {
+  "languageCode": "fr",
+  "text": "à bientôt",
+  "rate": "normal"
+ },
+ {
+  "languageCode": "fr",
+  "text": "oui",
+  "rate": "normal"
+ },
+ {
+  "languageCode": "fr",
+  "text": "demain",
+  "rate": "normal"
+ }
+]

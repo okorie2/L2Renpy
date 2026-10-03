@@ -35,6 +35,29 @@ class TTSSynthesisError(RuntimeError):
     """Raised when a configured provider cannot synthesize the request."""
 
 
+# The sentence around a single word, (before, after), so the voice says the word
+# as it sounds there, and in the right language. Only the word itself is spoken.
+WordContext = tuple[str, str]
+MAX_CONTEXT = 300
+
+# One spoken word: where it is in the text (characters, end exclusive) and
+# when it is heard (seconds), so the game can trace the words as they are said.
+WordTiming = tuple[int, int, float, float]
+
+_WORD = re.compile(r"[^\W_]+(?:['’][^\W_]+)*(?:-[^\W_]+(?:['’][^\W_]+)*)*", re.UNICODE)
+
+
+def word_timings_from_alignment(text: str, characters: list[str], starts: list[float], ends: list[float]) -> list[WordTiming] | None:
+    """Turn a provider's per-character timing into per-word timing for `text`."""
+
+    if not characters or "".join(characters) != text or not (len(starts) == len(ends) == len(text)):
+        return None
+    return [
+        (match.start(), match.end(), round(float(starts[match.start()]), 3), round(float(ends[match.end() - 1]), 3))
+        for match in _WORD.finditer(text)
+    ]
+
+
 @dataclass(frozen=True)
 class SynthesizedAudio:
     """Audio returned by a provider in a format the API can stream."""
@@ -42,6 +65,7 @@ class SynthesizedAudio:
     content: bytes
     media_type: str
     file_extension: str
+    words: list[WordTiming] | None = None
 
 
 @dataclass(frozen=True)
@@ -67,7 +91,14 @@ class TTSProvider(Protocol):
 
     def voice_for(self, language: str, speaker_id: str | None) -> str: ...
 
-    def synthesize(self, text: str, language: str, voice: str, rate: str) -> SynthesizedAudio: ...
+    def synthesize(self, text: str, language: str, voice: str, rate: str, context: "WordContext | None" = None) -> SynthesizedAudio: ...
+
+
+def _speed(value: str) -> float:
+    try:
+        return min(1.2, max(0.7, float(value)))
+    except ValueError:
+        return 1.0
 
 
 def _speaker_voice(voices: dict, speaker_id: str | None) -> object | None:
@@ -98,7 +129,7 @@ class UnconfiguredTTSProvider:
         self.check()
         return ""
 
-    def synthesize(self, text: str, language: str, voice: str, rate: str) -> SynthesizedAudio:
+    def synthesize(self, text: str, language: str, voice: str, rate: str, context: "WordContext | None" = None) -> SynthesizedAudio:
         self.check()
         raise AssertionError("unreachable")
 
@@ -114,8 +145,6 @@ class ElevenLabsTTSProvider:
 
     provider_name = "elevenlabs"
     output_format = "mp3_44100_128"
-    # ElevenLabs accepts speeds from 0.7 to 1.2.
-    slow_speed = 0.8
 
     def __init__(self):
         self.api_key = os.getenv("ELEVENLABS_API_KEY", "").strip()
@@ -138,6 +167,15 @@ class ElevenLabsTTSProvider:
             raise TTSConfigurationError(
                 "ElevenLabs TTS is not fully configured. Missing: {}.".format(", ".join(missing))
             )
+        # ElevenLabs accepts speeds from 0.7 to 1.2. A learner needs a little slower
+        # than natural by default, and "Slower" slower still.
+        self.speeds = {
+            "normal": _speed(os.getenv("ELEVENLABS_SPEED", "0.9")),
+            "slow": _speed(os.getenv("ELEVENLABS_SLOW_SPEED", "0.75")),
+        }
+        self._voice_settings: dict[str, object] = {}
+        # Only some models accept a language to speak in; the others work it out from the text.
+        self.enforces_language = any(tag in self.model_id for tag in ("v2_5", "flash", "turbo", "v3"))
 
         try:
             from elevenlabs.client import ElevenLabs
@@ -153,8 +191,8 @@ class ElevenLabsTTSProvider:
 
     @property
     def cache_identity(self) -> str:
-        # The voice ID is part of the cache key separately.
-        return "elevenlabs:{}:{}".format(self.model_id, self.output_format)
+        # The voice ID and the rate are part of the cache key separately; the speeds are here.
+        return "elevenlabs:{}:{}:{}:{}:words".format(self.model_id, self.output_format, self.speeds["normal"], self.speeds["slow"])
 
     def check(self) -> None:
         return None
@@ -176,29 +214,64 @@ class ElevenLabsTTSProvider:
         except (TypeError, ValueError) as exc:
             raise TTSSynthesisError("ElevenLabs returned an invalid audio response.") from exc
 
-    def synthesize(self, text: str, language: str, voice: str, rate: str) -> SynthesizedAudio:
-        options = {}
-        if rate == "slow":
-            from elevenlabs import VoiceSettings
+    def _settings(self, voice: str, rate: str):
+        """The voice's own saved settings, with the speed for this rate.
 
-            options["voice_settings"] = VoiceSettings(speed=self.slow_speed)
+        Sending settings replaces the voice's saved ones for the request, so they
+        are read once and only the speed is changed.
+        """
+
+        from elevenlabs import VoiceSettings
+
+        if voice not in self._voice_settings:
+            try:
+                self._voice_settings[voice] = self.client.voices.settings.get(voice)
+            except Exception:  # noqa: BLE001 - fall back to the defaults with our speed
+                logger.warning("Could not read the saved settings of an ElevenLabs voice", exc_info=True)
+                self._voice_settings[voice] = None
+        saved = self._voice_settings[voice]
+        fields = saved.model_dump(exclude_none=True) if hasattr(saved, "model_dump") else {}
+        fields["speed"] = self.speeds[rate]
+        return VoiceSettings(**fields)
+
+    def synthesize(self, text: str, language: str, voice: str, rate: str, context: "WordContext | None" = None) -> SynthesizedAudio:
+        import base64
+
         try:
-            audio = self.client.text_to_speech.convert(
+            options = {}
+            if context:
+                # The neighbouring words steer pronunciation and language without being spoken.
+                before, after = context
+                if before:
+                    options["previous_text"] = before
+                if after:
+                    options["next_text"] = after
+            if self.enforces_language:
+                options["language_code"] = language
+            response = self.client.text_to_speech.convert_with_timestamps(
+                voice,
                 text=text,
-                voice_id=voice,
                 model_id=self.model_id,
                 output_format=self.output_format,
+                voice_settings=self._settings(voice, rate),
                 **options,
             )
-            audio_bytes = self._collect_audio_bytes(audio)
-        except TTSSynthesisError:
-            raise
+            audio_bytes = base64.b64decode(getattr(response, "audio_base_64", "") or "")
         except Exception as exc:
             raise TTSSynthesisError("ElevenLabs speech synthesis failed.") from exc
 
         if not audio_bytes:
             raise TTSSynthesisError("ElevenLabs returned no audio.")
-        return SynthesizedAudio(content=audio_bytes, media_type="audio/mpeg", file_extension=".mp3")
+        alignment = getattr(response, "alignment", None)
+        words = None
+        if alignment is not None:
+            words = word_timings_from_alignment(
+                text,
+                list(alignment.characters or []),
+                list(alignment.character_start_times_seconds or []),
+                list(alignment.character_end_times_seconds or []),
+            )
+        return SynthesizedAudio(content=audio_bytes, media_type="audio/mpeg", file_extension=".mp3", words=words)
 
 
 # Development voices for macOS, best first. The plain names ship with macOS; the
@@ -271,7 +344,7 @@ class SystemTTSProvider:
             return self.voice_for(language, None)
         raise TTSConfigurationError(f"None of these voices is installed: {', '.join(map(str, options))}.")
 
-    def synthesize(self, text: str, language: str, voice: str, rate: str) -> SynthesizedAudio:
+    def synthesize(self, text: str, language: str, voice: str, rate: str, context: "WordContext | None" = None) -> SynthesizedAudio:
         with tempfile.TemporaryDirectory(prefix="say-") as folder:
             path = Path(folder) / "line.wav"
             try:
@@ -324,7 +397,7 @@ class ChatterboxTTSProvider:
     def voice_for(self, language: str, speaker_id: str | None) -> str:
         return "chatterbox"
 
-    def synthesize(self, text: str, language: str, voice: str, rate: str) -> SynthesizedAudio:
+    def synthesize(self, text: str, language: str, voice: str, rate: str, context: "WordContext | None" = None) -> SynthesizedAudio:
         import urllib.error
         import urllib.request
 
@@ -473,7 +546,13 @@ def _read_cached(cache_dir: Path, key: str) -> tuple[SynthesizedAudio, str | Non
         return None
     if not content or extension not in _EXTENSION_MEDIA_TYPES:
         return None
-    audio = SynthesizedAudio(content=content, media_type=_EXTENSION_MEDIA_TYPES[extension], file_extension=extension)
+    words = meta.get("words")
+    audio = SynthesizedAudio(
+        content=content,
+        media_type=_EXTENSION_MEDIA_TYPES[extension],
+        file_extension=extension,
+        words=[tuple(item) for item in words] if isinstance(words, list) else None,
+    )
     return audio, meta.get("mouthTimeline")
 
 
@@ -490,7 +569,7 @@ def _write_cached(cache_dir: Path, key: str, audio: SynthesizedAudio, timeline: 
         os.replace(temp, audio_path)
         meta_path = cache_dir / (key + ".json")
         temp = meta_path.with_suffix(".json.tmp")
-        temp.write_text(json.dumps({"extension": audio.file_extension, "mouthTimeline": timeline}), "utf-8")
+        temp.write_text(json.dumps({"extension": audio.file_extension, "mouthTimeline": timeline, "words": audio.words}), "utf-8")
         os.replace(temp, meta_path)
     except OSError:
         logger.warning("Could not write a line to the speech cache", exc_info=True)
@@ -513,7 +592,7 @@ _key_locks: dict[str, threading.Lock] = {}
 _key_locks_guard = threading.Lock()
 
 
-def synthesize_speech(text: str, language: str = "fr", speaker_id: str | None = None, rate: str = "normal") -> SpeechResult:
+def synthesize_speech(text: str, language: str = "fr", speaker_id: str | None = None, rate: str = "normal", context: WordContext | None = None) -> SpeechResult:
     """Voice one line through the configured provider, using the cache."""
 
     text = (text or "").strip()
@@ -529,7 +608,12 @@ def synthesize_speech(text: str, language: str = "fr", speaker_id: str | None = 
 
     provider = get_tts_provider()
     voice = provider.voice_for(language, speaker_id)
-    key = tts_cache_key(provider.cache_identity, voice, language, rate, text)
+    if context is not None:
+        before, after = (" ".join((part or "").split())[:MAX_CONTEXT] for part in context)
+        context = (before, after) if before or after else None
+    # The same word in another sentence may be said differently, so the context is part of the key.
+    spoken = text if context is None else "{}\u241e{}\u241e{}".format(context[0], text, context[1])
+    key = tts_cache_key(provider.cache_identity, voice, language, rate, spoken)
     cache_dir = _tts_cache_dir()
 
     with _key_locks_guard:
@@ -541,7 +625,7 @@ def synthesize_speech(text: str, language: str = "fr", speaker_id: str | None = 
                 return SpeechResult(audio=cached[0], mouth_timeline=cached[1], cache_key=key, cached=True)
 
         started = time.perf_counter()
-        audio = provider.synthesize(text, language, voice, rate)
+        audio = provider.synthesize(text, language, voice, rate, context) if context else provider.synthesize(text, language, voice, rate)
         timeline = _timeline(audio)
         if cache_dir is not None:
             _write_cached(cache_dir, key, audio, timeline)
