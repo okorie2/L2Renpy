@@ -1,3 +1,4 @@
+import { backendError, logError, newRequestId } from "../diagnostics/log";
 import type { PracticeResult, PracticeWord } from "./practice";
 import type { AudioClip } from "./types";
 
@@ -57,8 +58,12 @@ export function createHttpPractice(baseUrl: string, fetchImpl: Fetch = (input, i
         form.append("contextBefore", context.before);
         form.append("contextAfter", context.after);
       }
-      const response = await fetchImpl(endpoint, { method: "POST", body: form, signal });
-      if (!response.ok) throw new PracticeRequestError(response.status);
+      const requestId = newRequestId();
+      const response = await fetchImpl(endpoint, { method: "POST", body: form, signal, headers: { "X-Request-Id": requestId } });
+      if (!response.ok) {
+        logError("practice", `Pronunciation check failed for "${text}"`, (await backendError("/speech/practice", response, requestId)).detail);
+        throw new PracticeRequestError(response.status);
+      }
       const body = await response.json() as Record<string, unknown>;
       return {
         similarity: typeof body.similarity === "number" ? body.similarity : null,

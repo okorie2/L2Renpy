@@ -1,3 +1,4 @@
+import { BackendError, describeError, logWarning } from "../diagnostics/log";
 import { ttsCacheKey } from "./ttsCache";
 import type { SynthesisRequest, SynthesizedSpeech, TextToSpeechProvider } from "./types";
 
@@ -25,7 +26,7 @@ export class VoiceLibrary {
 
   constructor(private readonly provider: TextToSpeechProvider, private readonly options: VoiceLibraryOptions = {}) {
     this.capacity = options.capacity ?? 60;
-    this.retryAfterMs = options.retryAfterMs ?? 30_000;
+    this.retryAfterMs = options.retryAfterMs ?? 10_000;
     this.now = options.now ?? (() => Date.now());
   }
 
@@ -53,8 +54,11 @@ export class VoiceLibrary {
     const local = this.options.isLocal?.(request) ?? false;
     if (!local && !this.available) return Promise.resolve(undefined);
 
-    const pending = this.provider.synthesize(request).catch(() => {
-      if (!local) this.unavailableUntil = this.now() + this.retryAfterMs;
+    const pending = this.provider.synthesize(request).catch((error: unknown) => {
+      const said = request.text.length > 40 ? `${request.text.slice(0, 40)}…` : request.text;
+      logWarning("voice", `No voice for "${said}" (${request.languageCode}, ${request.rate ?? "normal"})`, describeError(error));
+      // An unreachable backend is left alone for a while; a line it could not voice says nothing about the next one.
+      if (!local && !(error instanceof BackendError)) this.unavailableUntil = this.now() + this.retryAfterMs;
       // A failure is not remembered for the line, so it can be tried again later.
       this.lines.delete(key);
       return undefined;

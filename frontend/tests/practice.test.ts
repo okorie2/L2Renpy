@@ -183,3 +183,62 @@ test("Sophie's gesture follows what she says during practice, and she listens on
   assert.equal(practiceExpression({ text: PRACTICE_PHRASES.sayAgain[0], languageCode: "en" }, "fr"), "beckoning");
   assert.equal(practiceExpression({ text: "Something new", languageCode: "en" }, "fr"), "talking");
 });
+
+import { practiceChunk } from "../src/speech/practice";
+
+test("a short word is practised with its neighbour, so there is enough to hear", () => {
+  const line = "Je voudrais apprendre le français pour mes études.";
+  const je = practiceChunk(line, "Je", 0);
+  assert.equal(je.text, "Je voudrais");
+  assert.equal(je.text.slice(je.focus.start, je.focus.end), "Je");
+  assert.equal(je.focusIndex, 0);
+  assert.deepEqual(je.context, { before: "", after: "apprendre le français pour mes études." });
+
+  const mes = practiceChunk(line, "mes", 6);
+  assert.equal(mes.text, "mes études");
+  assert.equal(mes.text.slice(mes.focus.start, mes.focus.end), "mes");
+
+  // At the end of a line the word before keeps it company.
+  const end = practiceChunk("Je vais au parc", "parc", 3);
+  assert.equal(end.text, "au parc");
+  assert.equal(end.focusIndex, 1);
+  assert.equal(practiceChunk("Il est là", "là", 2).text, "Il est là", "and one more before, when that is still short");
+
+  // Two short words together are still too little: one more is added.
+  const short = practiceChunk("Je ne sais pas.", "Je", 0);
+  assert.equal(short.text, "Je ne sais");
+
+  // A longer word is clear enough on its own.
+  const long = practiceChunk(line, "apprendre", 2);
+  assert.equal(long.text, "apprendre");
+  assert.equal(long.focusIndex, 0);
+});
+
+test("a practised chunk is judged by the weak word in it", () => {
+  const line = ["Je voudrais apprendre le français."];
+  const weak = (similarity: number): PracticeResult => ({
+    similarity,
+    words: [],
+    weakestWord: { index: 0, word: "Je", scored: true, needsPractice: true, score: 0.4 }
+  });
+  let state = recordAttempt(startPractice(), weak(0.5), 1, line);
+  assert.equal(state.word?.text, "Je voudrais");
+  assert.deepEqual(practiceTarget(state, line)?.focus, { start: 0, end: 2 });
+  assert.equal(practiceSpeech(state, line, kinds).at(-1)?.text, "Je voudrais", "Sophie says the chunk");
+
+  // The chunk as a whole sounds fine, but "Je" still does not: not yet.
+  const attempt = (jeScore: number, similarity: number): PracticeResult => ({
+    similarity,
+    words: [
+      { index: 0, word: "Je", scored: true, needsPractice: jeScore < 0.8, score: jeScore },
+      { index: 1, word: "voudrais", scored: true, needsPractice: false, score: 0.95 }
+    ],
+    weakestWord: null
+  });
+  state = recordAttempt(state, attempt(0.5, 0.86), 1, line);
+  assert.equal(state.feedback?.kind, "word-again");
+  assert.equal(state.lastSimilarity, 0.5, "feedback follows the weak word");
+  // Now "Je" comes through, even if the whole chunk is a little rough.
+  state = recordAttempt(state, attempt(0.9, 0.7), 1, line);
+  assert.equal(state.feedback?.kind, "word-clear");
+});

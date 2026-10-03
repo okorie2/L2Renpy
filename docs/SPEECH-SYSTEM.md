@@ -235,3 +235,14 @@ Each line names an expression (`presentation.expression`), which is a pose in `s
 - **Blinking.** The neutral and talking poses have a shut-eyes patch (`neutral/blink.png`, cut from `blink_idle`), shown for 140 ms every 2.5 to 6 s. It is off when the device asks for reduced motion.
 - **Never frozen.** A line left on `neutral` alternates with `talking` from card to card.
 - **Practice.** Her gesture follows what she says (`practiceExpression` in `src/speech/practice.ts`): `excellent`, `well-done`, `close` or `good-try` for the feedback, `beckoning` for "say it again", `speaking-french` for the line itself, and `listening` (hand to her ear) while it is the learner's turn.
+
+## Practising a short word
+
+A word of four letters or fewer ("je", "mes", "pour") is one or two sounds: on its own there is too little for the phoneme model to hear, and a good retry can come back as a miss. So when the weak word is short, the learner practises it with its neighbour (`practiceChunk` in `src/speech/practice.ts`):
+
+- The chunk is the weak word and the word after it, or the word before it at the end of a line. If that is still under six letters ("je ne"), one more word is added ("Je ne sais").
+- Sophie says the chunk, with the rest of the sentence as context, and the weak word is underlined on the card.
+- The attempt is judged by the weak word's own score within the chunk (`score`, now sent per word by `/speech/practice`), not by the chunk as a whole. Her feedback follows that word too.
+- Longer words are still practised on their own. Change `SHORT_WORD_LETTERS` to adjust.
+- The voice pack holds each word as it would be practised, so chunks are packed too.
+

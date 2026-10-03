@@ -89,6 +89,38 @@ def test_bad_synthesis_requests_are_400_and_a_missing_voice_is_503():
         assert client.post("/speech/synthesize", json={"text": "Bonjour", "languageCode": "fr"}).status_code == 503
 
 
+def test_a_failed_line_says_why_and_which_request_it_was():
+    class Refusing(FakeProvider):
+        def __init__(self, error):
+            super().__init__()
+            self.error = error
+
+        def synthesize(self, *args):
+            raise self.error
+
+    permanent = tts.TTSSynthesisError("ElevenLabs refused the request (401, quota_exceeded): no credits", status=401, code="quota_exceeded")
+    with with_voice(Refusing(permanent)):
+        response = client.post("/speech/synthesize", json={"text": "Bonjour", "languageCode": "fr"}, headers={"X-Request-Id": "abc123"})
+    assert response.status_code == 502
+    assert response.json() == {"detail": "ElevenLabs refused the request (401, quota_exceeded): no credits", "requestId": "abc123"}
+    assert response.headers["x-request-id"] == "abc123"
+
+    busy = tts.TTSSynthesisError("ElevenLabs refused the request (429, too_many_concurrent_requests): busy", status=429, retryable=True)
+    with with_voice(Refusing(busy)):
+        response = client.post("/speech/synthesize", json={"text": "Bonjour", "languageCode": "fr"})
+    assert response.status_code == 503, "busy is worth trying again"
+    assert response.headers["retry-after"] == "2"
+    assert len(response.json()["requestId"]) == 8, "an id is made up when the game sends none"
+
+
+def test_requests_are_logged_with_their_id(caplog):
+    with with_voice(FakeProvider()), caplog.at_level("INFO"):
+        client.post("/speech/synthesize", json={"text": "Salut", "languageCode": "fr"}, headers={"X-Request-Id": "line-7"})
+    lines = [record for record in caplog.records if record.name == "backend.requests"]
+    assert lines and "POST /speech/synthesize -> 200" in lines[-1].getMessage()
+    assert lines[-1].request_id == "line-7"
+
+
 def test_the_installed_app_may_call_the_api_and_read_the_lip_sync_headers():
     response = client.options(
         "/speech/synthesize",

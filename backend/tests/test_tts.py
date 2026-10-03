@@ -130,14 +130,88 @@ class ElevenLabsTTSProviderTests(unittest.TestCase):
             with self.assertRaisesRegex(TTSConfigurationError, "ELEVENLABS_API_KEY"):
                 ElevenLabsTTSProvider()
 
-    def test_provider_failure_is_not_exposed_as_raw_sdk_exception(self):
+    def api_error(self, status, code=None, message="nope", headers=None):
+        from elevenlabs.core.api_error import ApiError
+
+        return ApiError(status_code=status, headers=headers or {}, body={"detail": {"status": code, "message": message}})
+
+    def provider(self, client, **env):
+        with patch.dict(os.environ, dict(ENVIRONMENT, **env), clear=False), patch("elevenlabs.client.ElevenLabs", return_value=client):
+            return ElevenLabsTTSProvider()
+
+    def test_a_provider_failure_says_what_went_wrong(self):
         client = self.client()
-        client.text_to_speech.convert_with_timestamps.side_effect = RuntimeError("provider detail")
-        with patch.dict(os.environ, ENVIRONMENT, clear=False):
-            with patch("elevenlabs.client.ElevenLabs", return_value=client):
-                provider = ElevenLabsTTSProvider()
-                with self.assertRaisesRegex(TTSSynthesisError, "ElevenLabs speech synthesis failed"):
-                    provider.synthesize("Bonjour.", "fr", "v", "normal")
+        client.text_to_speech.convert_with_timestamps.side_effect = self.api_error(400, "invalid_request", "text is too long")
+        provider = self.provider(client)
+        with self.assertRaises(TTSSynthesisError) as caught, self.assertLogs("app.speech.tts", "WARNING") as logged:
+            provider.synthesize("Bonjour.", "fr", "v", "normal")
+        self.assertIn("400", str(caught.exception))
+        self.assertIn("invalid_request", str(caught.exception))
+        self.assertIn("text is too long", str(caught.exception))
+        self.assertEqual((caught.exception.status, caught.exception.code, caught.exception.retryable), (400, "invalid_request", False))
+        self.assertEqual(client.text_to_speech.convert_with_timestamps.call_count, 1, "a bad request is not repeated")
+        self.assertIn("text is too long", "\n".join(logged.output))
+
+    def test_busy_or_failing_provider_is_tried_again_then_reported(self):
+        import base64
+        from types import SimpleNamespace
+
+        client = self.client()
+        ok = SimpleNamespace(audio_base_64=base64.b64encode(b"mp3").decode(), alignment=None)
+        calls = client.text_to_speech.convert_with_timestamps
+        calls.side_effect = [self.api_error(429, "too_many_concurrent_requests", "busy", {"retry-after": "1"}), ok]
+        provider = self.provider(client)
+        with patch("app.speech.tts.time.sleep") as sleep:
+            audio = provider.synthesize("Bonjour.", "fr", "v", "normal")
+        self.assertEqual(audio.content, b"mp3")
+        self.assertEqual(calls.call_count, 2)
+        sleep.assert_called_once_with(1.0)
+        self.assertEqual(calls.call_args.kwargs["request_options"]["max_retries"], 0, "the SDK does not retry on its own as well")
+
+        calls.reset_mock()
+        calls.side_effect = RuntimeError("connection reset")
+        with patch("app.speech.tts.time.sleep"), self.assertRaises(TTSSynthesisError) as caught:
+            provider.synthesize("Merci.", "fr", "v", "normal")
+        self.assertEqual(calls.call_count, 3, "the first try and two more")
+        self.assertTrue(caught.exception.retryable)
+        self.assertIn("connection reset", str(caught.exception))
+
+    def test_an_exhausted_quota_is_not_retried(self):
+        client = self.client()
+        client.text_to_speech.convert_with_timestamps.side_effect = self.api_error(401, "quota_exceeded", "You have 0 credits left")
+        provider = self.provider(client)
+        with patch("app.speech.tts.time.sleep") as sleep, self.assertRaises(TTSSynthesisError) as caught:
+            provider.synthesize("Bonjour.", "fr", "v", "normal")
+        sleep.assert_not_called()
+        self.assertFalse(caught.exception.retryable)
+        self.assertIn("quota_exceeded", str(caught.exception))
+
+    def test_only_a_few_requests_go_to_elevenlabs_at_once(self):
+        import base64
+        import threading
+        import time as clock
+        from types import SimpleNamespace
+
+        client = self.client()
+        running, peak, guard = [0], [0], threading.Lock()
+
+        def slow(*_, **__):
+            with guard:
+                running[0] += 1
+                peak[0] = max(peak[0], running[0])
+            clock.sleep(0.05)
+            with guard:
+                running[0] -= 1
+            return SimpleNamespace(audio_base_64=base64.b64encode(b"mp3").decode(), alignment=None)
+
+        client.text_to_speech.convert_with_timestamps.side_effect = slow
+        provider = self.provider(client, ELEVENLABS_MAX_CONCURRENCY="2")
+        threads = [threading.Thread(target=provider.synthesize, args=(f"Ligne {n}.", "fr", "v", "normal")) for n in range(6)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        self.assertEqual(peak[0], 2)
 
     def test_empty_provider_audio_is_rejected(self):
         client = self.client(audio=b"")

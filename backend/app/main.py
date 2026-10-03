@@ -12,6 +12,8 @@ import json
 import logging
 import os
 import threading
+import time
+import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -19,9 +21,11 @@ from tempfile import TemporaryDirectory
 from fastapi import FastAPI, File, Form, HTTPException, Request, Response, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from pydantic import BaseModel
 
-from . import config
+from . import config, logs
 from .conversation.service import ConversationService, TurnError
 from .speech import practice
 from .speech import transcribe as stt
@@ -29,8 +33,9 @@ from .speech import tts
 from .speech.audio import AudioError
 from .speech.lipsync import FRAMES_PER_SECOND
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
+LOG_FILE = logs.configure()
 logger = logging.getLogger("backend")
+access = logging.getLogger("backend.requests")
 
 conversation = ConversationService()
 _pronunciation = {"loaded": False, "reason": "loading"}
@@ -62,6 +67,8 @@ async def lifespan(_: FastAPI):
         threading.Thread(target=_load_pronunciation, daemon=True).start()
     else:
         _pronunciation.update(reason="loads on first use")
+    if LOG_FILE is not None:
+        logger.info("Logging to %s", LOG_FILE)
     status = tts.tts_readiness()
     if status["ready"]:
         logger.info("Text-to-speech ready (%s)", status["provider"])
@@ -75,10 +82,44 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=config.cors_origins(),
     allow_methods=["GET", "POST"],
-    allow_headers=["Content-Type"],
+    allow_headers=["Content-Type", "X-Request-Id"],
     # The client reads the lip-sync track and cache status from these.
-    expose_headers=["X-Speech-Cache", "X-Speech-Key", "X-Mouth-Timeline", "X-Mouth-Fps", "X-Word-Timings"],
+    expose_headers=["X-Speech-Cache", "X-Speech-Key", "X-Mouth-Timeline", "X-Mouth-Fps", "X-Word-Timings", "X-Request-Id"],
 )
+
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    """One line per request, with its id, outcome and time; the id goes back in the response."""
+
+    rid = (request.headers.get("X-Request-Id") or uuid.uuid4().hex[:8])[:32]
+    token = logs.request_id.set(rid)
+    started = time.perf_counter()
+    try:
+        response = await call_next(request)
+        elapsed = (time.perf_counter() - started) * 1000
+        status = response.status_code
+        level = logging.ERROR if status >= 500 else logging.WARNING if status >= 400 else logging.INFO
+        # Health checks are polled; they are only worth a line when they fail.
+        if status >= 400 or not request.url.path.startswith("/health"):
+            access.log(level, "%s %s -> %d in %.0f ms", request.method, request.url.path, status, elapsed)
+        response.headers["X-Request-Id"] = rid
+        return response
+    except Exception:
+        access.exception("%s %s crashed after %.0f ms", request.method, request.url.path, (time.perf_counter() - started) * 1000)
+        raise
+    finally:
+        logs.request_id.reset(token)
+
+
+@app.exception_handler(StarletteHTTPException)
+async def explain_errors(request: Request, exc: StarletteHTTPException):
+    """Errors carry their reason and the request id, so the game can show and log both."""
+
+    rid = logs.request_id.get()
+    if exc.status_code >= 400 and exc.status_code != 404:
+        logger.log(logging.ERROR if exc.status_code >= 500 else logging.WARNING, "%s %s failed (%d): %s", request.method, request.url.path, exc.status_code, exc.detail)
+    return JSONResponse({"detail": exc.detail, "requestId": rid}, status_code=exc.status_code, headers=getattr(exc, "headers", None))
 
 
 # ---------------------------------------------------------------------------
@@ -158,7 +199,9 @@ def synthesize(request: SynthesizeRequest) -> Response:
         logger.warning("Speech synthesis is unavailable: %s", exc)
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except tts.TTSSynthesisError as exc:
-        logger.error("Speech synthesis failed: %s", exc)
+        # The provider was busy or briefly down even after retries: worth trying again shortly.
+        if exc.retryable:
+            raise HTTPException(status_code=503, detail=str(exc), headers={"Retry-After": "2"}) from exc
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     headers = {

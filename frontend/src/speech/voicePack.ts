@@ -1,7 +1,7 @@
 import { PLAYER_SPEAKER_ID } from "../dialogue/models";
 import { resolveTemplate, templateSlots, type SlotDefinition } from "../dialogue/template";
 import type { LanguagePack } from "../languages/types";
-import { ALL_PRACTICE_PHRASES, splitWords, wordContext } from "./practice";
+import { ALL_PRACTICE_PHRASES, practiceChunk, splitWords } from "./practice";
 import type { RecordedLine } from "./recordings";
 import type { SpeechRate, WordTiming } from "./types";
 
@@ -89,14 +89,22 @@ export function voicePackLines(
       for (const item of response.lines) {
         for (const text of expandTemplate(item.text, pack.slots)) {
           both({ speakerId: teacher, languageCode: pack.code, text });
-          for (const word of practiceWords(text)) both({ speakerId: teacher, languageCode: pack.code, text: word, context: wordContext(text, word) });
+          // Each word as it would be practised: on its own, or with its neighbour when it is short.
+          splitWords(text).forEach(({ word }, index) => {
+            const chunk = practiceChunk(text, word, index);
+            both({ speakerId: teacher, languageCode: pack.code, text: chunk.text, context: chunk.context });
+          });
         }
         // A line with the player's name in it is made live, but its other words can still be packed,
         // said in a version of the sentence with a stand-in name.
         const sample = item.text.replace(/\{[A-Za-z][A-Za-z0-9]*\}/g, "Marie");
-        for (const word of practiceWords(item.text.replace(/\{[A-Za-z][A-Za-z0-9]*\}/g, " "))) {
-          both({ speakerId: teacher, languageCode: pack.code, text: word, context: wordContext(sample, word) });
-        }
+        const personal = new Set(practiceWords(sample).filter((word) => !practiceWords(item.text.replace(/\{[A-Za-z][A-Za-z0-9]*\}/g, " ")).includes(word)));
+        splitWords(sample).forEach(({ word }, index) => {
+          const chunk = practiceChunk(sample, word, index);
+          // A chunk with the stand-in name in it would be said with the player's own name: made live instead.
+          if (personal.has(word) || practiceWords(chunk.text).some((part) => personal.has(part))) return;
+          both({ speakerId: teacher, languageCode: pack.code, text: chunk.text, context: chunk.context });
+        });
       }
     }
   }

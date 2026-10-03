@@ -121,6 +121,8 @@ def evaluate_attempt(
         return {
             "index": entry.get("index"),
             "word": entry.get("word"),
+            # Share of the word's sounds that matched; the game judges a practised word by it.
+            "score": round(float(score), 3) if scored else None,
             "scored": bool(scored),
             "needsPractice": bool(scored and score < WORD_NEEDS_PRACTICE_BELOW),
             "phoneticGuide": entry.get("phonetic_guide") or None,

@@ -10,6 +10,7 @@ import hashlib
 import json
 import logging
 import os
+import random
 import re
 import shutil
 import subprocess
@@ -32,7 +33,69 @@ class TTSConfigurationError(RuntimeError):
 
 
 class TTSSynthesisError(RuntimeError):
-    """Raised when a configured provider cannot synthesize the request."""
+    """Raised when a configured provider cannot synthesize the request.
+
+    ``status`` and ``code`` are the provider's own (HTTP status, error code) when it
+    gave them. ``retryable`` means it was busy or briefly down, not that the request
+    was wrong: asking again shortly may well work.
+    """
+
+    def __init__(self, message: str, *, status: int | None = None, code: str | None = None, retryable: bool = False):
+        super().__init__(message)
+        self.status = status
+        self.code = code
+        self.retryable = retryable
+
+
+# ElevenLabs error codes that will not get better by asking again.
+_PERMANENT_CODES = {"quota_exceeded", "invalid_api_key", "voice_not_found", "missing_permissions", "detected_unusual_activity", "payment_required"}
+
+
+def describe_provider_error(exc: BaseException) -> tuple[int | None, str | None, str]:
+    """(HTTP status, error code, message) from an SDK or network error, as far as they are known."""
+
+    status = getattr(exc, "status_code", None)
+    body = getattr(exc, "body", None)
+    code = message = None
+    if isinstance(body, dict):
+        detail = body.get("detail", body)
+        if isinstance(detail, dict):
+            code = detail.get("status") or detail.get("code") or detail.get("type")
+            message = detail.get("message")
+        elif isinstance(detail, list) and detail:
+            message = "; ".join(str(item.get("msg", item)) if isinstance(item, dict) else str(item) for item in detail)
+        elif detail:
+            message = str(detail)
+    elif isinstance(body, (str, bytes)) and body:
+        message = body.decode(errors="replace") if isinstance(body, bytes) else body
+    if not message:
+        message = "{}: {}".format(type(exc).__name__, exc) if str(exc) else type(exc).__name__
+    return (int(status) if isinstance(status, int) else None), (str(code) if code else None), " ".join(str(message).split())[:300]
+
+
+def _retryable(status: int | None, code: str | None) -> bool:
+    if code in _PERMANENT_CODES:
+        return False
+    # No status means the request never got an answer: a timeout or a dropped connection.
+    return status is None or status == 429 or status >= 500
+
+
+def _int_setting(name: str, default: int) -> int:
+    try:
+        return int(os.getenv(name, str(default)).strip())
+    except ValueError:
+        return default
+
+
+def _retry_after(exc: BaseException) -> float | None:
+    """Seconds the provider asked us to wait, if it said, capped at a few."""
+
+    headers = getattr(exc, "headers", None) or {}
+    try:
+        value = float(headers.get("retry-after") or headers.get("Retry-After"))
+    except (TypeError, ValueError):
+        return None
+    return max(0.2, min(value, 5.0))
 
 
 # The sentence around a single word, (before, after), so the voice says the word
@@ -174,6 +237,12 @@ class ElevenLabsTTSProvider:
             "slow": _speed(os.getenv("ELEVENLABS_SLOW_SPEED", "0.75")),
         }
         self._voice_settings: dict[str, object] = {}
+        # Every ElevenLabs plan allows only a few requests at once; more are refused
+        # with 429. Calls beyond the limit wait their turn here instead.
+        self.max_concurrency = max(1, _int_setting("ELEVENLABS_MAX_CONCURRENCY", 2))
+        self._slots = threading.BoundedSemaphore(self.max_concurrency)
+        # Busy (429), server errors and timeouts are tried again, waiting longer each time.
+        self.retries = max(0, _int_setting("ELEVENLABS_RETRIES", 2))
         # Only some models accept a language to speak in; the others work it out from the text.
         self.enforces_language = any(tag in self.model_id for tag in ("v2_5", "flash", "turbo", "v3"))
 
@@ -234,31 +303,62 @@ class ElevenLabsTTSProvider:
         fields["speed"] = self.speeds[rate]
         return VoiceSettings(**fields)
 
+    def _request(self, voice: str, text: str, rate: str, options: dict):
+        """One call to ElevenLabs, waiting for a free slot, retried while it is busy."""
+
+        attempts = self.retries + 1
+        for attempt in range(1, attempts + 1):
+            waited = time.perf_counter()
+            with self._slots:
+                queued = (time.perf_counter() - waited) * 1000
+                if queued > 200:
+                    logger.info("Waited %.0f ms for a free ElevenLabs slot (limit %d at once)", queued, self.max_concurrency)
+                try:
+                    return self.client.text_to_speech.convert_with_timestamps(
+                        voice,
+                        text=text,
+                        model_id=self.model_id,
+                        output_format=self.output_format,
+                        voice_settings=self._settings(voice, rate),
+                        # Retries are done here, where they are logged and spaced out.
+                        request_options={"max_retries": 0, "timeout_in_seconds": 30},
+                        **options,
+                    )
+                except Exception as exc:  # noqa: BLE001 - every failure is described and logged
+                    status, code, message = describe_provider_error(exc)
+                    retry = _retryable(status, code) and attempt < attempts
+                    logger.warning(
+                        "ElevenLabs refused a line (attempt %d of %d): status=%s code=%s: %s [%d chars, %s, voice %s, model %s%s]%s",
+                        attempt, attempts, status, code, message, len(text), rate, voice[:6], self.model_id,
+                        ", with sentence context" if "previous_text" in options or "next_text" in options else "",
+                        " - trying again" if retry else "",
+                    )
+                    if not retry:
+                        reason = "ElevenLabs refused the request ({}{}): {}".format(status or "no response", ", " + code if code else "", message)
+                        raise TTSSynthesisError(reason, status=status, code=code, retryable=_retryable(status, code)) from exc
+                    retry_after = _retry_after(exc)
+            # Outside the slot, so others can use it while this one waits.
+            time.sleep(retry_after if retry_after is not None else min(4.0, 0.6 * 2 ** (attempt - 1)) + random.uniform(0, 0.3))
+        raise TTSSynthesisError("ElevenLabs did not answer.", retryable=True)
+
     def synthesize(self, text: str, language: str, voice: str, rate: str, context: "WordContext | None" = None) -> SynthesizedAudio:
         import base64
 
+        options = {}
+        if context:
+            # The neighbouring words steer pronunciation and language without being spoken.
+            before, after = context
+            if before:
+                options["previous_text"] = before
+            if after:
+                options["next_text"] = after
+        if self.enforces_language:
+            options["language_code"] = language
+        response = self._request(voice, text, rate, options)
         try:
-            options = {}
-            if context:
-                # The neighbouring words steer pronunciation and language without being spoken.
-                before, after = context
-                if before:
-                    options["previous_text"] = before
-                if after:
-                    options["next_text"] = after
-            if self.enforces_language:
-                options["language_code"] = language
-            response = self.client.text_to_speech.convert_with_timestamps(
-                voice,
-                text=text,
-                model_id=self.model_id,
-                output_format=self.output_format,
-                voice_settings=self._settings(voice, rate),
-                **options,
-            )
             audio_bytes = base64.b64decode(getattr(response, "audio_base_64", "") or "")
-        except Exception as exc:
-            raise TTSSynthesisError("ElevenLabs speech synthesis failed.") from exc
+        except (TypeError, ValueError) as exc:
+            raise TTSSynthesisError("ElevenLabs returned audio that could not be read.") from exc
 
         if not audio_bytes:
             raise TTSSynthesisError("ElevenLabs returned no audio.")
@@ -625,12 +725,17 @@ def synthesize_speech(text: str, language: str = "fr", speaker_id: str | None = 
                 return SpeechResult(audio=cached[0], mouth_timeline=cached[1], cache_key=key, cached=True)
 
         started = time.perf_counter()
-        audio = provider.synthesize(text, language, voice, rate, context) if context else provider.synthesize(text, language, voice, rate)
+        try:
+            audio = provider.synthesize(text, language, voice, rate, context) if context else provider.synthesize(text, language, voice, rate)
+        except TTSSynthesisError as exc:
+            logger.error("Could not voice a line (%d characters, %s, %s): %s", len(text), language, rate, exc)
+            raise
+        finally:
+            with _key_locks_guard:
+                _key_locks.pop(key, None)
         timeline = _timeline(audio)
         if cache_dir is not None:
             _write_cached(cache_dir, key, audio, timeline)
         # Log sizes and timings only.
         logger.info("Synthesized %d characters with %s in %.0f ms", len(text), provider.provider_name, (time.perf_counter() - started) * 1000)
-    with _key_locks_guard:
-        _key_locks.pop(key, None)
     return SpeechResult(audio=audio, mouth_timeline=timeline, cache_key=key, cached=False)

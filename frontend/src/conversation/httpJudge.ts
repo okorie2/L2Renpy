@@ -1,3 +1,4 @@
+import { backendError, describeError, logWarning, newRequestId } from "../diagnostics/log";
 import { readJudgement, type UtteranceJudgement } from "../dialogue/judgement";
 import type { TurnContext } from "./context";
 
@@ -34,19 +35,22 @@ export function createHttpTurnJudge(
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeoutMs);
       try {
+        const requestId = newRequestId();
         const response = await fetchImpl(endpoint, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "X-Request-Id": requestId },
           body: JSON.stringify(context),
           signal: controller.signal
         });
         if (!response.ok) {
+          logWarning("conversation", "No second opinion on that answer", (await backendError("/conversation/turn", response, requestId)).detail);
           // A rejected request says nothing about the service; anything else means "not now".
           if (response.status !== 400) unavailableUntil = now() + backoffMs;
           return undefined;
         }
         return readJudgement(await response.json(), context.intents.map((intent) => intent.id));
-      } catch {
+      } catch (error) {
+        logWarning("conversation", "No second opinion on that answer", describeError(error));
         unavailableUntil = now() + backoffMs;
         return undefined;
       } finally {

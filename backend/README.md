@@ -192,3 +192,19 @@ app/
 tts_service/               optional Chatterbox server
 tests/                     pytest; everything external is faked
 ```
+
+## Logs and errors
+
+Every request gets one line in the terminal and in `backend/logs/backend.log` (rotated at 2 MB, five old files kept):
+
+```
+14:02:11 INFO    [k3f9a1c2] backend.requests: POST /speech/synthesize -> 200 in 812 ms
+14:02:15 WARNING [p0w8x4d1] app.speech.tts: ElevenLabs refused a line (attempt 1 of 3): status=429 code=too_many_concurrent_requests: ... - trying again
+14:02:17 ERROR   [m2c7b9e5] backend: POST /speech/synthesize failed (502): ElevenLabs refused the request (401, quota_exceeded): ...
+```
+
+The id in brackets is the request's. The game sends it (`X-Request-Id`) and shows it next to each problem in **phone > Settings > Problems**, so a problem seen in the game can be found here with a search. Error responses are `{ "detail": "<the reason>", "requestId": "<id>" }`.
+
+- `/speech/synthesize` answers **502** when ElevenLabs refused the line (the reason says why: quota, voice, bad request), and **503** with `Retry-After` when it was busy or down even after retries. The game tries a 503 once more by itself.
+- At most `ELEVENLABS_MAX_CONCURRENCY` lines (default 2) are requested from ElevenLabs at once; the rest queue. Busy answers (429), server errors and timeouts are retried `ELEVENLABS_RETRIES` times (default 2), with growing waits.
+- `LOG_LEVEL=DEBUG` adds more detail; `LOG_FILE=off` writes to the terminal only.

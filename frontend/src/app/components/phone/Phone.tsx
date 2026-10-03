@@ -12,6 +12,7 @@ import type { AudioSettings } from "../../voice";
 import type { SayChoice } from "../Conversation";
 import { ProgressSummary } from "../ProgressSheet";
 import { QuestList } from "../QuestLog";
+import { ProblemLog } from "../ProblemLog";
 import { SoundSettings } from "../SoundSettings";
 import { MessageThreadView, threadPreview, type ThreadEntry } from "./MessagesApp";
 
@@ -322,6 +323,7 @@ export function Phone(props: Props) {
                 <SoundSettings settings={props.audioSettings} available={props.voicesAvailable} onChange={props.onAudioSettingsChange} />
               </section>
               <SavedGame onStartOver={props.onStartOver} />
+              <ProblemLog />
             </>
           )}
         </div>

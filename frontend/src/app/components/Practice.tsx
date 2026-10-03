@@ -200,7 +200,11 @@ export function Practice({ lines, excluded, languageCode, interfaceLanguageCode,
         <WordMarks words={state.lastWords} languageCode={languageCode} />
       )}
       <p className="target-language" lang={languageCode}>
-        {targetPlaying ? traceText(target.text, speaking?.words, speaking?.activeWord) : target.text}
+        {targetPlaying
+          ? traceText(target.text, speaking?.words, speaking?.activeWord)
+          : target.focus
+            ? <>{target.text.slice(0, target.focus.start)}<mark className="practice-focus">{target.text.slice(target.focus.start, target.focus.end)}</mark>{target.text.slice(target.focus.end)}</>
+            : target.text}
       </p>
       {target.mode === "phrase" && line?.translation && <p className="translation">{line.translation}</p>}
       {target.guide && <p className="hint-text">Sounds like: <strong>{target.guide}</strong></p>}

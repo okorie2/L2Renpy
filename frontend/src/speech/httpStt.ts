@@ -1,3 +1,4 @@
+import { backendError, logError, newRequestId } from "../diagnostics/log";
 import type { AudioClip, SpeechToTextProvider } from "./types";
 
 type Fetch = (input: string, init?: RequestInit) => Promise<Response>;
@@ -23,8 +24,12 @@ export function createHttpSpeechToText(baseUrl: string, fetchImpl: Fetch = (inpu
       const extension = EXTENSIONS[audio.mimeType.split(";")[0]] ?? "audio";
       form.append("audio", audio.data, `answer.${extension}`);
       form.append("languageCode", languageCode);
-      const response = await fetchImpl(endpoint, { method: "POST", body: form, signal });
-      if (!response.ok) throw new RecognitionRequestError(response.status);
+      const requestId = newRequestId();
+      const response = await fetchImpl(endpoint, { method: "POST", body: form, signal, headers: { "X-Request-Id": requestId } });
+      if (!response.ok) {
+        logError("speech", "Your answer could not be turned into words", (await backendError("/speech/transcribe", response, requestId)).detail);
+        throw new RecognitionRequestError(response.status);
+      }
       const body = await response.json() as { transcript?: string; speechDetected?: boolean; confidence?: number };
       return {
         transcript: (body.transcript ?? "").trim(),

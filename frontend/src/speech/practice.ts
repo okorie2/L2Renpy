@@ -23,6 +23,8 @@ export const GUIDE_ON_WORD_ATTEMPT = 3;
 export interface PracticeWord {
   index: number;
   word: string;
+  /** Share of the word's sounds that matched, 0 to 1, when it was graded. */
+  score?: number | null;
   /** False for spans that are not graded, such as the learner's name. */
   scored: boolean;
   needsPractice: boolean;
@@ -57,7 +59,12 @@ export interface PracticeState {
   mode: "phrase" | "word";
   /** The last go at the whole line, after practising a word. */
   finalPhrase: boolean;
-  word?: { text: string; phoneticGuide?: string | null; context?: WordContext };
+  /**
+   * The part being practised: the weak word, or for a short word, the word with
+   * its neighbour, so there is enough sound to hear it by. `focus` is where the
+   * weak word sits in `text`, and `focusIndex` which word of `text` it is.
+   */
+  word?: { text: string; focusWord: string; focus: { start: number; end: number }; focusIndex: number; phoneticGuide?: string | null; context?: WordContext };
   /** Word attempts already made. */
   wordAttempts: number;
   outcomes: LineOutcome[];
@@ -82,18 +89,79 @@ export function wordContext(line: string, word: string, index?: number): WordCon
   return found ? { before: line.slice(0, found.start).trim(), after: line.slice(found.end).trim() } : undefined;
 }
 
+/**
+ * A word with this many letters or fewer ("je", "mes", "pour") is practised
+ * with the word after it, or before it at the end of a line: on its own it is
+ * one or two sounds, too little for the evaluator to hear reliably.
+ */
+export const SHORT_WORD_LETTERS = 4;
+/** A chunk shorter than this is given one more word, as in "je ne sais". */
+const CHUNK_MIN_LETTERS = 6;
+
+export interface PracticeChunk {
+  text: string;
+  focus: { start: number; end: number };
+  focusIndex: number;
+  context?: WordContext;
+}
+
+const letters = (text: string) => text.replace(/[^\p{L}\p{N}]/gu, "").length;
+
+/**
+ * What to practise when word number `index` (or the first match of `word`) of
+ * `line` needs it: the word itself, or with its neighbour when it is short, and
+ * the rest of the sentence around it, so it is said as it sounds there.
+ */
+export function practiceChunk(line: string, word: string, index?: number): PracticeChunk {
+  const words = splitWords(line);
+  let at = index !== undefined && words[index]?.word === word ? index : words.findIndex((item) => item.word === word);
+  if (at < 0) return { text: word, focus: { start: 0, end: word.length }, focusIndex: 0 };
+  let from = at;
+  let to = at;
+  const grow = () => {
+    if (to + 1 < words.length) to++;
+    else if (from > 0) from--;
+  };
+  if (letters(words[at].word) <= SHORT_WORD_LETTERS) {
+    grow();
+    if (letters(words.slice(from, to + 1).map((item) => item.word).join("")) < CHUNK_MIN_LETTERS) grow();
+  }
+  const start = words[from].start;
+  const end = words[to].end;
+  return {
+    text: line.slice(start, end),
+    focus: { start: words[at].start - start, end: words[at].end - start },
+    focusIndex: at - from,
+    context: { before: line.slice(0, start).trim(), after: line.slice(end).trim() }
+  };
+}
+
+/**
+ * How the weak word went in an attempt at its chunk: its own score when the
+ * evaluator gave one, otherwise the attempt's overall similarity.
+ */
+export function focusScore(state: PracticeState, result: PracticeResult): number | null {
+  const word = state.word;
+  const entry = word ? result.words.find((item) => item.index === word.focusIndex && item.word.toLowerCase() === word.focusWord.toLowerCase()) ?? result.words[word.focusIndex] : undefined;
+  if (entry?.scored && typeof entry.score === "number") return entry.score;
+  if (entry?.scored && entry.score === undefined) return entry.needsPractice ? Math.min(result.similarity ?? 0, WORD_PASS - 0.01) : Math.max(result.similarity ?? 0, WORD_PASS);
+  return result.similarity;
+}
+
 export function startPractice(): PracticeState {
   return { lineIndex: 0, mode: "phrase", finalPhrase: false, wordAttempts: 0, outcomes: [], done: false };
 }
 
 /** What to say now: the line, or the word being practised, and whether to show the guide. */
-export function practiceTarget(state: PracticeState, lines: string[]): { text: string; mode: "phrase" | "word"; guide?: string; context?: WordContext } | undefined {
+export function practiceTarget(state: PracticeState, lines: string[]): { text: string; mode: "phrase" | "word"; guide?: string; context?: WordContext; focus?: { start: number; end: number } } | undefined {
   if (state.done) return undefined;
   if (state.mode === "word" && state.word) {
     const showGuide = state.wordAttempts + 1 >= GUIDE_ON_WORD_ATTEMPT && Boolean(state.word.phoneticGuide);
     return {
       text: state.word.text,
       mode: "word",
+      // Only worth marking when the word has company.
+      ...(state.word.text !== state.word.focusWord ? { focus: state.word.focus } : {}),
       ...(state.word.context ? { context: state.word.context } : {}),
       ...(showGuide ? { guide: state.word.phoneticGuide ?? undefined } : {})
     };
@@ -126,7 +194,10 @@ export function recordAttempt(state: PracticeState, result: PracticeResult, line
   if (state.mode === "word" && state.word) {
     const wordAttempts = state.wordAttempts + 1;
     const word = state.word.text;
-    if (passes(result.similarity, WORD_PASS)) {
+    // The chunk is judged by the weak word in it, and Sophie's feedback follows that word too.
+    const score = focusScore(state, result);
+    heard.lastSimilarity = score;
+    if (passes(score, WORD_PASS)) {
       return { ...state, ...heard, mode: "phrase", finalPhrase: true, wordAttempts, feedback: { kind: "word-clear", word } };
     }
     if (wordAttempts >= MAX_WORD_ATTEMPTS) {
@@ -140,11 +211,19 @@ export function recordAttempt(state: PracticeState, result: PracticeResult, line
   const weakest = result.weakestWord;
   if (!weakest?.word) return nextLine(state, lineCount, "practised", { kind: "moving-on" }, result);
   const line = lines[state.lineIndex];
+  const chunk = line ? practiceChunk(line, weakest.word, weakest.index) : practiceChunk(weakest.word, weakest.word, 0);
   return {
     ...state,
     ...heard,
     mode: "word",
-    word: { text: weakest.word, phoneticGuide: weakest.phoneticGuide, ...(line ? { context: wordContext(line, weakest.word, weakest.index) } : {}) },
+    word: {
+      text: chunk.text,
+      focusWord: weakest.word,
+      focus: chunk.focus,
+      focusIndex: chunk.focusIndex,
+      phoneticGuide: weakest.phoneticGuide,
+      ...(chunk.context ? { context: chunk.context } : {})
+    },
     wordAttempts: 0,
     feedback: { kind: "practise-word", word: weakest.word }
   };

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { logWarning } from "../diagnostics/log";
 import { mouthOpenAt } from "../speech/mouth";
 import type { MouthTimeline, SpeechRate, SynthesizedSpeech, WordTiming } from "../speech/types";
 import type { VoiceLibrary } from "../speech/voiceLibrary";
@@ -181,7 +182,10 @@ export function useLineVoice(library: VoiceLibrary | undefined, settings: AudioS
       audio.play().then(
         () => { if (ticket === request.current) setStatus("playing"); },
         // Playback refused (no tap yet, or the device is muted by policy): stay silent.
-        () => { if (ticket === request.current) setStatus("unavailable"); }
+        (error: unknown) => {
+          logWarning("voice", "The device would not play a line", error instanceof Error ? `${error.name}: ${error.message}` : String(error));
+          if (ticket === request.current) setStatus("unavailable");
+        }
       );
     });
   }, [library]);

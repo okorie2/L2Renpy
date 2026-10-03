@@ -1,3 +1,4 @@
+import { backendError, newRequestId } from "../diagnostics/log";
 import type { SynthesisRequest, SynthesizedSpeech, TextToSpeechProvider, WordTiming } from "./types";
 
 /** "start:end:fromMs:toMs;..." from the backend, or undefined when absent or malformed. */
@@ -23,9 +24,9 @@ export function createHttpTextToSpeech(baseUrl: string, fetchImpl: Fetch = (inpu
   return {
     providerId: "backend",
     async synthesize(request: SynthesisRequest): Promise<SynthesizedSpeech> {
-      const response = await fetchImpl(endpoint, {
+      const send = (requestId: string) => fetchImpl(endpoint, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "X-Request-Id": requestId },
         body: JSON.stringify({
           text: request.text,
           languageCode: request.languageCode,
@@ -35,7 +36,18 @@ export function createHttpTextToSpeech(baseUrl: string, fetchImpl: Fetch = (inpu
         }),
         signal: request.signal
       });
-      if (!response.ok) throw new Error(`Speech synthesis failed with status ${response.status}`);
+      let requestId = newRequestId();
+      let response = await send(requestId);
+      // Busy (the voice service limits how many lines it makes at once): one more go, after the wait it asked for.
+      if (response.status === 503 || response.status === 429) {
+        const retryAfter = Math.min(3, Number(response.headers.get("Retry-After")) || 1);
+        await new Promise((resolve) => setTimeout(resolve, retryAfter * 1000));
+        if (!request.signal?.aborted) {
+          requestId = newRequestId();
+          response = await send(requestId);
+        }
+      }
+      if (!response.ok) throw await backendError("/speech/synthesize", response, requestId);
 
       const data = await response.blob();
       const frames = response.headers.get("X-Mouth-Timeline");
