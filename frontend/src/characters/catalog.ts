@@ -14,6 +14,14 @@ import type { CanvasRect, CharacterVisualDefinition } from "./types";
  */
 export const WORLD_FIGURE_HEIGHT = 116;
 
+/**
+ * Art for one scene lives together in `public/assets/scenes/<scene>/`, under the
+ * names it was briefed with (see docs/SCENE-2-WALK-TO-CAFE.md). Files not delivered
+ * yet are simply absent: the nearest existing portrait or painting stands in.
+ */
+export const sceneArt = (scene: string, file: string) => `scenes/${scene}/${file}`;
+const walkArt = (name: string) => sceneArt("walk-to-cafe", `${name}.webp`);
+
 /** One of Sophie's gesture poses: a master portrait and its own mouth patch. */
 const gesture = (name: string, mouthRect: CanvasRect) => ({
   closed: `characters/sophie/conversation/${name}/closed.webp`,
@@ -76,7 +84,25 @@ const sophie: CharacterVisualDefinition = {
       inviting: { closed: "characters/sophie/conversation/inviting/closed.webp" },
       goodbye: { closed: "characters/sophie/conversation/goodbye/closed.webp" }
     },
-    fallbacks: { happy: "pleased", confused: "question" }
+    // The walking moments borrow the closest portrait until their full-body art arrives.
+    fallbacks: {
+      happy: "pleased", confused: "question",
+      "walk-away": "inviting", "walk-side": "talking", greeting: "goodbye", glance: "playful", proud: "excellent"
+    },
+    // Full-body, for the walk to the café. Same face, outfit and scale as the portraits.
+    wide: {
+      "walk-away": walkArt("sophie_walk_away"),
+      "walk-side": walkArt("sophie_walk_side"),
+      question: walkArt("sophie_ask"),
+      listening: walkArt("sophie_listen"),
+      pleased: walkArt("sophie_pleased"),
+      encouraging: walkArt("sophie_encourage"),
+      explaining: walkArt("sophie_explain"),
+      greeting: walkArt("sophie_greet_side"),
+      glance: walkArt("sophie_glance"),
+      proud: walkArt("sophie_proud"),
+      playful: walkArt("sophie_playful")
+    }
   }
 };
 
@@ -129,10 +155,25 @@ function standing(id: string): CharacterVisualDefinition {
   };
 }
 
+/**
+ * Someone met in passing during a scene, never in the world. Shown full-body when
+ * their art is on disk; until then a neighbour's close-up stands in.
+ */
+function passing(id: string, standIn: string, art: string): CharacterVisualDefinition {
+  const base = standing(standIn);
+  return {
+    ...base,
+    id,
+    conversation: { ...base.conversation!, wide: { neutral: art, question: art, encouraging: art } }
+  };
+}
+
 export const characterVisuals: Record<string, CharacterVisualDefinition> = {
   [sophie.id]: sophie,
   [player.id]: player,
   barista: standing("barista"),
   baker: standing("baker"),
-  neighbor: standing("neighbor")
+  neighbor: standing("neighbor"),
+  passerby: passing("passerby", "neighbor", walkArt("npc_passerby")),
+  shopkeeper: passing("shopkeeper", "baker", walkArt("npc_shopkeeper"))
 };

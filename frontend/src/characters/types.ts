@@ -11,7 +11,12 @@ export type CharacterExpression =
   | "neutral" | "question" | "explaining" | "encouraging" | "happy" | "confused"
   // Sophie's gestures for particular moments.
   | "talking" | "presenting" | "playful" | "pinching" | "speaking-french" | "listening"
-  | "excellent" | "well-done" | "close" | "good-try" | "beckoning" | "pleased" | "inviting" | "goodbye";
+  | "excellent" | "well-done" | "close" | "good-try" | "beckoning" | "pleased" | "inviting" | "goodbye"
+  // On the move, for scenes framed wide (the walk to the café).
+  | "walk-away" | "walk-side" | "greeting" | "glance" | "proud";
+
+/** Camera distance: `close` is the usual portrait, `wide` steps back to show the place. */
+export type Framing = "close" | "wide";
 
 /** Mouth state within an expression; `speaking` is shown only while a line is being voiced. */
 export type CharacterActivity = "closed" | "speaking";
@@ -19,7 +24,8 @@ export type CharacterActivity = "closed" | "speaking";
 export const CHARACTER_EXPRESSIONS: CharacterExpression[] = [
   "neutral", "question", "explaining", "encouraging", "happy", "confused",
   "talking", "presenting", "playful", "pinching", "speaking-french", "listening",
-  "excellent", "well-done", "close", "good-try", "beckoning", "pleased", "inviting", "goodbye"
+  "excellent", "well-done", "close", "good-try", "beckoning", "pleased", "inviting", "goodbye",
+  "walk-away", "walk-side", "greeting", "glance", "proud"
 ];
 export const WORLD_POSES: WorldPose[] = ["idle", "walking", "waving"];
 
@@ -79,6 +85,11 @@ export interface CharacterVisualDefinition {
     /** Expressions without dedicated art borrow the closest approved one. */
     fallbacks: Partial<Record<CharacterExpression, CharacterExpression>>;
     defaultExpression: CharacterExpression;
+    /**
+     * Full-body art for wide framing, by expression. Optional, and allowed to be
+     * missing on disk: until a file is delivered the matching portrait stands in.
+     */
+    wide?: Partial<Record<CharacterExpression, string>>;
   };
 }
 
@@ -86,6 +97,7 @@ export interface ConversationVisualRequest {
   character: string;
   expression?: CharacterExpression;
   activity?: CharacterActivity;
+  framing?: Framing;
 }
 
 /** Placement of a patch as fractions of the portrait, so it scales with the image. */
@@ -110,6 +122,13 @@ export interface ConversationVisual {
   /** Shut eyes for blinking, when the expression has them. */
   blinkOverlay?: PortraitOverlay;
   aspectRatio: number;
+  /** `portrait` is cropped at the hip; `full-body` shows the whole figure, for wide framing. */
+  art: "portrait" | "full-body";
+  /**
+   * What to show if `path` cannot be loaded. Full-body art is optional and may not
+   * have been delivered yet, so it always carries the nearest portrait as a stand-in.
+   */
+  standIn?: ConversationVisual;
 }
 
 export interface WorldVisual {

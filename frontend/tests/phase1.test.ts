@@ -105,7 +105,7 @@ test("Sophie's quest still completes once", () => {
   save = travelThroughPortal(save, chapterOneLocations, "leaveApartment", chapterOneQuests);
   const events = [
     { type: "DIALOGUE_LINE_COMPLETED" as const, dialogueId: "meetSophie", nodeId: "askName" },
-    { type: "INTENT_COMMUNICATED" as const, intentId: "introduceSelf" },
+    { type: "DIALOGUE_LINE_COMPLETED" as const, dialogueId: "meetSophie", nodeId: "practice" },
     { type: "DIALOGUE_COMPLETED" as const, dialogueId: "meetSophie", npcId: "sophie" }
   ];
   for (const event of events) save = applyGameEvent(save, chapterOneQuests, event);

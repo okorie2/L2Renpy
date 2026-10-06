@@ -1,4 +1,55 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
+
+/** A painted place shown behind a scene's conversation, with URLs ready to load. */
+export interface SceneLayer {
+  id: string;
+  image: string;
+  /** Shown while `image` is not delivered yet. */
+  standIn: string;
+  standInPosition?: string;
+  drift?: boolean;
+}
+
+/** Art found missing once is not asked for again. */
+const missing = new Set<string>();
+
+/** One painting; it falls back to its stand-in when its own file is not there. */
+export function ScenePainting({ layer, style }: { layer: SceneLayer; style?: CSSProperties }) {
+  const [failed, setFailed] = useState(() => missing.has(layer.image));
+  const useStandIn = failed && layer.image !== layer.standIn;
+  return (
+    <img
+      className={`scene-painting${layer.drift ? " drift" : ""}`}
+      src={useStandIn ? layer.standIn : layer.image}
+      style={{ ...style, ...(useStandIn && layer.standInPosition ? { objectPosition: layer.standInPosition } : {}) }}
+      onError={() => {
+        missing.add(layer.image);
+        setFailed(true);
+      }}
+      alt=""
+    />
+  );
+}
+
+/**
+ * The place behind the conversation. A new place fades in over the last one,
+ * which stays underneath until it has, so there is never a gap between them.
+ */
+function SceneBackdrop({ scene }: { scene: SceneLayer }) {
+  const [layers, setLayers] = useState<SceneLayer[]>([scene]);
+  useEffect(() => {
+    setLayers((current) => (current.at(-1)?.id === scene.id ? current : [...current.slice(-1), scene]));
+  }, [scene]);
+  return (
+    <div className="scene-backdrop">
+      {layers.map((layer) => (
+        <div key={layer.id} className="scene-layer">
+          <ScenePainting layer={layer} />
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export type OpeningStage = "title" | "walking" | "talking" | "leaving" | "done";
 
@@ -18,6 +69,9 @@ type Props = {
   onArrived: () => void;
   /** Shown if the player closed the welcome before it finished. */
   onTalk?: () => void;
+  talkLabel?: string;
+  /** Where the story has moved on to, such as the street on the way to the café. */
+  scene?: SceneLayer;
   title: { eyebrow: string; heading: string; headingLang: string; text: string };
 };
 
@@ -32,7 +86,7 @@ const WAVE_MS = 900;
  * up the path toward the camera, a wave, and then her welcome. It is a picture
  * with a figure on it, not a place to walk around; the street comes after.
  */
-export function OpeningScene({ stage, art, onStart, onArrived, onTalk, title }: Props) {
+export function OpeningScene({ stage, art, onStart, onArrived, onTalk, talkLabel = "Talk to Sophie", scene, title }: Props) {
   const [pose, setPose] = useState<"hidden" | "walking" | "waving" | "idle">("hidden");
   const [frame, setFrame] = useState(0);
   const [near, setNear] = useState(false);
@@ -87,6 +141,7 @@ export function OpeningScene({ stage, art, onStart, onArrived, onTalk, title }: 
         alt=""
         style={{ transitionDuration: `${WALK_MS}ms, ${WALK_MS}ms, ${WALK_MS}ms, 300ms` }}
       />
+      {scene && <SceneBackdrop scene={scene} />}
       {stage === "title" && (
         <div className="opening-card" role="dialog" aria-label="Welcome">
           <p className="eyebrow">{title.eyebrow}</p>
@@ -98,7 +153,7 @@ export function OpeningScene({ stage, art, onStart, onArrived, onTalk, title }: 
       )}
       {stage === "talking" && onTalk && (
         <div className="opening-card compact">
-          <button className="primary-pill" onClick={onTalk}>Talk to Sophie</button>
+          <button className="primary-pill" onClick={onTalk}>{talkLabel}</button>
         </div>
       )}
     </div>

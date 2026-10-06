@@ -26,6 +26,26 @@ export function resolveConversationVisual(
   const asset = expressions[expression];
   if (!asset) return undefined;
 
+  // Stepped back, a character with full-body art for this moment is shown whole;
+  // the portrait resolved above stands in until that art is on disk.
+  const wide = definition.conversation.wide;
+  const widePath = request.framing === "wide" && wide
+    ? wide[requestedExpression] ?? (fallbacks[requestedExpression] ? wide[fallbacks[requestedExpression]!] : undefined)
+    : undefined;
+  if (widePath) {
+    const portrait = resolveConversationVisual({ ...request, framing: "close" }, catalog);
+    return {
+      character: definition.id,
+      requestedExpression,
+      expression: requestedExpression,
+      activity: "closed",
+      path: widePath,
+      aspectRatio: canvas.width / canvas.height,
+      art: "full-body",
+      standIn: portrait
+    };
+  }
+
   const rect = asset.mouthRect ?? mouthRect;
   const canSpeak = request.activity === "speaking" && asset.mouthOpen !== undefined && rect !== undefined;
   const fractions = (area: { x: number; y: number; width: number; height: number }) => ({
@@ -42,7 +62,8 @@ export function resolveConversationVisual(
     path: asset.closed,
     mouthOverlay: canSpeak && asset.mouthOpen && rect ? { path: asset.mouthOpen, ...fractions(rect) } : undefined,
     blinkOverlay: asset.blink ? { path: asset.blink.path, ...fractions(asset.blink.rect) } : undefined,
-    aspectRatio: canvas.width / canvas.height
+    aspectRatio: canvas.width / canvas.height,
+    art: "portrait"
   };
 }
 
@@ -60,6 +81,11 @@ export function worldFrames(asset: WorldPoseAsset, direction: WorldDirection): {
   if (direction === "up" && asset.back?.length) return { frames: asset.back, mirrored: false };
   if ((direction === "left" || direction === "right") && asset.side?.length) return { frames: asset.side, mirrored: direction === "left" };
   return { frames: asset.frames, mirrored: false };
+}
+
+/** Full-body art for wide framing. It may not be on disk yet, so it is preloaded but never required. */
+export function listOptionalArt(character: string, catalog: Catalog = characterVisuals): string[] {
+  return [...new Set(Object.values(catalog[character]?.conversation?.wide ?? {}))];
 }
 
 /** Every image a character can show; used for preloading and asset checks. */

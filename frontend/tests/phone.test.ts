@@ -26,7 +26,7 @@ const evening = (): GameSave => {
   return {
     ...save,
     questProgress: {
-      meetSophie: done, cafe: done, bakery: done, neighborhood: done,
+      meetSophie: done, walkToCafe: done, cafe: done, bakery: done, neighborhood: done,
       goodbye: { status: "active", completedObjectiveIds: ["goHome"], objectiveCounts: {} }
     }
   };

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Conversation, type ConversationSpeaker } from "./components/Conversation";
-import { OpeningScene, type OpeningArt, type OpeningStage } from "./components/OpeningScene";
+import { OpeningScene, type OpeningArt, type OpeningStage, type SceneLayer } from "./components/OpeningScene";
+import { sceneAt } from "../content/scenes";
 import { GameView } from "./components/GameView";
 import { Phone, type PhoneRoute } from "./components/phone/Phone";
 import type { ThreadEntry } from "./components/phone/MessagesApp";
@@ -11,7 +12,7 @@ import { selectNpcDialogueId } from "../core/conditions";
 import { createInitialSave, questGuidance, questLog } from "../core/quests";
 import { travelThroughPortal, updatePlayerPosition } from "../core/world";
 import type { WorldPosition } from "../core/models";
-import { chapterOneItems, chapterOneLocations, chapterOneMessages, chapterOneNpcs, chapterOneQuests, createStartingPlayer } from "../content/chapter1";
+import { chapterOneItems, chapterOneLocations, chapterOneMessages, chapterOneNpcs, chapterOneQuests, chapterOneSceneSpeakers, createStartingPlayer } from "../content/chapter1";
 import { mapPlaces, metCharacters } from "../phone/directory";
 import { deliverMessages, markThreadRead, saveThreadSession, unreadThreadIds } from "../phone/messages";
 import { resolveSayOptions, startDialogue, stepDialogue, type DialogueInput, type DialogueSession } from "../dialogue/engine";
@@ -56,7 +57,7 @@ const SAVE_NOTICES: Record<SaveNotice, string> = {
   failed: "Your progress can't be saved on this device right now."
 };
 const npcSpeakers: Record<string, ConversationSpeaker> = Object.fromEntries(
-  chapterOneNpcs.map((npc) => [npc.id, { name: npc.name, characterId: npc.appearanceId }])
+  [...chapterOneNpcs, ...chapterOneSceneSpeakers].map((npc) => [npc.id, { name: npc.name, characterId: npc.appearanceId }])
 );
 
 // Catalog paths become URLs here, so the world layer never knows where assets live.
@@ -93,8 +94,15 @@ const voiceLibrary = new VoiceLibrary(
 const practiceClient = apiUrl ? createHttpPractice(apiUrl) : undefined;
 /** The learner's own language, for lines such as Sophie's welcome. */
 const INTERFACE_LANGUAGE = "en";
-/** The first story beat: the dialogue whose completion ends the opening. */
-const OPENING = { npcId: "sophie", dialogueId: "meetSophie" };
+/**
+ * The opening story, played in order with Sophie before the street opens up:
+ * Scene 1 in the park (meeting her), then Scene 2 (the walk to the café).
+ * The opening ends when the last one is complete.
+ */
+const OPENING = { npcId: "sophie", dialogueIds: ["meetSophie", "walkToCafe"] };
+const OPENING_LAST = OPENING.dialogueIds[OPENING.dialogueIds.length - 1];
+/** Where the walk to the café leaves the player: at the café door. */
+const OPENING_ARRIVAL = { locationId: "neighborhood", spawnId: "outsideCafe" };
 const OPENING_ART: OpeningArt = {
   backdrop: assetUrl("locations/park.webp"),
   idle: assetUrl("characters/sophie/opening/idle.webp"),
@@ -177,16 +185,21 @@ function Game({ initialSave, onSaveChange, onStartOver, saveNotice, onDismissSav
   // The opening, as in the Ren'Py prototype: the park, a first tap, Sophie walking up
   // and waving, then her welcome. It lasts until her introduction is complete.
   const [opening, setOpening] = useState<OpeningStage>(() => (
-    initialSave.completedDialogueIds.includes(OPENING.dialogueId) ? "done" : "title"
+    initialSave.completedDialogueIds.includes(OPENING_LAST) ? "done"
+      // Met Sophie already: pick the story up where it was left, in the park.
+      : initialSave.completedDialogueIds.includes(OPENING.dialogueIds[0]) ? "talking"
+      : "title"
   ));
-  const metSophie = save.completedDialogueIds.includes(OPENING.dialogueId);
+  const openingFinished = save.completedDialogueIds.includes(OPENING_LAST);
   useEffect(() => {
-    if (!metSophie || opening === "done" || opening === "leaving") return;
+    if (!openingFinished || opening === "done" || opening === "leaving") return;
     setOpening("leaving");
     const timer = window.setTimeout(() => setOpening("done"), OPENING_FADE_MS);
     return () => window.clearTimeout(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [metSophie]);
+  }, [openingFinished]);
+  // Bumped when the story puts the player somewhere new, so the world is rebuilt there.
+  const [worldEpoch, setWorldEpoch] = useState(0);
 
   // The Phaser scene is created at entry and keeps its own transient animation state.
   const world = useMemo<WorldSceneConfig>(() => ({
@@ -204,7 +217,7 @@ function Game({ initialSave, onSaveChange, onStartOver, saveNotice, onDismissSav
     props: location.props?.map((prop) => ({ ...prop, image: assetUrl(prop.image) }))
   // A position report updates the save, but should not recreate Phaser every frame.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [location]);
+  }), [location, worldEpoch]);
 
   useEffect(() => {
     const onNpcProximity = (id: string, near: boolean) => setNearNpcIds((current) => {
@@ -288,13 +301,33 @@ function Game({ initialSave, onSaveChange, onStartOver, saveNotice, onDismissSav
     startOpeningConversation();
   };
   // The welcome happens in the park, whichever street the save says the player is on.
+  // It resumes at the first part of the opening story not yet finished.
+  const nextOpeningDialogue = () => {
+    const id = OPENING.dialogueIds.find((item) => !save.completedDialogueIds.includes(item));
+    return id ? activeLanguagePack.dialogues[id] : undefined;
+  };
   const startOpeningConversation = () => {
-    const dialogue = activeLanguagePack.dialogues[OPENING.dialogueId];
+    const dialogue = nextOpeningDialogue();
     if (!dialogue) return;
     unlockVoice();
     refreshSpeech();
     setConversation(startDialogue(dialogue, OPENING.npcId));
   };
+
+  // The painted place behind the opening story's current line, once it leaves the park.
+  const openingScene = useMemo<SceneLayer | undefined>(() => {
+    if (!conversation || !dialogue || !OPENING.dialogueIds.includes(conversation.dialogueId)) return undefined;
+    const scene = sceneAt(
+      [...conversation.history.map((line) => line.nodeId), conversation.nodeId],
+      (nodeId) => dialogue.nodes[nodeId]?.presentation?.scene
+    );
+    if (!scene || scene.id === "park") return undefined;
+    return { ...scene, image: assetUrl(scene.image), standIn: assetUrl(scene.standIn) };
+  }, [conversation, dialogue]);
+  // The last place stays up while the opening fades into the street, so the park does not flash back.
+  const lastOpeningScene = useRef<SceneLayer | undefined>(undefined);
+  if (openingScene) lastOpeningScene.current = openingScene;
+  const shownOpeningScene = openingScene ?? (opening === "leaving" ? lastOpeningScene.current : undefined);
 
   const learning = useMemo(() => summarizeLearning(save, chapterOneConcepts, activeLanguagePack.vocabulary), [save]);
   const nearbyNpc = chapterOneNpcs.find((npc) => npc.locationId === location.id && nearNpcIds.has(npc.id));
@@ -370,7 +403,21 @@ function Game({ initialSave, onSaveChange, onStartOver, saveNotice, onDismissSav
       vocabulary: activeLanguagePack.vocabulary,
       utterance: input.text
     }));
-    return judgement ? stepDialogue(session, spoken, { ...input, judgement }, save, dialogueContext()) : step;
+    return judgement ? { ...stepDialogue(session, spoken, { ...input, judgement }, save, dialogueContext()), judgement } : step;
+  };
+
+  /**
+   * Was a spoken answer understood? Asked before it is sent, so the card can stay
+   * while Sophie reacts to it. The second opinion, if one was needed, travels with
+   * the answer so it is not asked for twice.
+   */
+  const checkSaid = async (input: DialogueInput): Promise<{ understood: boolean; input: DialogueInput }> => {
+    if (!conversation || !dialogue || input.type !== "SAY") return { understood: false, input };
+    const turn = judgedTurn.current;
+    const step = await stepWithSecondOpinion(conversation, dialogue, conversationNpc, input, location, () => setThinking(true));
+    if (turn === judgedTurn.current) setThinking(false);
+    const understood = step.result === "advanced" || step.result === "completed";
+    return { understood, input: "judgement" in step && step.judgement ? { ...input, judgement: step.judgement } : input };
   };
 
   // Report the input; the dialogue engine decides what it means for the save and the conversation.
@@ -386,8 +433,31 @@ function Game({ initialSave, onSaveChange, onStartOver, saveNotice, onDismissSav
       setTrail(afterReplayStep(trail, step));
       return;
     }
-    setSave(step.save);
-    setTrail(step.session.status === "completed" ? null : afterLiveStep(trail, step));
+    if (step.session.status !== "completed") {
+      setSave(step.save);
+      setTrail(afterLiveStep(trail, step));
+      return;
+    }
+    // The opening story runs on from one scene into the next without a break.
+    const storyIndex = OPENING.dialogueIds.indexOf(step.session.dialogueId);
+    const following = storyIndex >= 0 ? activeLanguagePack.dialogues[OPENING.dialogueIds[storyIndex + 1]] : undefined;
+    if (following) {
+      setSave(step.save);
+      setConversation(startDialogue(following, OPENING.npcId));
+      return;
+    }
+    if (step.session.dialogueId === OPENING_LAST) {
+      // Scene 2 ends at the café: the street opens with the player at its door.
+      const street = chapterOneLocations.find((item) => item.id === OPENING_ARRIVAL.locationId);
+      const door = street?.spawnPoints[OPENING_ARRIVAL.spawnId];
+      setSave(street && door
+        ? { ...step.save, player: { ...step.save.player, locationId: street.id, position: { ...door } } }
+        : step.save);
+      setWorldEpoch((current) => current + 1);
+    } else {
+      setSave(step.save);
+    }
+    setTrail(null);
   };
   /** Back to an earlier card, or forward again as far as the furthest reached. */
   const moveInConversation = (move: (current: Trail) => Trail) => {
@@ -434,7 +504,7 @@ function Game({ initialSave, onSaveChange, onStartOver, saveNotice, onDismissSav
         </button>
       </header>
 
-      <GameView key={location.id} world={world} />
+      <GameView key={`${location.id}:${worldEpoch}`} world={world} />
 
       {opening === "done" && (
         <div className="hint">
@@ -448,6 +518,8 @@ function Game({ initialSave, onSaveChange, onStartOver, saveNotice, onDismissSav
         onStart={beginOpening}
         onArrived={welcome}
         onTalk={conversation ? undefined : startOpeningConversation}
+        talkLabel={save.completedDialogueIds.includes(OPENING.dialogueIds[0]) ? "Continue with Sophie" : "Talk to Sophie"}
+        scene={shownOpeningScene}
         title={{ eyebrow: "CHAPTER 1", heading: "Bienvenue", headingLang: activeLanguagePack.code, text: "A sunny morning in the park. Someone is coming to say hello." }}
       />
 
@@ -491,6 +563,7 @@ function Game({ initialSave, onSaveChange, onStartOver, saveNotice, onDismissSav
           sayChoices={resolveSayOptions(dialogue.nodes[conversation.nodeId], save, activeLanguagePack)}
           thinking={thinking}
           onInput={(input) => void sendDialogueInput(input)}
+          checkSaid={checkSaid}
           onBack={trail && canGoBack(trail) ? () => moveInConversation(goBack) : undefined}
           onForward={trail && canGoForward(trail) ? () => moveInConversation(goForward) : undefined}
           replaying={Boolean(trail && isReplaying(trail))}

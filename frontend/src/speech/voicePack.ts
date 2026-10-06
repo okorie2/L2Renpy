@@ -43,7 +43,7 @@ export function expandTemplate(template: string, slots: Record<string, SlotDefin
   let results: Array<Record<string, string>> = [{}];
   for (const name of templateSlots(template)) {
     const slot = slots[name];
-    if (!slot || slot.source === "profile") return [];
+    if (!slot || slot.source === "profile" || slot.source === "profile-number") return [];
     const values = slot.source === "literal" ? [slot.value.target] : Object.values(slot.options).map((option) => option.target);
     results = results.flatMap((done) => values.map((value) => ({ ...done, [name]: value })));
   }

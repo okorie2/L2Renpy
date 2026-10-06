@@ -57,13 +57,13 @@ test("pronunciation diagnostics ride along without changing the communication ou
 
 test("reading a line is exposure, not success, and never touches game progression", () => {
   const save = newSave();
-  const node = french.dialogues.meetSophie.nodes.hello2;
+  const node = french.dialogues.sophieCatchUp.nodes.hello;
   const next = recordLineEncounter(save, node, vocabularyInText(node.targetText, french.vocabulary), "reading", ["translation"], at);
   assert.deepEqual(next.conceptMastery.GREETING.byModality.reading, {
     encounters: 1, attempts: 0, successfulAttempts: 0, unsuccessfulAttempts: 0, independentSuccesses: 0, assistedEncounters: 1
   });
   assert.equal(next.vocabularyMastery["fr.salut"].byModality.reading?.encounters, 1);
-  assert.equal(next.vocabularyMastery["fr.sappeler"].byModality.reading?.encounters, 1);
+  assert.equal(next.vocabularyMastery["fr.cava"].byModality.reading?.encounters, 1);
   assert.equal(next.evidenceLog.length, 1, "one line is one logged interaction");
   assert.equal(next.player.xp, save.player.xp);
   assert.deepEqual(next.questProgress, save.questProgress);
@@ -127,7 +127,7 @@ test("support follows behaviour: smooth answers lower it, struggle raises it, on
 
 test("words are found in text in any of their forms, and the log stays bounded", () => {
   assert.deepEqual(vocabularyInText("Bonjour ! Un café, s’il te plaît.", french.vocabulary).sort(), ["fr.bonjour", "fr.cafe", "fr.silvousplait"]);
-  assert.deepEqual(vocabularyInText("Enchantée, Samuel !", french.vocabulary), ["fr.enchante"]);
+  assert.deepEqual(vocabularyInText("Ça va BIEN, Samuel !", french.vocabulary).sort(), ["fr.bien", "fr.cava"]);
   assert.deepEqual(vocabularyInText("Hello there", french.vocabulary), []);
   let save = newSave();
   for (let i = 0; i < EVIDENCE_LOG_LIMIT + 25; i++) save = recordLearningEvidence(save, attempt());

@@ -39,10 +39,25 @@ export function validateDialogue(dialogue: Dialogue, references: DialogueReferen
       if (!targetSlots.includes(slot)) problems.push(`${at(key)}: excluded span "${slot}" is not in the target text`);
     }
 
+    const alongside = node.presentation?.street?.with;
+    if (alongside && !references.speakerIds.includes(alongside)) problems.push(`${at(key)}: unknown person "${alongside}"`);
+    const onStreet = [...(node.presentation?.street?.people ?? []), ...(node.interlude?.segments ?? []).flatMap((segment) => segment.people ?? [])];
+    for (const person of onStreet) {
+      if (!references.speakerIds.includes(person.id)) problems.push(`${at(key)}: unknown person "${person.id}" on the street`);
+    }
+
+    const focus = node.presentation?.focus;
+    if (focus && !references.speakerIds.includes(focus)) problems.push(`${at(key)}: unknown focus "${focus}"`);
+
     const expression = node.presentation?.expression;
     if (expression && !CHARACTER_EXPRESSIONS.includes(expression)) problems.push(`${at(key)}: unknown expression "${expression}"`);
 
     if (node.language === "interface" && node.translation) problems.push(`${at(key)}: a line in the learner's language has no translation`);
+
+    if (node.interlude) {
+      if (!node.interlude.segments.length) problems.push(`${at(key)}: a walk needs at least one stretch`);
+      if (node.response || node.targetText) problems.push(`${at(key)}: a walk has no words and asks for nothing`);
+    }
 
     const response = node.response;
     if (!response) continue;
@@ -51,6 +66,9 @@ export function validateDialogue(dialogue: Dialogue, references: DialogueReferen
       for (const option of response.options) {
         if (option.nextNodeId && !hasNode(option.nextNodeId)) problems.push(`${at(key)}: option target "${option.nextNodeId}" is missing`);
       }
+    }
+    if (response.kind === "say" && response.question?.speakerId && !references.speakerIds.includes(response.question.speakerId)) {
+      problems.push(`${at(key)}: unknown asker "${response.question.speakerId}"`);
     }
     if ((response.kind === "say" || response.kind === "act") && response.repairNodeId && !hasNode(response.repairNodeId)) {
       problems.push(`${at(key)}: repair node "${response.repairNodeId}" is missing`);

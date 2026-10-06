@@ -8,7 +8,9 @@ import {
   type DialogueInput, type DialogueSession
 } from "../src/dialogue/engine";
 import { PLAYER_SPEAKER_ID, type Dialogue } from "../src/dialogue/models";
+import { buildSlotValues, resolveDialogueLine } from "../src/dialogue/template";
 import { french } from "../src/languages/fr";
+import { streetPeople } from "../src/content/scenes";
 import { assessUtterance, normalizeUtterance, placeWords } from "../src/learning/assessment";
 import { vocabularySpans } from "../src/learning/vocabulary";
 
@@ -112,7 +114,7 @@ test("Sophie's welcome: English questions, a French model, practice, then the pl
     for (let guard = 0; current.session.nodeId !== nodeId && guard < 30; guard++) {
       const response = meet.nodes[current.session.nodeId].response;
       current = go(current, meet, !response ? next
-        : response.kind === "text" ? { type: "ANSWER", value: "  Léa  ", assistance: [] }
+        : response.kind === "text" ? { type: "ANSWER", value: response.saveTo === "age" ? " 27 " : "  Léa  ", assistance: [] }
         : response.kind === "practice" ? { type: "PRACTICED", assistance: [] }
         : { type: "ANSWER", value: current.session.nodeId === "askExperience" ? experience : "travel", assistance: [] });
     }
@@ -124,7 +126,14 @@ test("Sophie's welcome: English questions, a French model, practice, then the pl
   assert.equal(welcomed.save.player.profile.displayName, "Léa");
   assert.equal(welcomed.save.player.profile.targetLanguageExperience, "new");
   assert.equal(welcomed.save.evidenceLog.length, 0, "English lines teach no French");
-  assert.deepEqual(welcomed.session.history.map((line) => line.nodeId), ["hello", "niceToMeetYou", "askName", "greetName", "askExperience", "askMotivation", "great", "model"]);
+  assert.equal(welcomed.save.player.profile.age, 27);
+  assert.deepEqual(welcomed.session.history.map((line) => line.nodeId), ["hello", "niceToMeetYou", "askName", "greetName", "askAge", "askExperience", "askMotivation", "great", "model"]);
+  assert.equal(meet.nodes.askExperience.targetText, "Great! And how much French do you already know?");
+  // The introduction includes the age, written out as it is said.
+  assert.equal(
+    resolveDialogueLine(meet.nodes.example, buildSlotValues(french.slots, welcomed.save.player.profile)).target.text.split("\n")[1],
+    "J'ai vingt-sept ans."
+  );
 
   // The model introduction is French, and is evidence.
   let state = go(welcomed, meet, next);
@@ -134,18 +143,11 @@ test("Sophie's welcome: English questions, a French model, practice, then the pl
   state = until(state, "practice", "new");
   assert.equal(go(state, meet, next).result, "ignored");
   state = go(state, meet, { type: "PRACTICED", assistance: [] });
-  assert.equal(state.session.nodeId, "hello2");
+  assert.equal(state.session.nodeId, "letsGo");
 
-  state = until(state, "yourTurn", "new");
-  assert.deepEqual(resolveSayOptions(meet.nodes.yourTurn, state.save, context).map((option) => [option.text, option.fits]), [
-    ["Je m'appelle Léa.", true], ["Merci, au revoir !", false]
-  ]);
-  state = go(state, meet, say("moi c'est Léa !"));
-  assert.equal(state.session.nodeId, "niceToMeet");
-  const last = state.session.history.at(-1)!;
-  assert.deepEqual([last.speakerId, last.text], [PLAYER_SPEAKER_ID, "moi c'est Léa !"]);
-
-  state = go(go(state, meet, next), meet, next);
+  // Sophie turns toward the gate; the welcome ends on the learner's tap, not by itself.
+  assert.equal(meet.nodes.letsGo.presentation?.framing, "wide");
+  state = go(state, meet, next);
   assert.equal(state.result, "completed");
   assert.equal(state.session.status, "completed");
   assert.deepEqual(state.save.completedDialogueIds, ["meetSophie"]);
@@ -185,4 +187,80 @@ test("each answer is kept with how it went, and which of its words were recognis
   }
   assert.deepEqual(vocabularySpans("au revoir, au revoir !", french.vocabulary, ["fr.aurevoir"]), [{ start: 0, end: 9 }, { start: 11, end: 20 }]);
   assert.deepEqual(vocabularySpans("Merci", french.vocabulary, []), []);
+});
+
+test("the walk to the café: Sophie's questions, a greeting in passing, and any age will do", () => {
+  const walk = french.dialogues.walkToCafe;
+  const fresh = createInitialSave(createStartingPlayer("fr"), chapterOneQuests);
+  const met: GameSave = {
+    ...fresh,
+    player: { ...fresh.player, profile: { displayName: "Léa", age: 27 } },
+    questProgress: {
+      ...fresh.questProgress,
+      meetSophie: { status: "completed", completedObjectiveIds: [], objectiveCounts: {} },
+      walkToCafe: { status: "active", completedObjectiveIds: [], objectiveCounts: {} }
+    }
+  };
+  let state = { session: startDialogue(walk, "sophie"), save: met };
+  const continueTo = (nodeId: string) => {
+    for (let guard = 0; state.session.nodeId !== nodeId; guard++) {
+      assert.ok(guard < 60, `never reached ${nodeId}`);
+      assert.equal(walk.nodes[state.session.nodeId].response, undefined, `${state.session.nodeId} needs an answer`);
+      state = go(state, walk, next);
+    }
+  };
+
+  // One speaking card: Sophie's question is asked on it, and the learner answers out loud.
+  continueTo("nameAnswer");
+  const card = walk.nodes.nameAnswer.response!;
+  assert.ok(card.kind === "say" && card.speakOnly && card.question?.text === "Comment tu t'appelles ?");
+  assert.equal(walk.nodes.nameAnswer.presentation?.translation, "delayed", "a new question is heard before it is translated");
+  // Nothing moves on until the answer is understood: a miss gets encouragement and the same card again.
+  state = go(state, walk, say("euh…"));
+  assert.equal(state.session.nodeId, "tryAgain");
+  state = go(state, walk, next);
+  assert.equal(state.session.nodeId, "nameAnswer");
+  // The pronunciation check rides along with the answer and is kept with it.
+  const pronunciation = { wordsNeedingPractice: [{ word: "appelle" }], phraseRelativeSimilarity: 0.7 };
+  state = go(state, walk, { type: "SAY", text: "Je m'appelle Léa", mode: "speech", assistance: [], pronunciation });
+  assert.equal(state.session.nodeId, "peopleOnStreet");
+  assert.deepEqual(state.session.history.at(-1)?.said?.pronunciation, pronunciation);
+  assert.deepEqual(state.save.evidenceLog.at(-1)?.pronunciation, pronunciation);
+
+  // A passer-by and a shopkeeper say bonjour; the learner answers the shopkeeper.
+  // They are on the street from afar, before anyone speaks, and come closer as Sophie walks.
+  const onStreet = () => streetPeople(walk, [...state.session.history.map((entry) => entry.nodeId), state.session.nodeId]);
+  assert.deepEqual(onStreet(), [{ id: "passerby", at: "far" }, { id: "shopkeeper", at: undefined }]);
+  continueTo("yourTurnNext");
+  assert.deepEqual(onStreet().find((person) => person.id === "passerby"), { id: "passerby", at: "near", to: "passed" }, "the passer-by walks on past");
+  continueTo("greetShopkeeper");
+  assert.deepEqual(onStreet().map((person) => person.id), ["shopkeeper"], "and has gone");
+  assert.equal(walk.nodes.greetShopkeeper.presentation?.focus, "shopkeeper");
+  assert.equal(walk.nodes.passerbyHello.translation, undefined, "bonjour is known by now");
+  state = go(state, walk, say("bonjour"));
+
+  continueTo("caVaAnswer");
+  state = go(state, walk, say("ça va bien"));
+  continueTo("caVaCheckAnswer");
+  assert.equal(walk.nodes.caVaCheckAnswer.presentation?.translation, "on-request", "met before: no English up front");
+  state = go(state, walk, say("ça va"));
+
+  // The number is the learner's own: any age in « J'ai … ans » communicates.
+  continueTo("ageAnswer");
+  assert.equal(resolveDialogueLine(walk.nodes.ageAnswer, buildSlotValues(french.slots, state.save.player.profile)).target.text, "J'ai vingt-sept ans.");
+  state = go(state, walk, say("j'ai trente ans"));
+  assert.equal(state.session.nodeId, "ageExactly");
+
+  // The mixed mini-conversation, then the café.
+  for (const [nodeId, answer] of [["miniHelloAnswer", "Bonjour"], ["miniCaVaAnswer", "Ça va bien"], ["miniNameAnswer", "Je m'appelle Léa"], ["miniAgeAnswer", "J'ai 27 ans"]]) {
+    continueTo(nodeId);
+    state = go(state, walk, say(answer));
+  }
+  continueTo("ready");
+  assert.equal(walk.nodes.weAreHere.presentation?.scene, "cafe-exterior");
+  assert.equal(go(state, walk, say("oui")).result, "ignored", "the last card only waits for the tap");
+  state = go(state, walk, next);
+  assert.equal(state.result, "completed");
+  assert.equal(state.save.questProgress.walkToCafe.status, "completed");
+  assert.equal(state.save.questProgress.cafe.status, "active");
 });

@@ -25,8 +25,8 @@ function playedSave(): GameSave {
   let session = startDialogue(meet, "sophie");
   for (let guard = 0; session.status !== "completed" && guard < 40; guard++) {
     const response = meet.nodes[session.nodeId].response;
-    const input: DialogueInput = !response ? { type: "CONTINUE", assistance: [] }
-      : response.kind === "text" ? { type: "ANSWER", value: "Léa", assistance: [] }
+    const input: DialogueInput = !response || response.kind === "continue" ? { type: "CONTINUE", assistance: [] }
+      : response.kind === "text" ? { type: "ANSWER", value: response.saveTo === "age" ? "29" : "Léa", assistance: [] }
       : response.kind === "choice" ? { type: "ANSWER", value: session.nodeId === "askExperience" ? "some" : "travel", assistance: [] }
       : response.kind === "practice" ? { type: "PRACTICED", assistance: [] }
       : { type: "SAY", text: "Je m'appelle Léa.", mode: "speech", assistance: [] };
@@ -85,7 +85,14 @@ test("the profile is cleaned on the way in like any other answer", () => {
   stored.save.player.profile = { displayName: "  <b>Léa</b> {x} ", motivation: "fame", targetLanguageExperience: "some", age: 31 };
   const decoded = decodeSave(JSON.stringify(stored));
   assert.equal(decoded.status, "ok");
-  assert.deepEqual(decoded.status === "ok" && decoded.save.player.profile, { displayName: "bLéa/b x", targetLanguageExperience: "some" });
+  assert.deepEqual(decoded.status === "ok" && decoded.save.player.profile, { displayName: "bLéa/b x", age: 31, targetLanguageExperience: "some" });
+
+  // An age must be a whole number of years in a sensible range, or it is dropped.
+  for (const age of [0, 400, "thirty", 12.5, -3]) {
+    stored.save.player.profile = { displayName: "Léa", age };
+    const again = decodeSave(JSON.stringify(stored));
+    assert.deepEqual(again.status === "ok" && again.save.player.profile, { displayName: "Léa" }, String(age));
+  }
 });
 
 test("a save from a newer version is left alone and never overwritten", () => {

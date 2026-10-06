@@ -52,7 +52,8 @@ test("speaking changes only the mouth: one master portrait plus a small patch", 
     // The same base image in both states is what keeps the rest of her still.
     assert.equal(speaking.path, closed.path, expression);
     assert.deepEqual(imageSize(closed.path), canvas, closed.path);
-    if (turnedAway.has(expression)) {
+    // Poses that borrow a turned-away one (walking away, waving in passing) have no mouth either.
+    if (turnedAway.has(speaking.expression)) {
       assert.equal(speaking.mouthOverlay, undefined, expression);
       continue;
     }
@@ -207,4 +208,68 @@ test("Sophie blinks now and then in her standing poses, and the patch matches it
   }
   assert.ok(listCharacterAssetPaths("sophie").includes("characters/sophie/conversation/neutral/blink.png"));
   assert.equal(resolveConversationVisual({ character: "sophie", expression: "excellent" })?.blinkOverlay, undefined);
+});
+
+test("stepped back, Sophie is shown full-body, with her nearest portrait standing in until that art arrives", () => {
+  const wide = resolveConversationVisual({ character: "sophie", expression: "walk-side", framing: "wide" })!;
+  assert.equal(wide.art, "full-body");
+  assert.equal(wide.path, "scenes/walk-to-cafe/sophie_walk_side.webp");
+  assert.equal(wide.mouthOverlay, undefined, "full-body art is shown as drawn");
+  assert.equal(wide.standIn?.art, "portrait");
+  assert.equal(wide.standIn?.expression, "talking");
+  assert.ok(existsSync(join(assetRoot, wide.standIn!.path)), "the stand-in is always on disk");
+
+  // A moment with no full-body art (turning toward the gate) keeps its portrait, framed wide by the UI.
+  const turning = resolveConversationVisual({ character: "sophie", expression: "inviting", framing: "wide" })!;
+  assert.deepEqual([turning.art, turning.path], ["portrait", "characters/sophie/conversation/inviting/closed.webp"]);
+  // Close up, nothing changes.
+  assert.equal(resolveConversationVisual({ character: "sophie", expression: "question" })!.art, "portrait");
+
+  // People met in passing have a stand-in too, so a scene never shows a broken image.
+  for (const id of ["passerby", "shopkeeper"]) {
+    const visual = resolveConversationVisual({ character: id, expression: "neutral", framing: "wide" })!;
+    assert.equal(visual.art, "full-body", id);
+    assert.ok(visual.standIn && existsSync(join(assetRoot, visual.standIn.path)), id);
+  }
+});
+
+test("Scene 2's own art is delivered: every backdrop and full-body pose is on disk", async () => {
+  const { SCENES } = await import("../src/content/scenes");
+  const { listOptionalArt } = await import("../src/characters/resolve");
+  for (const scene of Object.values(SCENES)) {
+    assert.ok(existsSync(join(assetRoot, scene.image)), scene.image);
+    assert.ok(existsSync(join(assetRoot, scene.standIn)), scene.standIn);
+  }
+  for (const id of ["sophie", "passerby", "shopkeeper"]) {
+    for (const path of listOptionalArt(id)) {
+      assert.ok(existsSync(join(assetRoot, path)), path);
+      // Full-body art shares the portraits' 2:3 canvas, so it fits the same box.
+      assert.deepEqual(imageSize(path), { width: 1024, height: 1536 }, path);
+    }
+  }
+});
+
+test("Sophie's street poses are on disk, on the walk cycle's canvas, so she stops where she walked", async () => {
+  const { STREET_POSES } = await import("../src/content/scenes");
+  for (const [pose, art] of Object.entries(STREET_POSES)) {
+    assert.ok(existsSync(join(assetRoot, art.image)), pose);
+    assert.deepEqual(imageSize(art.image), { width: 683, height: 1024 }, art.image);
+  }
+  // Looking back, she talks: the same pose with her mouth open, on the same canvas.
+  const talking = STREET_POSES.glance.talking!;
+  assert.ok(existsSync(join(assetRoot, talking)), talking);
+  assert.deepEqual(imageSize(talking), { width: 683, height: 1024 });
+});
+
+test("Sophie's walk cycle is on disk: ten frames on one canvas, both steps the same length", async () => {
+  const { SOPHIE_WALK } = await import("../src/content/scenes");
+  assert.equal(SOPHIE_WALK.frames.length, 10);
+  assert.equal(SOPHIE_WALK.frameMs.length, SOPHIE_WALK.frames.length);
+  const [right, left] = SOPHIE_WALK.stepStarts;
+  const sum = (from: number, to: number) => SOPHIE_WALK.frameMs.slice(from, to).reduce((total, ms) => total + ms, 0);
+  assert.equal(sum(right, left), sum(left, SOPHIE_WALK.frames.length));
+  for (const path of SOPHIE_WALK.frames) {
+    assert.ok(existsSync(join(assetRoot, path)), path);
+    assert.deepEqual(imageSize(path), { width: 683, height: 1024 }, path);
+  }
 });

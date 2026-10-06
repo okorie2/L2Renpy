@@ -17,10 +17,12 @@ export type LearningMotivation = "travel" | "work" | "study" | "people" | "curio
 
 /**
  * The little the game knows about the learner, kept apart from canonical language
- * content. Everything is optional and deliberately coarse: no age, no real name required.
+ * content. Everything is optional and deliberately coarse: no real name required. The
+ * age is only a number to practise "J'ai … ans." with; it is never checked or shared.
  */
 export interface PlayerProfile {
   displayName?: string;
+  age?: number;
   targetLanguageExperience?: TargetLanguageExperience;
   motivation?: LearningMotivation;
 }

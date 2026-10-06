@@ -12,12 +12,19 @@ export interface LocalizedText {
  * names fixed spans such as a brand or place so they can be excluded from assessment.
  */
 export type SlotDefinition =
-  | { source: "profile"; field: "displayName"; fallback: LocalizedText }
+  | { source: "profile"; field: "displayName" | "age"; fallback: LocalizedText }
   | {
       source: "profile-lookup";
       field: "targetLanguageExperience" | "motivation";
       options: Record<string, LocalizedText>;
       fallbackOption: string;
+    }
+  | {
+      /** A number from the profile, written out in words (the age: "vingt-neuf" / "twenty-nine"). */
+      source: "profile-number";
+      field: "age";
+      spell: (value: number) => LocalizedText;
+      fallback: LocalizedText;
     }
   | { source: "literal"; value: LocalizedText };
 
@@ -52,9 +59,12 @@ export function buildSlotValues(slots: Record<string, SlotDefinition>, profile: 
   for (const [name, slot] of Object.entries(slots)) {
     if (slot.source === "literal") {
       values[name] = slot.value;
+    } else if (slot.source === "profile-number") {
+      const value = profile[slot.field];
+      values[name] = value === undefined ? slot.fallback : slot.spell(value);
     } else if (slot.source === "profile") {
       const value = profile[slot.field];
-      values[name] = value ? { target: value, translation: value } : slot.fallback;
+      values[name] = value !== undefined && value !== "" ? { target: String(value), translation: String(value) } : slot.fallback;
     } else {
       values[name] = slot.options[profile[slot.field] ?? ""] ?? slot.options[slot.fallbackOption];
     }

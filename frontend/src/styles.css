@@ -348,6 +348,78 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--blue); outl
 
 .portrait-figure img { position: absolute; user-select: none; }
 .portrait-base { inset: 0; width: 100%; height: 100%; }
+.portrait-figure { transition: height .45s cubic-bezier(.2, .8, .3, 1); }
+
+/* Stepped back: the same portrait stands smaller, so more of the place shows around it. */
+.portrait.framing-wide .portrait-figure { height: min(66cqh, calc(66cqw / var(--portrait-ratio))); }
+/* Full-body art is drawn whole, so in wide framing it takes the height the portrait gave up. */
+.portrait.framing-wide.art-full-body { bottom: -18px; }
+.portrait.framing-wide.art-full-body .portrait-figure { height: min(100cqh, calc(100cqw / var(--portrait-ratio))); }
+.portrait.art-full-body .portrait-base { object-fit: contain; object-position: 50% 100%; }
+/* Walking: a soft step-by-step bob, so a still picture reads as moving. */
+.portrait.moving .portrait-figure { animation: walk-bob .9s ease-in-out infinite; }
+@keyframes walk-bob {
+  0%, 100% { transform: translateY(0); }
+  25% { transform: translateY(-5px) rotate(-.4deg); }
+  50% { transform: translateY(0); }
+  75% { transform: translateY(-5px) rotate(.4deg); }
+}
+
+.continue-pill { width: 100%; margin-top: 10px; }
+
+/* A walk between beats: the camera follows Sophie from just behind. Above the scrim,
+   below the top controls. Everything moving is set from script, frame by frame. */
+.walk-interlude { position: absolute; z-index: 1; inset: 0; overflow: hidden; background: #e9e1d2; }
+.walk-camera { position: absolute; inset: 0; transform-origin: 50% 58%; will-change: transform; }
+.walk-layer { position: absolute; inset: 0; }
+.walk-layer .scene-painting { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+/* A little to the left of the camera, so she reads as walking along beside the learner
+   on this side of the street rather than heading off down the middle of it. */
+.walk-figure {
+  position: absolute;
+  left: 30%; /* set per place by the scene (DEFAULT_WALK_X) */
+  bottom: 6%;
+  height: 46%;
+  aspect-ratio: 2 / 3;
+  transform-origin: 50% 100%;
+  will-change: transform;
+}
+.walk-figure img { position: relative; width: 100%; height: 100%; object-fit: contain; object-position: 50% 100%; }
+.walk-figure img.walk-figure-talking { position: absolute; inset: 0; transition: opacity .06s linear; }
+/* Someone else on the street, standing on the painting's pavement. They are there
+   from afar and come closer with the camera, so they never fade or slide in. */
+.street-person {
+  position: absolute;
+  aspect-ratio: 2 / 3;
+  transform: translateX(-50%);
+  transform-origin: 50% 100%;
+}
+.street-person img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; object-position: 50% 100%; }
+.street-person img.street-person-talking { transition: opacity .06s linear; }
+/* Walking on past the camera: bigger and off the edge of the frame. */
+.street-person.leaving { animation: person-leave 1.8s ease-in both; }
+@keyframes person-leave {
+  to { left: var(--to-left); bottom: var(--to-bottom); height: var(--to-height); opacity: 0; }
+}
+/* The card sits over the street: a soft fade at the bottom keeps it readable. */
+.street-scrim {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(to bottom, rgba(31, 42, 68, .1) 0%, rgba(31, 42, 68, 0) 30%, rgba(255, 249, 245, .35) 72%, rgba(255, 249, 245, .85) 100%);
+}
+.walk-shadow {
+  position: absolute;
+  left: 50%;
+  bottom: -1.5%;
+  width: 46%;
+  height: 5%;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(40, 32, 20, .38), rgba(40, 32, 20, 0) 70%);
+}
+.walk-controls { position: absolute; right: max(14px, var(--safe-right)); bottom: max(calc(var(--safe-bottom) + 18px), 18px); }
+.walk-controls .card-pause { position: static; }
 
 .conversation-dock {
   position: relative;
@@ -599,6 +671,17 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--blue); outl
 .text-response .primary-pill { margin-top: 14px; }
 .button-row { display: flex; flex-wrap: wrap; gap: 10px; width: 100%; }
 
+/* A speaking card: each French line sits right on its English, and question and answer stand apart. */
+.speak-layout .qa-group + .qa-group { margin-top: 26px; }
+.speak-layout .qa-group .translation { margin-top: 2px; }
+.speak-layout .assist-row { margin-top: 18px; }
+.speak-action { display: flex; flex-direction: column; align-items: center; margin-top: 18px; text-align: center; }
+.speak-prompt { margin: 0; font-size: 15px; font-weight: 700; color: var(--text-secondary); }
+.speak-action .speech-control { margin-top: 4px; }
+.answer-feedback { display: flex; flex-direction: column; align-items: center; gap: 4px; min-height: 120px; justify-content: center; }
+.feedback-phrase { margin: 0 0 4px; font-size: 22px; font-weight: 800; color: var(--navy); animation: feedback-in .25s ease-out; }
+@keyframes feedback-in { from { opacity: 0; transform: scale(.94); } to { opacity: 1; transform: none; } }
+
 .speech-control { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 10px; }
 .said-feedback { margin: 0 0 10px; padding: 8px 12px; border-radius: 14px; background: #eef7ef; }
 .said-feedback.missed { background: var(--cream); }
@@ -642,6 +725,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--blue); outl
 
 @media (prefers-reduced-motion: reduce) {
   .conversation, .portrait, .conversation-dock, .dialogue-card, .sheet, .sheet-backdrop, .quest-toast { animation: none; }
+  .portrait.moving .portrait-figure, .scene-layer, .scene-painting.drift, .street-person { animation: none; }
+  .street-person.leaving { display: none; }
 }
 
 @media (min-width: 700px) {
@@ -924,6 +1009,18 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--blue); outl
 .opening-shadow.near { left: 40%; bottom: -0.6%; width: 22%; height: 3.4%; }
 .opening-shadow.visible { opacity: 1; }
 .opening-card.compact { padding: 14px; }
+
+/* Where the opening story has moved on to: the street on the way to the café. */
+.scene-backdrop { position: absolute; z-index: 1; inset: 0; overflow: hidden; }
+.scene-layer { position: absolute; inset: 0; animation: scene-in .8s ease both; }
+.scene-painting { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+/* Walking scenes drift slowly across the painting, as if moving along the street. */
+.scene-painting.drift { animation: scene-drift 40s linear infinite alternate; }
+@keyframes scene-in { from { opacity: 0; } }
+@keyframes scene-drift {
+  from { transform: scale(1.08) translateX(2.5%); }
+  to { transform: scale(1.08) translateX(-2.5%); }
+}
 .opening-scene .opening-card { z-index: 2; }
 
 /* Word tracing: each word lights up as Sophie says it. */

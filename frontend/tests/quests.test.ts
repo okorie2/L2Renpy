@@ -10,6 +10,7 @@ import { applyGameEvent, createInitialSave, currentObjective, questGuidance, que
 import { validateQuestContent } from "../src/core/validate";
 import { travelThroughPortal } from "../src/core/world";
 import { resolveSayOptions, startDialogue, stepDialogue, type DialogueInput } from "../src/dialogue/engine";
+import { buildSlotValues, resolveDialogueLine } from "../src/dialogue/template";
 import { french } from "../src/languages/fr";
 import { chapterOneConcepts } from "../src/learning/concepts";
 import { summarizeLearning } from "../src/learning/summary";
@@ -137,7 +138,7 @@ test("Chapter 1 content references resolve", () => {
     conceptIds: chapterOneConceptIds
   });
   assert.deepEqual(problems, []);
-  assert.ok(chapterOneQuests.length >= 3 && chapterOneQuests.length <= 5);
+  assert.ok(chapterOneQuests.length >= 3 && chapterOneQuests.length <= 6);
 });
 
 test("the validator catches broken quest content", () => {
@@ -167,15 +168,16 @@ test("Chapter 1 can be played from start to finish through game events alone", (
     const dialogue = french.dialogues[expected];
     let state = { session, save };
     for (let guard = 0; state.session.status === "active"; guard++) {
-      assert.ok(guard < 40, "conversation did not end");
+      assert.ok(guard < 120, "conversation did not end");
       const node = dialogue.nodes[state.session.nodeId];
       const response = node.response;
-      const input: DialogueInput = !response ? { type: "CONTINUE", assistance: [] }
-        : response.kind === "text" ? { type: "ANSWER", value: "Samuel", assistance: [] }
+      const input: DialogueInput = !response || response.kind === "continue" ? { type: "CONTINUE", assistance: [] }
+        : response.kind === "text" ? { type: "ANSWER", value: response.saveTo === "age" ? "34" : "Samuel", assistance: [] }
         : response.kind === "choice" ? { type: "ANSWER", value: response.options[0].value, assistance: [] }
         : response.kind === "act" ? { type: "ACT", optionId: response.options.find((option) => option.correct)!.id, assistance: [] }
         : response.kind === "practice" ? { type: "PRACTICED", assistance: [] }
-        : { type: "SAY", text: resolveSayOptions(node, state.save, context).find((option) => option.fits)!.text, mode: "typed", assistance: [] };
+        // Speaking cards offer no options: say the model answer, as Assist would give it.
+        : { type: "SAY", text: resolveSayOptions(node, state.save, context).find((option) => option.fits)?.text ?? resolveDialogueLine(node, buildSlotValues(french.slots, state.save.player.profile)).target.text, mode: "typed", assistance: [] };
       const step = stepDialogue(state.session, dialogue, input, state.save, context);
       assert.notEqual(step.result, "ignored", `${expected}.${node.id}`);
       state = step;
@@ -191,6 +193,12 @@ test("Chapter 1 can be played from start to finish through game events alone", (
   assert.equal(status(save, "cafe"), "locked");
   save = converse(save, sophie, "meetSophie");
   assert.equal(status(save, "meetSophie"), "completed");
+  assert.equal(save.player.profile.age, 34);
+  // Scene 2: the walk to the café, answering Sophie's questions on the way.
+  assert.equal(status(save, "cafe"), "locked");
+  assert.equal(questGuidance(save, quests)?.text, "Say bonjour to the shopkeeper");
+  save = converse(save, sophie, "walkToCafe");
+  assert.equal(status(save, "walkToCafe"), "completed");
   assert.equal(questGuidance(save, quests)?.text, "Go into the café");
   save = converse(save, sophie, "sophieToCafe");
 
@@ -212,7 +220,7 @@ test("Chapter 1 can be played from start to finish through game events alone", (
   // "Le quartier" waits to be started by talking to Sophie.
   save = travel(save, "leaveBakery");
   assert.equal(status(save, "neighborhood"), "available");
-  assert.deepEqual(questGuidance(save, quests), { quest: quests[3], text: "Talk to Sophie", kind: "start" });
+  assert.deepEqual(questGuidance(save, quests), { quest: quests.find((quest) => quest.id === "neighborhood"), text: "Talk to Sophie", kind: "start" });
   save = converse(save, sophie, "sophieToSquare");
   assert.equal(status(save, "neighborhood"), "active");
   save = converse(save, neighbor, "meetNeighbor");
@@ -243,8 +251,8 @@ test("Chapter 1 can be played from start to finish through game events alone", (
 
   for (const item of quests) assert.equal(status(save, item.id), "completed", item.id);
   assert.equal(questGuidance(save, quests), undefined);
-  assert.equal(save.player.xp, 130);
-  assert.equal(questLog(save, quests).length, 5);
+  assert.equal(save.player.xp, 160);
+  assert.equal(questLog(save, quests).length, 6);
 
   // After the chapter the game can explain what was met, understood and produced.
   const summary = summarizeLearning(save, chapterOneConcepts, french.vocabulary);
@@ -252,15 +260,16 @@ test("Chapter 1 can be played from start to finish through game events alone", (
   assert.equal(summary.concepts.some((entry) => entry.standing === "not-met"), false, "every Chapter 1 concept was at least met");
   assert.equal(standing.ORDER_ITEM, "independent");
   assert.equal(standing.UNDERSTAND_PRICE, "independent");
-  assert.equal(standing.INTRODUCE_SELF, "with-support", "one success is not mastery");
-  assert.equal(standing.BASIC_QUESTION, "with-support", "answered once, in Sophie's message");
+  // Name and age were retrieved several times on the walk to the café, unaided.
+  assert.equal(standing.INTRODUCE_SELF, "independent");
+  assert.equal(standing.BASIC_QUESTION, "independent", "« Ça va ? » answered on the walk and again in Sophie's message");
   assert.equal(standing.YES_NO, "with-support");
   assert.equal(summary.concepts.some((entry) => entry.producedBySpeaking > 0), false, "typing is never credited as speaking");
   assert.equal(summary.concepts.some((entry) => entry.needsPractice), false);
   const used = summary.vocabulary.filter((entry) => entry.produced > 0).map((entry) => entry.item.id);
   for (const id of ["fr.sappeler", "fr.bonjour", "fr.cafe", "fr.croissant", "fr.merci"]) assert.ok(used.includes(id), id);
   assert.ok(summary.vocabulary.length >= 15);
-  // The player said they were new (full support), then answered eight questions first try:
-  // support has stepped down once, from behaviour, and not jumped further.
-  assert.deepEqual([save.learningSupport.level, save.learningSupport.basis], ["guided", "observed"]);
+  // The player said they were new (full support), then answered every question first try,
+  // the walk to the café included: support has stepped down, from behaviour, one level at a time.
+  assert.deepEqual([save.learningSupport.level, save.learningSupport.basis], ["independent", "observed"]);
 });

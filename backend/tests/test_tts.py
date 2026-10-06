@@ -79,6 +79,8 @@ class ElevenLabsTTSProviderTests(unittest.TestCase):
         # Anyone not listed falls back to ELEVENLABS_VOICE_ID.
         self.assertEqual(provider.voice_for("fr", "neighbor"), "sophie-test-voice")
         self.assertEqual(provider.voice_for("fr", None), "sophie-test-voice")
+        # The shopkeeper on the street speaks with the baker's voice until given one.
+        self.assertEqual(provider.voice_for("fr", "shopkeeper"), "voice-b")
 
     def test_speed_is_slower_than_natural_and_keeps_the_voices_own_settings(self):
         client = self.client()
@@ -96,6 +98,22 @@ class ElevenLabsTTSProviderTests(unittest.TestCase):
 
         with patch.dict(os.environ, dict(ENVIRONMENT, ELEVENLABS_SPEED="2"), clear=False), patch("elevenlabs.client.ElevenLabs", return_value=client):
             self.assertEqual(ElevenLabsTTSProvider().speeds["normal"], 1.2, "speeds stay within what ElevenLabs accepts")
+
+    def test_a_key_without_voices_read_still_speaks_and_says_so_once(self):
+        from elevenlabs.core.api_error import ApiError
+
+        client = self.client()
+        client.voices.settings.get.side_effect = ApiError(status_code=401, body={"detail": {"code": "unauthorized", "message": "missing the permission voices_read"}})
+        with patch.dict(os.environ, ENVIRONMENT, clear=False), patch("elevenlabs.client.ElevenLabs", return_value=client):
+            provider = ElevenLabsTTSProvider()
+            with self.assertLogs("app.speech.tts", level="WARNING") as logs:
+                provider.synthesize("Bonjour.", "fr", "v", "normal")
+                provider.synthesize("Bonjour.", "fr", "other", "normal")
+            sent = client.text_to_speech.convert_with_timestamps.call_args.kwargs["voice_settings"]
+
+        self.assertEqual(sent.speed, 0.9, "the learner's speed is still sent")
+        refused = [line for line in logs.output if "Voices: Read" in line]
+        self.assertEqual(len(refused), 1, "one plain warning, not a traceback per voice")
 
     def test_words_are_timed_so_the_game_can_trace_them(self):
         text = "Je m'appelle Ella."

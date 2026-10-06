@@ -236,13 +236,13 @@ export function recordAttempt(state: PracticeState, result: PracticeResult, line
  */
 export const PRACTICE_PHRASES = {
   // The attempt was excellent (very close to Sophie's own).
-  excellent: ["Perfect!", "Beautiful!", "That was spot on!", "Excellent!", "That sounded really natural!"],
+  excellent: ["Perfect!", "Beautiful!", "That was spot on!", "Excellent!", "That sounded really natural!", "Wonderful!", "Brilliant!", "You sound like a local!"],
   // Clear enough to move on.
-  clear: ["Great!", "Very good!", "Nicely done!", "Well said!", "That was clear!"],
+  clear: ["Great!", "Very good!", "Nicely done!", "Well said!", "That was clear!", "Good job!", "Nice work!", "You got it!", "Lovely!", "That's it!"],
   // Not quite, but close.
-  close: ["So close!", "Almost there!", "Nearly!", "Really close!"],
+  close: ["So close!", "Almost there!", "Nearly!", "Really close!", "Very nearly!"],
   // Some of it came across.
-  goodTry: ["That was a good try.", "Good effort!", "Not bad at all.", "You're getting there."],
+  goodTry: ["That was a good try.", "Good effort!", "Not bad at all.", "You're getting there.", "Nice try!"],
   // Hard going: reassure.
   tricky: ["That one's tricky.", "No worries, it's a hard one.", "Don't worry, we'll get it together."],
   practisePart: ["Let's practise this part.", "Let's work on this bit.", "Try just this part.", "Let's focus on this one."],
@@ -253,6 +253,16 @@ export const PRACTICE_PHRASES = {
 } as const;
 
 export type PhraseKind = keyof typeof PRACTICE_PHRASES;
+
+/**
+ * Feedback on an answer that was understood. It moves the conversation on, so it
+ * is never discouraging: an unscored answer counts as clear, and a hard one as a good try.
+ */
+export function answerFeedbackKind(similarity: number | null | undefined): PhraseKind {
+  if (similarity === null || similarity === undefined) return "clear";
+  const kind = feedbackKind(similarity, PHRASE_PASS);
+  return kind === "tricky" ? "goodTry" : kind;
+}
 
 /** Every phrase Sophie may say, for the voice pack. */
 export const ALL_PRACTICE_PHRASES: string[] = Object.values(PRACTICE_PHRASES).flat();

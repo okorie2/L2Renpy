@@ -1,4 +1,4 @@
-import type { CharacterExpression } from "../characters/types";
+import type { CharacterExpression, Framing } from "../characters/types";
 import type { Condition } from "../core/models";
 import type { LanguageConceptId } from "../learning/models";
 
@@ -36,7 +36,15 @@ export interface ActOption {
 
 /** What the player is asked to do before the dialogue continues. */
 export type DialogueResponse =
-  | { kind: "text"; saveTo: "displayName"; label: string; placeholder?: string; note?: string }
+  | {
+      kind: "text";
+      saveTo: "displayName" | "age";
+      label: string;
+      placeholder?: string;
+      note?: string;
+      /** The keyboard to offer: a number pad for the age. */
+      inputMode?: "text" | "numeric";
+    }
   | { kind: "choice"; saveTo: "targetLanguageExperience" | "motivation"; options: ChoiceOption[] }
   | {
       /**
@@ -52,6 +60,18 @@ export type DialogueResponse =
       options?: SayOption[];
       /** Where the other speaker reacts when the meaning did not come across. */
       repairNodeId?: string;
+      /**
+       * Answer out loud only: the microphone, plus an Assist button that has the
+       * conversation partner say the answer (the node's `targetText`) to repeat.
+       * No suggestions to pick and no typing, unless the microphone can't be used.
+       */
+      speakOnly?: boolean;
+      /**
+       * The question being answered, said and shown on this same card, so asking and
+       * answering are one moment. Said by `speakerId` (default: the conversation
+       * partner); its English follows `presentation.translation`.
+       */
+      question?: { text: string; translation?: string; speakerId?: string };
     }
   | {
       /**
@@ -63,6 +83,14 @@ export type DialogueResponse =
        */
       kind: "practice";
       lines: Array<{ text: string; translation?: string }>;
+    }
+  | {
+      /**
+       * A single button to carry on, such as "Let's go" at the end of a scene. It
+       * asks for nothing and assesses nothing; the line simply waits for the tap.
+       */
+      kind: "continue";
+      label: string;
     }
   | {
       /** An in-scene action that shows understanding, such as paying the right price. */
@@ -78,6 +106,88 @@ export type DialogueEffect = { type: "GIVE_ITEM"; itemId: string; quantity?: num
 
 /** `speakerId` for lines the player says. Every other speaker is an NPC ID. */
 export const PLAYER_SPEAKER_ID = "player";
+
+export interface LinePresentation {
+  /** Semantic pose for whoever is shown; never a filename. */
+  expression?: CharacterExpression;
+  framing?: Framing;
+  /**
+   * The painted place behind the conversation, by scene ID (see content/scenes.ts).
+   * It stays until another line names a different one.
+   */
+  scene?: string;
+  /**
+   * Whose portrait is shown. Defaults to the speaker when they have one, else the
+   * conversation partner; set it on the player's reply to keep the person they answer.
+   */
+  focus?: string;
+  /**
+   * When the English appears, where the support level would show it outright:
+   * `delayed` lets the French be heard first (a question's first exposure);
+   * `on-request` keeps it behind a tap (a question the learner has met before).
+   */
+  translation?: "delayed" | "on-request";
+  /**
+   * On a street-staged dialogue: how Sophie stands while this line is said (she keeps
+   * her place on the street), and who else is there.
+   */
+  street?: {
+    pose?: StreetPose;
+    /** Who Sophie and the learner are talking with: there, close by. */
+    with?: string;
+    /**
+     * Everyone else in the shot from this line on, where they stand. Lines that don't
+     * say keep whoever was there, where they were left.
+     */
+    people?: StreetPresence[];
+  };
+}
+
+/** Where someone stands in a street shot (their places are in `STREET_PEOPLE`). */
+export type StreetSpot = "far" | "near" | "passed";
+
+/**
+ * Someone in the street shot, at one of their places, or on their way from `at` to
+ * `to` (over a walk, as the camera moves; on a card, while it is up). `wave` raises a
+ * hand, when that pose has been drawn.
+ */
+export interface StreetPresence {
+  id: string;
+  at?: StreetSpot;
+  to?: StreetSpot;
+  /** On a walk: how far through it (0–1) they set off. */
+  start?: number;
+  wave?: boolean;
+}
+
+/**
+ * Sophie's poses where she stands on the street, ahead of the camera. `glance` is
+ * looking back over her shoulder; `greeting` is waving to someone passing; the rest
+ * face the camera, for when she has stopped and turned round.
+ */
+export type StreetPose = "glance" | "greeting" | "playful" | "explaining" | "pleased";
+
+/**
+ * A moment with no words: the camera pulls back and follows Sophie from behind as she
+ * walks on, through one painted place or from one into the next. It moves on by itself.
+ */
+export interface WalkInterlude {
+  kind: "walk";
+  /**
+   * The stretches walked, in order, each in one painted place. The camera keeps its
+   * distance behind Sophie and moves into the painting from `zoom[0]` to `zoom[1]`:
+   * that is the ground she covers. One stretch dissolves into the next.
+   */
+  segments: Array<{
+    scene: string;
+    zoom: [number, number];
+    /** Who is on this stretch of street, standing in the painting or coming or going. */
+    people?: StreetPresence[];
+  }>;
+  durationMs: number;
+  /** Start close on Sophie, as on the card before, and pull back before she sets off. */
+  pullBack?: boolean;
+}
 
 export interface DialogueNode {
   id: string;
@@ -100,13 +210,15 @@ export interface DialogueNode {
    * has no translation, and is not evidence of target-language learning.
    */
   language?: "interface";
-  /** Semantic pose for the conversation partner; never a filename. */
-  presentation?: { expression?: CharacterExpression };
+  /** How the line is staged. Everything here is semantic; the UI decides how to draw it. */
+  presentation?: LinePresentation;
   /** Target-language scaffold such as "Je m'appelle ____." */
   hint?: string;
   assessment?: LineAssessment;
   response?: DialogueResponse;
   effects?: DialogueEffect[];
+  /** A walk with no words in place of a line. Such a node has empty text and no response. */
+  interlude?: WalkInterlude;
 }
 
 export interface Dialogue {
@@ -117,5 +229,11 @@ export interface Dialogue {
    * (or, in silence, read), so a scene flows without tapping "next".
    */
   autoAdvance?: boolean;
+  /**
+   * `street`: the conversation happens where the characters are, as one continuous
+   * shot: the place stays as the last walk left it and Sophie keeps her spot in it,
+   * instead of close-ups. Used for the walk to the café.
+   */
+  staging?: "street";
   nodes: Record<string, DialogueNode>;
 }

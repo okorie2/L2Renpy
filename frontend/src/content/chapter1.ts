@@ -138,7 +138,8 @@ export const chapterOneLocations: Location[] = [neighborhood, apartment, cafe, b
 
 export const chapterOneNpcs: NPC[] = [
   {
-    id: "sophie", name: "Sophie", locationId: neighborhood.id, position: streetPoint(312, 505), appearanceId: "sophie",
+    // She walks the player to the café, so she waits beside its door afterwards.
+    id: "sophie", name: "Sophie", locationId: neighborhood.id, position: streetPoint(470, 470), appearanceId: "sophie",
     persona: { role: "a friendly neighbour in her twenties who shows newcomers around", register: "informal" },
     // What Sophie says follows the quest chain; the last rule is her first meeting.
     dialogues: [
@@ -148,6 +149,8 @@ export const chapterOneNpcs: NPC[] = [
       { dialogueId: "sophieToCafe", when: [{ type: "QUEST_STATUS", questId: "cafe", status: "active" }] },
       { dialogueId: "sophieToBakery", when: [{ type: "QUEST_STATUS", questId: "bakery", status: "active" }] },
       { dialogueId: "sophieGoodbye", when: [{ type: "QUEST_STATUS", questId: "goodbye", status: "active" }] },
+      // Normally played straight after meeting her; here in case the walk was left unfinished.
+      { dialogueId: "walkToCafe", when: [{ type: "QUEST_STATUS", questId: "walkToCafe", status: "active" }] },
       { dialogueId: "sophieCatchUp", when: [{ type: "DIALOGUE_COMPLETED", dialogueId: "meetSophie" }] },
       { dialogueId: "meetSophie" }
     ],
@@ -187,6 +190,15 @@ export const chapterOneNpcs: NPC[] = [
   }
 ];
 
+/**
+ * People met in passing during a scene. They speak a line or two in a conversation
+ * but have no place in the world, so they are speakers only.
+ */
+export const chapterOneSceneSpeakers: Array<{ id: string; name: string; appearanceId: string }> = [
+  { id: "passerby", name: "Passer-by", appearanceId: "passerby" },
+  { id: "shopkeeper", name: "Shopkeeper", appearanceId: "shopkeeper" }
+];
+
 export const chapterOneItems: Item[] = [
   { id: "coffee", name: "Coffee" },
   { id: "croissant", name: "Croissant" }
@@ -206,17 +218,33 @@ export const chapterOneQuests: Quest[] = [
     prerequisites: [],
     objectives: [
       { id: "giveName", description: "Tell Sophie your name", trigger: { type: "DIALOGUE_LINE_COMPLETED", dialogueId: "meetSophie", nodeId: "askName" } },
-      { id: "introduceSelf", description: "Introduce yourself in French", trigger: { type: "INTENT_COMMUNICATED", intentId: "introduceSelf" } },
+      { id: "practiseIntroduction", description: "Practise introducing yourself in French", trigger: { type: "DIALOGUE_LINE_COMPLETED", dialogueId: "meetSophie", nodeId: "practice" } },
       { id: "hearPlan", description: "Hear Sophie's plan", trigger: { type: "DIALOGUE_COMPLETED", dialogueId: "meetSophie" } }
     ],
     rewards: [{ type: "XP", amount: 20 }]
+  },
+  {
+    // Goal 1, Scene 2: the first retrieval scene, on the way from the park to the café.
+    id: "walkToCafe",
+    chapter: 1,
+    title: "En route",
+    summary: "Walk to the café with Sophie and answer her questions in French.",
+    prerequisites: ["meetSophie"],
+    objectives: [
+      { id: "greetShopkeeper", description: "Say bonjour to the shopkeeper", trigger: { type: "DIALOGUE_LINE_COMPLETED", dialogueId: "walkToCafe", nodeId: "greetShopkeeper" } },
+      { id: "answerCaVa", description: "Answer « Ça va ? »", trigger: { type: "DIALOGUE_LINE_COMPLETED", dialogueId: "walkToCafe", nodeId: "caVaAnswer" } },
+      { id: "answerAge", description: "Answer « Tu as quel âge ? »", trigger: { type: "INTENT_COMMUNICATED", intentId: "tellAge" } },
+      { id: "answerName", description: "Answer « Comment tu t'appelles ? »", trigger: { type: "DIALOGUE_LINE_COMPLETED", dialogueId: "walkToCafe", nodeId: "miniNameAnswer" } },
+      { id: "arrive", description: "Arrive at the café", trigger: { type: "DIALOGUE_COMPLETED", dialogueId: "walkToCafe" } }
+    ],
+    rewards: [{ type: "XP", amount: 30 }]
   },
   {
     id: "cafe",
     chapter: 1,
     title: "Un café",
     summary: "Order your first coffee in French.",
-    prerequisites: ["meetSophie"],
+    prerequisites: ["walkToCafe"],
     objectives: [
       { id: "enterCafe", description: "Go into the café", trigger: { type: "LOCATION_ENTERED", locationId: "cafe" } },
       { id: "greetBarista", description: "Greet the barista", trigger: { type: "INTENT_COMMUNICATED", intentId: "greet" }, requires: { locationId: "cafe" } },

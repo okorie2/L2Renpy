@@ -1,6 +1,7 @@
 import { PLAYER_SPEAKER_ID } from "../../dialogue/models";
 import { CONCEPT_IDS } from "../../learning/models";
 import type { LanguagePack } from "../types";
+import { englishNumber, frenchNumber } from "./numbers";
 
 export const french: LanguagePack = {
   code: "fr",
@@ -14,8 +15,8 @@ export const french: LanguagePack = {
   conceptExpressions: {
     [CONCEPT_IDS.GREETING]: ["Salut !", "Bonjour !"],
     [CONCEPT_IDS.FAREWELL]: ["Au revoir !", "À bientôt !", "Bonne journée !"],
-    [CONCEPT_IDS.INTRODUCE_SELF]: ["Je m'appelle…", "Moi, c'est…"],
-    [CONCEPT_IDS.BASIC_QUESTION]: ["Comment tu t'appelles ?", "Vous désirez ?", "Ça va ?"],
+    [CONCEPT_IDS.INTRODUCE_SELF]: ["Je m'appelle…", "Moi, c'est…", "J'ai … ans."],
+    [CONCEPT_IDS.BASIC_QUESTION]: ["Comment tu t'appelles ?", "Tu as quel âge ?", "Ça va ?", "Vous désirez ?"],
     [CONCEPT_IDS.YES_NO]: ["Oui.", "Non."],
     [CONCEPT_IDS.POLITE_REQUEST]: ["S'il vous plaît."],
     [CONCEPT_IDS.THANK_PERSON]: ["Merci !"],
@@ -28,7 +29,7 @@ export const french: LanguagePack = {
       id: "fr.salut", lemma: "salut", surfaceForms: ["salut"], gloss: "hi", partOfSpeech: "interjection",
       conceptIds: [CONCEPT_IDS.GREETING],
       examples: [{ target: "Salut ! Ça va ?", translation: "Hi! How's it going?" }],
-      introducedIn: { chapter: 1, dialogueId: "meetSophie" }
+      introducedIn: { chapter: 1, dialogueId: "sophieCatchUp" }
     },
     {
       id: "fr.sappeler", lemma: "s'appeler", surfaceForms: ["je m'appelle", "tu t'appelles"], gloss: "to be called", partOfSpeech: "verb",
@@ -37,16 +38,10 @@ export const french: LanguagePack = {
       introducedIn: { chapter: 1, dialogueId: "meetSophie" }
     },
     {
-      id: "fr.enchante", lemma: "enchanté", surfaceForms: ["enchanté", "enchantée"], gloss: "nice to meet you", partOfSpeech: "adjective",
-      conceptIds: [CONCEPT_IDS.GREETING],
-      examples: [{ target: "Enchantée !", translation: "Nice to meet you!" }],
-      introducedIn: { chapter: 1, dialogueId: "meetSophie" }
-    },
-    {
       id: "fr.pardon", lemma: "pardon", surfaceForms: ["pardon"], gloss: "sorry? / excuse me", partOfSpeech: "interjection",
       conceptIds: [CONCEPT_IDS.BASIC_QUESTION],
       examples: [{ target: "Pardon ?", translation: "Sorry?" }],
-      introducedIn: { chapter: 1, dialogueId: "meetSophie" }
+      introducedIn: { chapter: 1, dialogueId: "sophieMessage" }
     },
     {
       id: "fr.cafe", lemma: "café", surfaceForms: ["café"], gloss: "coffee; café", partOfSpeech: "noun",
@@ -58,7 +53,7 @@ export const french: LanguagePack = {
       id: "fr.bonjour", lemma: "bonjour", surfaceForms: ["bonjour"], gloss: "hello", partOfSpeech: "interjection",
       conceptIds: [CONCEPT_IDS.GREETING],
       examples: [{ target: "Bonjour ! Vous désirez ?", translation: "Hello! What would you like?" }],
-      introducedIn: { chapter: 1, dialogueId: "cafeOrder" }
+      introducedIn: { chapter: 1, dialogueId: "walkToCafe" }
     },
     {
       id: "fr.desirer", lemma: "désirer", surfaceForms: ["vous désirez"], gloss: "to want (what would you like?)", partOfSpeech: "verb",
@@ -130,7 +125,25 @@ export const french: LanguagePack = {
       id: "fr.cava", lemma: "ça va", surfaceForms: ["ça va"], gloss: "how's it going? / I'm fine", partOfSpeech: "phrase",
       conceptIds: [CONCEPT_IDS.GREETING, CONCEPT_IDS.BASIC_QUESTION],
       examples: [{ target: "Salut ! Ça va ?", translation: "Hi! How's it going?" }],
-      introducedIn: { chapter: 1, dialogueId: "sophieAfterErrands" }
+      introducedIn: { chapter: 1, dialogueId: "walkToCafe" }
+    },
+    {
+      id: "fr.bien", lemma: "bien", surfaceForms: ["bien"], gloss: "well; good", partOfSpeech: "interjection",
+      conceptIds: [CONCEPT_IDS.BASIC_QUESTION],
+      examples: [{ target: "Ça va bien.", translation: "I'm good." }],
+      introducedIn: { chapter: 1, dialogueId: "walkToCafe" }
+    },
+    {
+      id: "fr.quelage", lemma: "quel âge", surfaceForms: ["quel âge"], gloss: "how old", partOfSpeech: "phrase",
+      conceptIds: [CONCEPT_IDS.BASIC_QUESTION],
+      examples: [{ target: "Tu as quel âge ?", translation: "How old are you?" }],
+      introducedIn: { chapter: 1, dialogueId: "walkToCafe" }
+    },
+    {
+      id: "fr.ans", lemma: "an", surfaceForms: ["ans"], gloss: "years (of age)", partOfSpeech: "noun",
+      conceptIds: [CONCEPT_IDS.INTRODUCE_SELF],
+      examples: [{ target: "J'ai vingt ans.", translation: "I'm twenty years old." }],
+      introducedIn: { chapter: 1, dialogueId: "walkToCafe" }
     },
     {
       id: "fr.abientot", lemma: "à bientôt", surfaceForms: ["à bientôt"], gloss: "see you soon", partOfSpeech: "phrase",
@@ -169,6 +182,24 @@ export const french: LanguagePack = {
       meaning: "Say what their own name is, in a sentence.",
       acceptedExpressions: ["Je m'appelle…", "Moi, c'est…", "Je suis…"],
       match: [["je m'appelle"], ["moi c'est"], ["je suis"], ["mon nom est"]]
+    },
+    tellAge: {
+      id: "tellAge",
+      conceptId: CONCEPT_IDS.INTRODUCE_SELF,
+      modality: "speaking",
+      prompt: "Dis ton âge.",
+      meaning: "Say how old they are, in a sentence such as « J'ai … ans ». Any age counts; the number is not checked.",
+      acceptedExpressions: ["J'ai vingt ans.", "J'ai 30 ans."],
+      match: [["ans"], ["j'ai"]]
+    },
+    answerCaVa: {
+      id: "answerCaVa",
+      conceptId: CONCEPT_IDS.BASIC_QUESTION,
+      modality: "speaking",
+      prompt: "Réponds à « Ça va ? ».",
+      meaning: "Answer the question \"how are you?\" (fine, well, not great, and so on).",
+      acceptedExpressions: ["Ça va bien.", "Ça va.", "Très bien !"],
+      match: [["ça va"], ["bien"], ["pas mal"], ["super"]]
     },
     greet: {
       id: "greet",
@@ -227,6 +258,13 @@ export const french: LanguagePack = {
   },
   slots: {
     playerName: { source: "profile", field: "displayName", fallback: { target: "toi", translation: "you" } },
+    // Written out in words, as in the Ren'Py prototype: "J'ai vingt-neuf ans."
+    playerAge: {
+      source: "profile-number",
+      field: "age",
+      spell: (age) => ({ target: frenchNumber(age), translation: englishNumber(age) }),
+      fallback: { target: "…", translation: "…" }
+    },
     motivationPhrase: {
       source: "profile-lookup",
       field: "motivation",
@@ -309,15 +347,31 @@ export const french: LanguagePack = {
           speakerId: "sophie",
           language: "interface",
           targetText: "Nice to meet you, {playerName}!",
-          nextNodeId: "askExperience",
+          nextNodeId: "askAge",
           conceptIds: [],
           presentation: { expression: "excellent" }
+        },
+        askAge: {
+          id: "askAge",
+          speakerId: "sophie",
+          language: "interface",
+          targetText: "And how old are you?",
+          nextNodeId: "askExperience",
+          conceptIds: [],
+          presentation: { expression: "question" },
+          response: {
+            kind: "text",
+            saveTo: "age",
+            label: "Your age",
+            inputMode: "numeric",
+            note: "Just a number, to practise with. It stays on this device."
+          }
         },
         askExperience: {
           id: "askExperience",
           speakerId: "sophie",
           language: "interface",
-          targetText: "First, how much French do you already know?",
+          targetText: "Great! And how much French do you already know?",
           nextNodeId: "askMotivation",
           conceptIds: [],
           presentation: { expression: "question" },
@@ -372,8 +426,8 @@ export const french: LanguagePack = {
         example: {
           id: "example",
           speakerId: "sophie",
-          targetText: "Je m'appelle {playerName}.\n{motivationSentence}\n{levelSentence}",
-          translation: "My name is {playerName}.\n{motivationSentence}\n{levelSentence}",
+          targetText: "Je m'appelle {playerName}.\nJ'ai {playerAge} ans.\n{motivationSentence}\n{levelSentence}",
+          translation: "My name is {playerName}.\nI am {playerAge} years old.\n{motivationSentence}\n{levelSentence}",
           nextNodeId: "mouthful",
           conceptIds: [CONCEPT_IDS.INTRODUCE_SELF],
           presentation: { expression: "speaking-french" }
@@ -399,9 +453,9 @@ export const french: LanguagePack = {
         practice: {
           id: "practice",
           speakerId: PLAYER_SPEAKER_ID,
-          targetText: "Je m'appelle {playerName}.\n{motivationSentence}\n{levelSentence}",
-          translation: "My name is {playerName}.\n{motivationSentence}\n{levelSentence}",
-          nextNodeId: "hello2",
+          targetText: "Je m'appelle {playerName}.\nJ'ai {playerAge} ans.\n{motivationSentence}\n{levelSentence}",
+          translation: "My name is {playerName}.\nI am {playerAge} years old.\n{motivationSentence}\n{levelSentence}",
+          nextNodeId: "letsGo",
           conceptIds: [CONCEPT_IDS.INTRODUCE_SELF],
           presentation: { expression: "encouraging" },
           assessment: { excludedSpans: ["playerName"] },
@@ -409,66 +463,567 @@ export const french: LanguagePack = {
             kind: "practice",
             lines: [
               { text: "Je m'appelle {playerName}.", translation: "My name is {playerName}." },
+              { text: "J'ai {playerAge} ans.", translation: "I am {playerAge} years old." },
               { text: "{motivationSentence}", translation: "{motivationSentence}" },
               { text: "{levelSentence}", translation: "{levelSentence}" }
             ]
           }
         },
-        hello2: {
-          id: "hello2",
+        // Practice done, Sophie turns toward the park gate: on to Scene 2, the walk to the café.
+        letsGo: {
+          id: "letsGo",
           speakerId: "sophie",
-          targetText: "Salut ! Je m'appelle Sophie. Et toi ?",
-          translation: "Hi! My name is Sophie. And you?",
-          nextNodeId: "yourTurn",
-          conceptIds: [CONCEPT_IDS.GREETING, CONCEPT_IDS.INTRODUCE_SELF, CONCEPT_IDS.BASIC_QUESTION],
-          presentation: { expression: "speaking-french" }
+          language: "interface",
+          targetText: "Ready? Let's go get something to drink.",
+          conceptIds: [],
+          presentation: { expression: "inviting", framing: "wide", scene: "park" },
+          response: { kind: "continue", label: "Let's go" }
+        }
+      }
+    },
+    // Goal 1, Scene 2: the walk from the park to the café. The first retrieval scene:
+    // Sophie asks for what Scene 1 taught, in a conversation rather than a quiz.
+    // See docs/SCENE-2-WALK-TO-CAFE.md. Everything is framed wide, so the street shows.
+    walkToCafe: {
+      id: "walkToCafe",
+      startNodeId: "walkOut",
+      autoAdvance: true,
+      // One continuous shot on the street: Sophie stops where she is and looks back to talk.
+      staging: "street",
+      nodes: {
+        // Beat 1: leaving the park. The camera pulls back from Sophie and follows her out.
+        walkOut: {
+          id: "walkOut",
+          speakerId: "sophie",
+          language: "interface",
+          targetText: "",
+          nextNodeId: "learned",
+          conceptIds: [],
+          presentation: { scene: "park-exit" },
+          interlude: { kind: "walk", segments: [{ scene: "park", zoom: [1, 1.3] }, { scene: "park-exit", zoom: [1, 1.3] }], durationMs: 7500 }
         },
-        yourTurn: {
-          id: "yourTurn",
+        learned: {
+          id: "learned",
+          speakerId: "sophie",
+          language: "interface",
+          targetText: "You've already learned quite a bit about introducing yourself.",
+          nextNodeId: "remember",
+          conceptIds: [],
+          presentation: { expression: "explaining", framing: "wide", scene: "park-exit" }
+        },
+        remember: {
+          id: "remember",
+          speakerId: "sophie",
+          language: "interface",
+          targetText: "Let's see what you remember on the way.",
+          nextNodeId: "walkIntoTown",
+          conceptIds: [],
+          presentation: { expression: "glance", framing: "wide" }
+        },
+        // A few seconds of walking, with no questions yet.
+        walkIntoTown: {
+          id: "walkIntoTown",
+          speakerId: "sophie",
+          language: "interface",
+          targetText: "",
+          nextNodeId: "ifIAsk",
+          conceptIds: [],
+          presentation: { scene: "lyon-route" },
+          interlude: { kind: "walk", segments: [{ scene: "park-exit", zoom: [1.3, 1.7] }, { scene: "lyon-route", zoom: [1, 1.2], people: [{ id: "passerby", at: "far" }, { id: "shopkeeper" }] }], durationMs: 6500 }
+        },
+        // Beat 2: the first question, the name.
+        ifIAsk: {
+          id: "ifIAsk",
+          speakerId: "sophie",
+          language: "interface",
+          targetText: "How do you respond to this?",
+          nextNodeId: "nameAnswer",
+          conceptIds: [],
+          presentation: { expression: "question", framing: "wide", scene: "lyon-route" }
+        },
+        nameAnswer: {
+          id: "nameAnswer",
           speakerId: PLAYER_SPEAKER_ID,
           targetText: "Je m'appelle {playerName}.",
           translation: "My name is {playerName}.",
-          nextNodeId: "niceToMeet",
+          nextNodeId: "peopleOnStreet",
           conceptIds: [CONCEPT_IDS.INTRODUCE_SELF],
-          presentation: { expression: "listening" },
+          presentation: { expression: "listening", framing: "wide", translation: "delayed" },
           hint: "Je m'appelle ____.",
           assessment: { excludedSpans: ["playerName"] },
           response: {
             kind: "say",
-            exerciseId: "ch1-introduce-self-001",
+            exerciseId: "ch1-walk-name-001",
             intentId: "introduceSelf",
-            prompt: "Now in French: tell Sophie your name.",
-            options: [
-              { id: "introduce", text: "Je m'appelle {playerName}.", translation: "My name is {playerName}." },
-              { id: "goodbye", text: "Merci, au revoir !", translation: "Thank you, goodbye!" }
-            ],
-            repairNodeId: "repairIntroduction"
+            prompt: "Answer out loud.",
+            speakOnly: true,
+            question: { text: "Comment tu t'appelles ?", translation: "What's your name?" },
+            repairNodeId: "tryAgain"
           }
         },
-        repairIntroduction: {
-          id: "repairIntroduction",
+        // Shared by the speaking cards: Sophie encourages, then the same card comes back.
+        tryAgain: {
+          id: "tryAgain",
           speakerId: "sophie",
-          targetText: "Pardon ? Comment tu t'appelles ?",
-          translation: "Sorry? What's your name?",
-          conceptIds: [CONCEPT_IDS.INTRODUCE_SELF, CONCEPT_IDS.BASIC_QUESTION],
-          presentation: { expression: "confused" }
-        },
-        niceToMeet: {
-          id: "niceToMeet",
-          speakerId: "sophie",
-          targetText: "Enchantée, {playerName} !",
-          translation: "Nice to meet you, {playerName}!",
-          nextNodeId: "invitation",
-          conceptIds: [CONCEPT_IDS.GREETING],
-          presentation: { expression: "pleased" }
-        },
-        invitation: {
-          id: "invitation",
-          speakerId: "sophie",
-          targetText: "Allez, viens ! Je vais te montrer le quartier.",
-          translation: "Come on! I'll show you the neighborhood.",
+          language: "interface",
+          targetText: "Almost. Listen once more.",
           conceptIds: [],
-          presentation: { expression: "inviting" }
+          presentation: { expression: "encouraging", framing: "wide" }
+        },
+        // Someone is coming up the street, and the shopkeeper is outside her shop: seen
+        // from here, far off, and closer with every step.
+        peopleOnStreet: {
+          id: "peopleOnStreet",
+          speakerId: "sophie",
+          language: "interface",
+          targetText: "There are people on the street. Let's interact with them.",
+          nextNodeId: "walkToShops",
+          conceptIds: [],
+          presentation: { expression: "pleased", framing: "wide" }
+        },
+        walkToShops: {
+          id: "walkToShops",
+          speakerId: "sophie",
+          language: "interface",
+          targetText: "",
+          nextNodeId: "passerbyHello",
+          conceptIds: [],
+          presentation: { scene: "lyon-route" },
+          interlude: { kind: "walk", segments: [{ scene: "lyon-route", zoom: [1.2, 1.45], people: [{ id: "passerby", at: "far", to: "near" }, { id: "shopkeeper" }] }], durationMs: 4500 }
+        },
+        // Beat 3: a greeting in passing. Bonjour is not translated: it is known by now.
+        passerbyHello: {
+          id: "passerbyHello",
+          speakerId: "passerby",
+          targetText: "Bonjour !",
+          nextNodeId: "sophieHello",
+          conceptIds: [CONCEPT_IDS.GREETING],
+          presentation: { expression: "neutral", framing: "wide", street: { with: "passerby", people: [{ id: "passerby", wave: true }, { id: "shopkeeper" }] } }
+        },
+        sophieHello: {
+          id: "sophieHello",
+          speakerId: "sophie",
+          targetText: "Bonjour !",
+          nextNodeId: "yourTurnNext",
+          conceptIds: [CONCEPT_IDS.GREETING],
+          presentation: { expression: "greeting", framing: "wide", street: { pose: "greeting", with: "passerby" } }
+        },
+        yourTurnNext: {
+          id: "yourTurnNext",
+          speakerId: "sophie",
+          language: "interface",
+          targetText: "Your turn next time.",
+          nextNodeId: "walkToShopkeeper",
+          conceptIds: [],
+          // The passer-by walks on, past the camera.
+          presentation: { expression: "glance", framing: "wide", street: { people: [{ id: "passerby", at: "near", to: "passed" }, { id: "shopkeeper" }] } }
+        },
+        walkToShopkeeper: {
+          id: "walkToShopkeeper",
+          speakerId: "sophie",
+          language: "interface",
+          targetText: "",
+          nextNodeId: "greetShopkeeper",
+          conceptIds: [],
+          presentation: { scene: "lyon-route" },
+          interlude: { kind: "walk", segments: [{ scene: "lyon-route", zoom: [1.45, 1.7], people: [{ id: "shopkeeper" }] }], durationMs: 3800 }
+        },
+        greetShopkeeper: {
+          id: "greetShopkeeper",
+          speakerId: PLAYER_SPEAKER_ID,
+          targetText: "Bonjour !",
+          nextNodeId: "parfait",
+          conceptIds: [CONCEPT_IDS.GREETING],
+          presentation: { expression: "neutral", framing: "wide", focus: "shopkeeper", street: { with: "shopkeeper", people: [{ id: "shopkeeper", wave: true }] } },
+          response: {
+            kind: "say",
+            exerciseId: "ch1-walk-greet-001",
+            intentId: "greet",
+            prompt: "Answer out loud.",
+            speakOnly: true,
+            question: { text: "Bonjour !", speakerId: "shopkeeper" },
+            repairNodeId: "tryAgain"
+          }
+        },
+        parfait: {
+          id: "parfait",
+          speakerId: "sophie",
+          targetText: "Parfait.",
+          translation: "Perfect.",
+          nextNodeId: "walkOn",
+          conceptIds: [],
+          presentation: { expression: "pleased", framing: "wide" }
+        },
+        // Beat 4: a new question, ça va.
+        walkOn: {
+          id: "walkOn",
+          speakerId: "sophie",
+          language: "interface",
+          targetText: "",
+          nextNodeId: "anotherQuestion",
+          conceptIds: [],
+          presentation: { scene: "lyon-route" },
+          interlude: { kind: "walk", segments: [{ scene: "lyon-route", zoom: [1.7, 1.85], people: [{ id: "shopkeeper", to: "passed", start: 0.3 }] }], durationMs: 4200 }
+        },
+        anotherQuestion: {
+          id: "anotherQuestion",
+          speakerId: "sophie",
+          language: "interface",
+          targetText: "There's another question you'll hear all the time.",
+          nextNodeId: "caVaIntro",
+          conceptIds: [],
+          presentation: { expression: "explaining", framing: "wide" }
+        },
+        caVaIntro: {
+          id: "caVaIntro",
+          speakerId: "sophie",
+          targetText: "Ça va ?",
+          translation: "How are you? / Are you okay?",
+          nextNodeId: "notWordForWord",
+          conceptIds: [CONCEPT_IDS.BASIC_QUESTION],
+          presentation: { expression: "question", framing: "wide", translation: "delayed" }
+        },
+        notWordForWord: {
+          id: "notWordForWord",
+          speakerId: "sophie",
+          language: "interface",
+          targetText: "It's one of those expressions that doesn't translate perfectly word for word.",
+          nextNodeId: "casual",
+          conceptIds: [],
+          presentation: { expression: "explaining", framing: "wide" }
+        },
+        casual: {
+          id: "casual",
+          speakerId: "sophie",
+          language: "interface",
+          targetText: "For now, just remember it as a casual 'How are you?'",
+          nextNodeId: "caVaListen",
+          conceptIds: [],
+          presentation: { expression: "explaining", framing: "wide" }
+        },
+        // Listen only: nothing to say yet.
+        caVaListen: {
+          id: "caVaListen",
+          speakerId: "sophie",
+          targetText: "Ça va ?",
+          translation: "How are you?",
+          nextNodeId: "easyAnswer",
+          conceptIds: [CONCEPT_IDS.BASIC_QUESTION],
+          presentation: { expression: "question", framing: "wide" }
+        },
+        easyAnswer: {
+          id: "easyAnswer",
+          speakerId: "sophie",
+          language: "interface",
+          targetText: "And an easy answer is…",
+          nextNodeId: "caVaBien",
+          conceptIds: [],
+          presentation: { expression: "explaining", framing: "wide" }
+        },
+        caVaBien: {
+          id: "caVaBien",
+          speakerId: "sophie",
+          targetText: "Ça va bien.",
+          translation: "I'm good.",
+          nextNodeId: "yourTurnCaVa",
+          conceptIds: [CONCEPT_IDS.BASIC_QUESTION],
+          presentation: { expression: "pleased", framing: "wide", translation: "delayed" }
+        },
+        yourTurnCaVa: {
+          id: "yourTurnCaVa",
+          speakerId: "sophie",
+          language: "interface",
+          targetText: "Your turn.",
+          nextNodeId: "caVaAnswer",
+          conceptIds: [],
+          presentation: { expression: "listening", framing: "wide" }
+        },
+        caVaAnswer: {
+          id: "caVaAnswer",
+          speakerId: PLAYER_SPEAKER_ID,
+          targetText: "Ça va bien.",
+          translation: "I'm good.",
+          nextNodeId: "tresBien",
+          conceptIds: [CONCEPT_IDS.BASIC_QUESTION],
+          presentation: { expression: "listening", framing: "wide" },
+          hint: "Ça va ____.",
+          response: {
+            kind: "say",
+            exerciseId: "ch1-walk-cava-001",
+            intentId: "answerCaVa",
+            prompt: "Answer out loud.",
+            speakOnly: true,
+            question: { text: "Ça va ?", translation: "How are you?" },
+            repairNodeId: "tryAgain"
+          }
+        },
+        // Exposure only: "très bien" is not tested in this scene.
+        tresBien: {
+          id: "tresBien",
+          speakerId: "sophie",
+          targetText: "Très bien.",
+          translation: "Very good.",
+          nextNodeId: "caVaCheckAnswer",
+          conceptIds: [],
+          presentation: { expression: "pleased", framing: "wide" }
+        },
+        caVaCheckAnswer: {
+          id: "caVaCheckAnswer",
+          speakerId: PLAYER_SPEAKER_ID,
+          targetText: "Ça va bien.",
+          translation: "I'm good.",
+          nextNodeId: "bien",
+          conceptIds: [CONCEPT_IDS.BASIC_QUESTION],
+          presentation: { expression: "glance", framing: "wide", translation: "on-request" },
+          hint: "Ça va ____.",
+          response: {
+            kind: "say",
+            exerciseId: "ch1-walk-cava-002",
+            intentId: "answerCaVa",
+            prompt: "Answer out loud.",
+            speakOnly: true,
+            question: { text: "Ça va ?", translation: "How are you?" },
+            repairNodeId: "tryAgain"
+          }
+        },
+        bien: {
+          id: "bien",
+          speakerId: "sophie",
+          targetText: "Bien.",
+          translation: "Good.",
+          nextNodeId: "walkNearer",
+          conceptIds: [],
+          presentation: { expression: "pleased", framing: "wide" }
+        },
+        walkNearer: {
+          id: "walkNearer",
+          speakerId: "sophie",
+          language: "interface",
+          targetText: "",
+          nextNodeId: "oneMore",
+          conceptIds: [],
+          presentation: { scene: "lyon-route" },
+          interlude: { kind: "walk", segments: [{ scene: "lyon-route", zoom: [1.85, 2] }], durationMs: 4200 }
+        },
+        // Beat 6: the second major retrieval, the age.
+        oneMore: {
+          id: "oneMore",
+          speakerId: "sophie",
+          language: "interface",
+          targetText: "One more before we get there.",
+          nextNodeId: "ageAnswer",
+          conceptIds: [],
+          presentation: { expression: "glance", framing: "wide" }
+        },
+        ageAnswer: {
+          id: "ageAnswer",
+          speakerId: PLAYER_SPEAKER_ID,
+          targetText: "J'ai {playerAge} ans.",
+          translation: "I'm {playerAge} years old.",
+          nextNodeId: "ageExactly",
+          conceptIds: [CONCEPT_IDS.INTRODUCE_SELF],
+          presentation: { expression: "listening", framing: "wide", translation: "delayed" },
+          hint: "J'ai ____ ans.",
+          assessment: { excludedSpans: ["playerAge"] },
+          response: {
+            kind: "say",
+            exerciseId: "ch1-walk-age-001",
+            intentId: "tellAge",
+            prompt: "Answer out loud.",
+            speakOnly: true,
+            question: { text: "Tu as quel âge ?", translation: "How old are you?" },
+            repairNodeId: "tryAgain"
+          }
+        },
+        ageExactly: {
+          id: "ageExactly",
+          speakerId: "sophie",
+          language: "interface",
+          targetText: "Exactly.",
+          nextNodeId: "agePair",
+          conceptIds: [],
+          presentation: { expression: "pleased", framing: "wide" }
+        },
+        agePair: {
+          id: "agePair",
+          speakerId: "sophie",
+          targetText: "Tu as quel âge ? — J'ai {playerAge} ans.",
+          translation: "How old are you? — I'm {playerAge} years old.",
+          nextNodeId: "tinyConversation",
+          conceptIds: [CONCEPT_IDS.BASIC_QUESTION, CONCEPT_IDS.INTRODUCE_SELF],
+          presentation: { expression: "explaining", framing: "wide" }
+        },
+        // Beat 7: the questions mixed, French only unless help is asked for.
+        tinyConversation: {
+          id: "tinyConversation",
+          speakerId: "sophie",
+          language: "interface",
+          targetText: "Okay. Tiny conversation. No English unless you ask for help.",
+          nextNodeId: "miniHelloAnswer",
+          conceptIds: [],
+          presentation: { expression: "explaining", framing: "wide" }
+        },
+        miniHelloAnswer: {
+          id: "miniHelloAnswer",
+          speakerId: PLAYER_SPEAKER_ID,
+          targetText: "Bonjour !",
+          translation: "Hello!",
+          nextNodeId: "miniCaVaAnswer",
+          conceptIds: [CONCEPT_IDS.GREETING],
+          presentation: { expression: "listening", framing: "wide", translation: "on-request" },
+          response: {
+            kind: "say",
+            exerciseId: "ch1-walk-mini-001",
+            intentId: "greet",
+            prompt: "Answer out loud.",
+            speakOnly: true,
+            question: { text: "Bonjour !", translation: "Hello!" },
+            repairNodeId: "pardon"
+          }
+        },
+        // In the mini-conversation a miss gets a French "Sorry?", as in a real conversation.
+        pardon: {
+          id: "pardon",
+          speakerId: "sophie",
+          targetText: "Pardon ?",
+          translation: "Sorry?",
+          conceptIds: [CONCEPT_IDS.BASIC_QUESTION],
+          presentation: { expression: "question", framing: "wide" }
+        },
+        miniCaVaAnswer: {
+          id: "miniCaVaAnswer",
+          speakerId: PLAYER_SPEAKER_ID,
+          targetText: "Ça va bien.",
+          translation: "I'm good.",
+          nextNodeId: "miniNameAnswer",
+          conceptIds: [CONCEPT_IDS.BASIC_QUESTION],
+          presentation: { expression: "listening", framing: "wide", translation: "on-request" },
+          hint: "Ça va ____.",
+          response: {
+            kind: "say",
+            exerciseId: "ch1-walk-mini-002",
+            intentId: "answerCaVa",
+            prompt: "Answer out loud.",
+            speakOnly: true,
+            question: { text: "Ça va ?", translation: "How are you?" },
+            repairNodeId: "pardon"
+          }
+        },
+        miniNameAnswer: {
+          id: "miniNameAnswer",
+          speakerId: PLAYER_SPEAKER_ID,
+          targetText: "Je m'appelle {playerName}.",
+          translation: "My name is {playerName}.",
+          nextNodeId: "miniAgeAnswer",
+          conceptIds: [CONCEPT_IDS.INTRODUCE_SELF],
+          presentation: { expression: "listening", framing: "wide", translation: "on-request" },
+          hint: "Je m'appelle ____.",
+          assessment: { excludedSpans: ["playerName"] },
+          response: {
+            kind: "say",
+            exerciseId: "ch1-walk-mini-003",
+            intentId: "introduceSelf",
+            prompt: "Answer out loud.",
+            speakOnly: true,
+            question: { text: "Comment tu t'appelles ?", translation: "What's your name?" },
+            repairNodeId: "pardon"
+          }
+        },
+        miniAgeAnswer: {
+          id: "miniAgeAnswer",
+          speakerId: PLAYER_SPEAKER_ID,
+          targetText: "J'ai {playerAge} ans.",
+          translation: "I'm {playerAge} years old.",
+          nextNodeId: "thatWasAConversation",
+          conceptIds: [CONCEPT_IDS.INTRODUCE_SELF],
+          presentation: { expression: "listening", framing: "wide", translation: "on-request" },
+          hint: "J'ai ____ ans.",
+          assessment: { excludedSpans: ["playerAge"] },
+          response: {
+            kind: "say",
+            exerciseId: "ch1-walk-mini-004",
+            intentId: "tellAge",
+            prompt: "Answer out loud.",
+            speakOnly: true,
+            question: { text: "Tu as quel âge ?", translation: "How old are you?" },
+            repairNodeId: "pardon"
+          }
+        },
+        thatWasAConversation: {
+          id: "thatWasAConversation",
+          speakerId: "sophie",
+          language: "interface",
+          targetText: "Look at that. That was a conversation.",
+          nextNodeId: "noTranslating",
+          conceptIds: [],
+          presentation: { expression: "proud", framing: "wide" }
+        },
+        noTranslating: {
+          id: "noTranslating",
+          speakerId: "sophie",
+          language: "interface",
+          targetText: "You didn't need to translate every word first.",
+          nextNodeId: "whatWeWant",
+          conceptIds: [],
+          presentation: { expression: "pleased", framing: "wide" }
+        },
+        whatWeWant: {
+          id: "whatWeWant",
+          speakerId: "sophie",
+          language: "interface",
+          targetText: "That's exactly what we want.",
+          nextNodeId: "walkToCafeDoor",
+          conceptIds: [],
+          presentation: { expression: "pleased", framing: "wide" }
+        },
+        // The last stretch: the street gives way to the café as the camera comes up to it.
+        walkToCafeDoor: {
+          id: "walkToCafeDoor",
+          speakerId: "sophie",
+          language: "interface",
+          targetText: "",
+          nextNodeId: "weAreHere",
+          conceptIds: [],
+          presentation: { scene: "cafe-exterior" },
+          interlude: { kind: "walk", segments: [{ scene: "lyon-route", zoom: [2, 2.15] }, { scene: "cafe-exterior", zoom: [1, 1.25] }], durationMs: 7000 }
+        },
+        // Beat 8: the café.
+        weAreHere: {
+          id: "weAreHere",
+          speakerId: "sophie",
+          language: "interface",
+          targetText: "We're here.",
+          nextNodeId: "someoneInside",
+          conceptIds: [],
+          presentation: { expression: "playful", framing: "wide", scene: "cafe-exterior", street: { pose: "playful" } }
+        },
+        someoneInside: {
+          id: "someoneInside",
+          speakerId: "sophie",
+          language: "interface",
+          targetText: "There's someone inside I want you to meet.",
+          nextNodeId: "askYourName",
+          conceptIds: [],
+          presentation: { expression: "explaining", framing: "wide", street: { pose: "explaining" } }
+        },
+        askYourName: {
+          id: "askYourName",
+          speakerId: "sophie",
+          language: "interface",
+          targetText: "And I have a feeling they're going to ask your name.",
+          nextNodeId: "ready",
+          conceptIds: [],
+          presentation: { expression: "glance", framing: "wide", street: { pose: "pleased" } }
+        },
+        // "Prêt ? / Prête ?" would need the learner's gender, so Sophie asks in English.
+        ready: {
+          id: "ready",
+          speakerId: "sophie",
+          language: "interface",
+          targetText: "Ready?",
+          conceptIds: [],
+          presentation: { expression: "playful", framing: "wide", street: { pose: "playful" } },
+          response: { kind: "continue", label: "Let's go in" }
         }
       }
     },

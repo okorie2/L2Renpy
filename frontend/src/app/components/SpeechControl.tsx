@@ -1,4 +1,5 @@
-import { useEffect, useReducer, useRef } from "react";
+import { useEffect, useReducer, useRef, useState } from "react";
+import type { PronunciationDiagnostics } from "../../learning/models";
 import { RecognitionRequestError } from "../../speech/httpStt";
 import { initialSpeechSession, speechErrorRecovery, speechSessionReducer } from "../../speech/session";
 import type { AudioClip, SpeechErrorKind } from "../../speech/types";
@@ -10,8 +11,28 @@ type Props = {
   /** Turn a recording into words. Injected, so this control knows no provider. */
   transcribe: (clip: AudioClip, signal: AbortSignal) => Promise<{ transcript: string; speechDetected: boolean }>;
   /** The learner said this. What it means is for the dialogue engine to judge. */
-  onSaid: (transcript: string) => void;
+  onSaid: (transcript: string, pronunciation?: PronunciationDiagnostics) => void;
+  /**
+   * Score the pronunciation of the same recording, alongside hearing what was said.
+   * Optional: without it (or if it fails) the answer still goes through.
+   */
+  assess?: (clip: AudioClip, signal: AbortSignal) => Promise<PronunciationDiagnostics | undefined>;
+  /** Show what was heard, and how it was pronounced, for a moment before moving on. */
+  showResult?: boolean;
+  /** The microphone or the listening service can't be used right now. */
+  onUnavailable?: () => void;
 };
+
+/** How long the heard answer stays on the card before the conversation moves on. */
+const RESULT_MS = 1800;
+
+/** In plain words, how an answer sounded. Feedback only: it never decides anything. */
+export function pronunciationNote(pronunciation: PronunciationDiagnostics | undefined): string | undefined {
+  if (!pronunciation) return undefined;
+  const words = pronunciation.wordsNeedingPractice.map((item) => `« ${item.word} »`);
+  if (!words.length) return "Pronunciation: clear.";
+  return `Pronunciation: nearly there. Work on ${words.slice(0, 2).join(" and ")}.`;
+}
 
 const ERROR_MESSAGES: Record<SpeechErrorKind, string> = {
   unavailable: "The microphone can't be used here. You can type your answer instead.",
@@ -27,8 +48,11 @@ const ERROR_MESSAGES: Record<SpeechErrorKind, string> = {
  * tap to record, tap to finish, wait while it is heard. Every failure leaves the
  * typed answer below as a way forward, so speaking is encouraged but never required.
  */
-export function SpeechControl({ transcribe, onSaid }: Props) {
+export function SpeechControl({ transcribe, onSaid, assess, showResult = false, onUnavailable }: Props) {
   const [session, dispatch] = useReducer(speechSessionReducer, initialSpeechSession);
+  const [heard, setHeard] = useState<{ transcript: string; pronunciation?: PronunciationDiagnostics } | undefined>(undefined);
+  const hold = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(hold.current), []);
   const recording = useRef<Recording | undefined>(undefined);
   const request = useRef<AbortController | undefined>(undefined);
   /** Guards against results from a recording that was cancelled or replaced. */
@@ -54,14 +78,21 @@ export function SpeechControl({ transcribe, onSaid }: Props) {
       const clip = await active.stop();
       const controller = new AbortController();
       request.current = controller;
-      const heard = await transcribe(clip, controller.signal);
+      // One recording, two questions: what was said, and how it sounded.
+      const scored = assess ? assess(clip, controller.signal).catch(() => undefined) : Promise.resolve(undefined);
+      const [result, pronunciation] = await Promise.all([transcribe(clip, controller.signal), scored]);
       if (current !== turn.current) return;
-      if (!heard.speechDetected) {
+      if (!result.speechDetected) {
         dispatch({ type: "FAIL", error: "no-speech" });
         return;
       }
-      dispatch({ type: "RESULT", transcript: heard.transcript });
-      onSaid(heard.transcript);
+      dispatch({ type: "RESULT", transcript: result.transcript });
+      if (!showResult) {
+        onSaid(result.transcript, pronunciation);
+        return;
+      }
+      setHeard({ transcript: result.transcript, pronunciation });
+      hold.current = window.setTimeout(() => onSaid(result.transcript, pronunciation), RESULT_MS);
     } catch (error) {
       if (current !== turn.current) return;
       const kind: SpeechErrorKind = error instanceof RecordingError ? error.kind
@@ -88,6 +119,22 @@ export function SpeechControl({ transcribe, onSaid }: Props) {
       if (current === turn.current) dispatch({ type: "FAIL", error: error instanceof RecordingError ? error.kind : "unavailable" });
     }
   };
+
+  // Anything but a missed word means speaking can't work right now.
+  const unavailable = session.status === "error" && session.error !== "no-speech";
+  useEffect(() => {
+    if (unavailable) onUnavailable?.();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unavailable]);
+
+  if (heard) {
+    return (
+      <div className="speech-control heard" role="status">
+        <p className="heard-note">You said: “<span lang="fr">{heard.transcript}</span>”</p>
+        {pronunciationNote(heard.pronunciation) && <p className="said-summary">{pronunciationNote(heard.pronunciation)}</p>}
+      </div>
+    );
+  }
 
   if (session.status === "error") {
     const recovery = speechErrorRecovery(session.error);

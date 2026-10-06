@@ -169,9 +169,9 @@ function readSave(value: Record<string, unknown>): GameSave | undefined {
   };
   // The profile goes through the same checks as a live answer; anything unexpected is dropped.
   const profile = isRecord(value.player) && isRecord(value.player.profile) ? value.player.profile : {};
-  for (const field of ["displayName", "targetLanguageExperience", "motivation"] satisfies Array<keyof PlayerProfile>) {
+  for (const field of ["displayName", "age", "targetLanguageExperience", "motivation"] satisfies Array<keyof PlayerProfile>) {
     const answer = profile[field];
-    if (isString(answer)) save = updatePlayerProfile(save, field, answer);
+    if (isString(answer) || typeof answer === "number") save = updatePlayerProfile(save, field, String(answer));
   }
   return save;
 }

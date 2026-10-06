@@ -164,11 +164,19 @@ def _speed(value: str) -> float:
         return 1.0
 
 
+# Characters who borrow another's voice until they have their own: the people Sophie
+# and the learner meet on the street in Scene 2.
+VOICE_STAND_INS = {"passerby": "neighbor", "shopkeeper": "baker"}
+
+
 def _speaker_voice(voices: dict, speaker_id: str | None) -> object | None:
     """A speaker's configured voice, or the default one. Unknown speakers are not an error."""
 
     if speaker_id and speaker_id in voices:
         return voices[speaker_id]
+    stand_in = VOICE_STAND_INS.get(speaker_id or "")
+    if stand_in and stand_in in voices:
+        return voices[stand_in]
     return voices.get("default")
 
 
@@ -237,6 +245,7 @@ class ElevenLabsTTSProvider:
             "slow": _speed(os.getenv("ELEVENLABS_SLOW_SPEED", "0.75")),
         }
         self._voice_settings: dict[str, object] = {}
+        self._settings_refused = False
         # Every ElevenLabs plan allows only a few requests at once; more are refused
         # with 429. Calls beyond the limit wait their turn here instead.
         self.max_concurrency = max(1, _int_setting("ELEVENLABS_MAX_CONCURRENCY", 2))
@@ -295,8 +304,20 @@ class ElevenLabsTTSProvider:
         if voice not in self._voice_settings:
             try:
                 self._voice_settings[voice] = self.client.voices.settings.get(voice)
-            except Exception:  # noqa: BLE001 - fall back to the defaults with our speed
-                logger.warning("Could not read the saved settings of an ElevenLabs voice", exc_info=True)
+            except Exception as exc:  # noqa: BLE001 - fall back to the defaults with our speed
+                status, code, message = describe_provider_error(exc)
+                if status in (401, 403):
+                    # A key without the voices_read permission: say so once, plainly, not per voice.
+                    if not self._settings_refused:
+                        self._settings_refused = True
+                        logger.warning(
+                            "The ElevenLabs API key can't read voices' saved settings (it needs the "
+                            "'Voices: Read' permission), so voices use ElevenLabs' default settings "
+                            "with the learner's speed. %s",
+                            message or code or "",
+                        )
+                else:
+                    logger.warning("Could not read the saved settings of an ElevenLabs voice", exc_info=True)
                 self._voice_settings[voice] = None
         saved = self._voice_settings[voice]
         fields = saved.model_dump(exclude_none=True) if hasattr(saved, "model_dump") else {}

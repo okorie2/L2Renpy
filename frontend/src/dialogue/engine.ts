@@ -2,7 +2,7 @@ import { conditionHolds } from "../core/conditions";
 import type { GameSave, Quest } from "../core/models";
 import { applyGameEvent, type GameEvent } from "../core/quests";
 import { assessUtterance } from "../learning/assessment";
-import type { AssistanceKind, ConversationIntent, LearningModality, VocabularyItem } from "../learning/models";
+import type { AssistanceKind, ConversationIntent, LearningModality, PronunciationDiagnostics, VocabularyItem } from "../learning/models";
 import { helpUsed, recordLearningEvidence } from "../learning/progress";
 import { adaptSupport } from "../learning/support";
 import { vocabularyInText, vocabularySpans, type TextSpan } from "../learning/vocabulary";
@@ -25,6 +25,8 @@ export interface SaidResult {
   helped: boolean;
   /** The stretches of the answer that were credited as vocabulary the player used. */
   usedWords: TextSpan[];
+  /** How a spoken answer was pronounced, when it was scored. */
+  pronunciation?: PronunciationDiagnostics;
 }
 
 export interface HistoryLine {
@@ -68,6 +70,8 @@ export type DialogueInput = (
       mode: SayMode;
       /** A second opinion on `text`. Advice only: the engine checks it against the line. */
       judgement?: UtteranceJudgement;
+      /** How it was pronounced, for spoken answers that were scored. Kept, never judged. */
+      pronunciation?: PronunciationDiagnostics;
     }
   | { type: "ACT"; optionId: string }
   | { type: "PRACTICED" }
@@ -185,7 +189,7 @@ export function stepDialogue(
     };
   };
 
-  if (!response) {
+  if (!response || response.kind === "continue") {
     if (input.type !== "CONTINUE") return { session, save, result: "ignored" };
     // A line in the learner's own language teaches nothing about the target language.
     if (node.language !== "interface") {
@@ -226,14 +230,17 @@ export function stepDialogue(
       assistance,
       attempts: failures + 1,
       at: context.now,
-      confidence: assessment.confidence
+      confidence: assessment.confidence,
+      // Kept with the attempt, so what needs practice can be brought back later.
+      ...(input.pronunciation ? { pronunciation: input.pronunciation } : {})
     });
     saidResult = {
       mode: input.mode,
       communicated: assessment.communicated,
       attempt: failures + 1,
       helped: helpUsed(assistance).length > 0,
-      usedWords: vocabularySpans(said, context.vocabulary, used)
+      usedWords: vocabularySpans(said, context.vocabulary, used),
+      ...(input.pronunciation ? { pronunciation: input.pronunciation } : {})
     };
     if (!assessment.communicated) return miss(response.repairNodeId, evidence, judged?.intentId === null ? judged.reply : undefined);
     next = adaptSupport(evidence);

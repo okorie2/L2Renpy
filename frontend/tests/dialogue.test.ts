@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { chapterOneItems, chapterOneNpcs, chapterOneQuests, createStartingPlayer } from "../src/content/chapter1";
+import { chapterOneItems, chapterOneNpcs, chapterOneQuests, chapterOneSceneSpeakers, createStartingPlayer } from "../src/content/chapter1";
 import { selectNpcDialogueId } from "../src/core/conditions";
 import { updatePlayerProfile } from "../src/core/player";
 import { applyGameEvent, createInitialSave } from "../src/core/quests";
@@ -13,7 +13,7 @@ import { french } from "../src/languages/fr";
 const newSave = () => createInitialSave(createStartingPlayer("fr"), chapterOneQuests);
 
 const references = {
-  speakerIds: [PLAYER_SPEAKER_ID, ...chapterOneNpcs.map((npc) => npc.id)],
+  speakerIds: [PLAYER_SPEAKER_ID, ...chapterOneNpcs.map((npc) => npc.id), ...chapterOneSceneSpeakers.map((speaker) => speaker.id)],
   slotSamples: Object.fromEntries(
     Object.entries(buildSlotValues(french.slots, { displayName: "Samuel", motivation: "travel" })).map(([name, value]) => [name, value.target])
   ),
@@ -83,9 +83,12 @@ test("personal values stay in the profile; canonical French stays in the pack", 
 
   const values = buildSlotValues(french.slots, { displayName: "Samuel", motivation: "travel" });
   const example = resolveDialogueLine(french.dialogues.meetSophie.nodes.example, values);
-  assert.equal(example.target.text, "Je m'appelle Samuel.\nJe voudrais apprendre à parler français pour voyager.\nMon niveau actuel en français est débutant.");
-  assert.equal(example.translation?.text, "My name is Samuel.\nI would like to learn French for travel.\nMy current French level is beginner.");
-  const turn = resolveDialogueLine(french.dialogues.meetSophie.nodes.yourTurn, values);
+  assert.equal(example.target.text, "Je m'appelle Samuel.\nJ'ai … ans.\nJe voudrais apprendre à parler français pour voyager.\nMon niveau actuel en français est débutant.");
+  const withAge = resolveDialogueLine(french.dialogues.meetSophie.nodes.example, buildSlotValues(french.slots, { displayName: "Samuel", age: 71 }));
+  assert.equal(withAge.target.text.split("\n")[1], "J'ai soixante et onze ans.");
+  assert.equal(withAge.translation?.text.split("\n")[1], "I am seventy-one years old.");
+  assert.equal(example.translation?.text, "My name is Samuel.\nI am … years old.\nI would like to learn French for travel.\nMy current French level is beginner.");
+  const turn = resolveDialogueLine(french.dialogues.walkToCafe.nodes.nameAnswer, values);
   assert.equal(turn.target.text, "Je m'appelle Samuel.");
   assert.deepEqual(turn.target.spans.filter((span) => !span.scored).map((span) => span.slot), ["playerName"]);
   assert.ok(!JSON.stringify(french).includes("Samuel"));
@@ -124,4 +127,52 @@ test("Sophie does not repeat her introduction after it is completed", () => {
   const met = applyGameEvent(save, chapterOneQuests, { type: "DIALOGUE_COMPLETED", dialogueId: "meetSophie", npcId: "sophie" });
   assert.deepEqual(met.completedDialogueIds, ["meetSophie"]);
   assert.notEqual(selectNpcDialogueId(sophie, met, chapterOneQuests), "meetSophie");
+});
+
+test("ages are written out in French as they are said", async () => {
+  const { frenchNumber, englishNumber } = await import("../src/languages/fr/numbers");
+  const cases: Array<[number, string, string]> = [
+    [5, "cinq", "five"], [16, "seize", "sixteen"], [21, "vingt et un", "twenty-one"], [29, "vingt-neuf", "twenty-nine"],
+    [70, "soixante-dix", "seventy"], [71, "soixante et onze", "seventy-one"], [80, "quatre-vingts", "eighty"],
+    [81, "quatre-vingt-un", "eighty-one"], [99, "quatre-vingt-dix-neuf", "ninety-nine"], [100, "cent", "one hundred"], [120, "cent vingt", "one hundred and twenty"]
+  ];
+  for (const [number, french, english] of cases) {
+    assert.equal(frenchNumber(number), french, String(number));
+    assert.equal(englishNumber(number), english, String(number));
+  }
+});
+
+test("the walks between beats go through places the game has paintings for", async () => {
+  const { SCENES } = await import("../src/content/scenes");
+  const walks = Object.values(french.dialogues.walkToCafe.nodes).filter((node) => node.interlude);
+  assert.ok(walks.length >= 5, "Sophie walks between the beats");
+  assert.equal(french.dialogues.walkToCafe.nodes[french.dialogues.walkToCafe.startNodeId].interlude?.pullBack, undefined, "the scene opens with her already walking on the street");
+  for (const node of walks) {
+    for (const segment of node.interlude!.segments) assert.ok(SCENES[segment.scene], `${node.id}: ${segment.scene}`);
+    assert.equal(node.presentation?.scene, node.interlude!.segments.at(-1)!.scene, `${node.id}: the next line is where the walk ends`);
+  }
+});
+
+test("on the street the camera never jumps: each walk starts where the last one ended", async () => {
+  const { streetCamera } = await import("../src/content/scenes");
+  const walk = french.dialogues.walkToCafe;
+  assert.equal(walk.staging, "street");
+  // Follow the scene in order and check the hand-over from each walk to the next.
+  let nodeId: string | undefined = walk.startNodeId;
+  const seen: string[] = [];
+  let last: { scene: string; zoom: number } | undefined;
+  while (nodeId && !seen.includes(nodeId)) {
+    const node = walk.nodes[nodeId];
+    const first = node.interlude?.segments[0];
+    if (first && last && first.scene === last.scene) assert.equal(first.zoom[0], last.zoom, `${nodeId} carries on from the shot before`);
+    seen.push(nodeId);
+    if (node.interlude) {
+      const camera = streetCamera(walk, seen)!;
+      last = { scene: camera.scene.id, zoom: camera.zoom };
+    }
+    nodeId = node.nextNodeId;
+  }
+  assert.ok(seen.includes("ready"), "the scene runs to the café");
+  // Talking holds the shot the last walk ended on.
+  assert.deepEqual(streetCamera(walk, ["walkOut", "learned"]), { scene: (await import("../src/content/scenes")).SCENES["park-exit"], zoom: 1.3 });
 });
