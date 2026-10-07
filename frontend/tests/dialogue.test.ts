@@ -145,7 +145,8 @@ test("ages are written out in French as they are said", async () => {
 test("the walks between beats go through places the game has paintings for", async () => {
   const { SCENES } = await import("../src/content/scenes");
   const walks = Object.values(french.dialogues.walkToCafe.nodes).filter((node) => node.interlude);
-  assert.ok(walks.length >= 5, "Sophie walks between the beats");
+  assert.ok(walks.length >= 3, "Sophie walks between the beats");
+  for (const node of walks) assert.ok(node.interlude!.durationMs <= 3000, `${node.id}: a walk is about four steps, kept short`);
   assert.equal(french.dialogues.walkToCafe.nodes[french.dialogues.walkToCafe.startNodeId].interlude?.pullBack, undefined, "the scene opens with her already walking on the street");
   for (const node of walks) {
     for (const segment of node.interlude!.segments) assert.ok(SCENES[segment.scene], `${node.id}: ${segment.scene}`);
@@ -174,5 +175,5 @@ test("on the street the camera never jumps: each walk starts where the last one 
   }
   assert.ok(seen.includes("ready"), "the scene runs to the café");
   // Talking holds the shot the last walk ended on.
-  assert.deepEqual(streetCamera(walk, ["walkOut", "learned"]), { scene: (await import("../src/content/scenes")).SCENES["park-exit"], zoom: 1.3 });
+  assert.deepEqual(streetCamera(walk, ["walkOut", "learned"]), { scene: (await import("../src/content/scenes")).SCENES["lyon-route"], zoom: 1.2 });
 });

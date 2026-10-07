@@ -120,6 +120,7 @@ function Person({ person, speaking }: { person: Placed; speaking: boolean }) {
   };
   return (
     <div className={`street-person${leaving ? " leaving" : ""}`} style={style}>
+      <div className="street-person-shadow" aria-hidden="true" />
       <img src={frame ?? wave ?? assetUrl(art.image)} alt="" draggable={false} />
       {talking && !frame && <img className="street-person-talking" src={talking} alt="" draggable={false} style={{ opacity: speaking ? 1 : 0 }} />}
     </div>

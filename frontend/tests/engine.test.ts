@@ -236,13 +236,14 @@ test("the walk to the café: Sophie's questions, a greeting in passing, and any 
   continueTo("greetShopkeeper");
   assert.deepEqual(onStreet().map((person) => person.id), ["shopkeeper"], "and has gone");
   assert.equal(walk.nodes.greetShopkeeper.presentation?.focus, "shopkeeper");
-  assert.equal(walk.nodes.passerbyHello.translation, undefined, "bonjour is known by now");
+  assert.equal(walk.nodes.passerbyHello.translation, "Hello!", "every card shows its English");
+  assert.ok(walk.nodes.greetShopkeeper.presentation?.exercise, "answering the shopkeeper is a test: the English waits for a tap");
   state = go(state, walk, say("bonjour"));
 
   continueTo("caVaAnswer");
   state = go(state, walk, say("ça va bien"));
   continueTo("caVaCheckAnswer");
-  assert.equal(walk.nodes.caVaCheckAnswer.presentation?.translation, "on-request", "met before: no English up front");
+  assert.ok(!walk.nodes.caVaCheckAnswer.presentation?.exercise, "not marked as a test, so its English shows");
   state = go(state, walk, say("ça va"));
 
   // The number is the learner's own: any age in « J'ai … ans » communicates.

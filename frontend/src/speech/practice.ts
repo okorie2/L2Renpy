@@ -350,3 +350,20 @@ export function practiceSpeech(next: PracticeState, lines: string[], pick: Phras
     default: return then;
   }
 }
+
+/** Lower case, without accents or punctuation, split into words. */
+const wordsOf = (text: string) => text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ")
+  .split(/\s+/).filter(Boolean);
+
+/**
+ * A typed line counts when it has most of the line's words, accents and punctuation
+ * aside (a phone keyboard makes those hard). Words that aren't graded, like the
+ * learner's name, don't count either way.
+ */
+export function typedLineMatches(typed: string, line: string, excluded: string[]): boolean {
+  const skip = new Set(excluded.flatMap(wordsOf));
+  const wanted = wordsOf(line).filter((word) => !skip.has(word));
+  if (!wanted.length) return true;
+  const given = new Set(wordsOf(typed));
+  return wanted.filter((word) => given.has(word)).length / wanted.length >= 0.8;
+}

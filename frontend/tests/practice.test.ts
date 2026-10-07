@@ -3,7 +3,7 @@ import test from "node:test";
 import { wordAt } from "../src/app/voice";
 import { readWordTimings } from "../src/speech/httpTts";
 import {
-  ALL_PRACTICE_PHRASES, MAX_WORD_ATTEMPTS, PRACTICE_PHRASES, createPhrasePicker, feedbackKind, practiceSpeech, practiceTarget,
+  ALL_PRACTICE_PHRASES, MAX_WORD_ATTEMPTS, PRACTICE_PHRASES, createPhrasePicker, feedbackKind, practiceSpeech, practiceTarget, typedLineMatches,
   recordAttempt, startPractice, wordContext, type PhraseKind, type PracticeResult
 } from "../src/speech/practice";
 import { findRecording, RECORDED_LINES, withRecordings } from "../src/speech/recordings";
@@ -241,4 +241,11 @@ test("a practised chunk is judged by the weak word in it", () => {
   // Now "Je" comes through, even if the whole chunk is a little rough.
   state = recordAttempt(state, attempt(0.9, 0.7), 1, line);
   assert.equal(state.feedback?.kind, "word-clear");
+});
+
+test("without a microphone, a typed line counts when it has the line's words, accents and punctuation aside", () => {
+  assert.ok(typedLineMatches("je m appelle Ella", "Je m'appelle Ella.", ["Ella"]));
+  assert.ok(typedLineMatches("Mon niveau actuel en francais est debutant", "Mon niveau actuel en français est débutant.", []));
+  assert.ok(!typedLineMatches("bonjour", "Je m'appelle Ella.", ["Ella"]));
+  assert.ok(typedLineMatches("je m'appelle Sam", "Je m'appelle Ella.", ["Ella"]), "the name isn't graded");
 });

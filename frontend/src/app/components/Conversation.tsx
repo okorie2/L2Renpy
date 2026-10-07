@@ -24,6 +24,7 @@ import { streetCamera, streetPeople } from "../../content/scenes";
 import { SAID_LABEL, SaidText, saidSummary } from "./Said";
 import { SoundSettings } from "./SoundSettings";
 import { pronunciationNote, SpeechControl } from "./SpeechControl";
+import { TypeInstead } from "./TypeInstead";
 
 export interface ConversationSpeaker {
   name: string;
@@ -69,6 +70,8 @@ type Props = {
   checkSaid?: (input: DialogueInput) => Promise<{ understood: boolean; input: DialogueInput }>;
   /** Back to the previous card, which plays again. Absent on the first card. */
   onBack?: () => void;
+  /** Open the scene menu, to play a part of the story again. */
+  onOpenScenes?: () => void;
   /** Forward again through cards already seen. Absent at the furthest card reached. */
   onForward?: () => void;
   /** Behind the furthest card: answers here are practice and are not recorded. */
@@ -177,15 +180,12 @@ function SpeakLine(props: LineProps) {
   const { node, line, languageCode, speech, transcribe, voice, lastSaid, thinking, onInput, retrying, partnerId, partnerName } = props;
   const response = node.response as Extract<NonNullable<DialogueNode["response"]>, { kind: "say" }>;
   const question = response.question;
-  const policy = supportPolicy(props.supportLevel);
   const timing = node.presentation?.translation;
 
   const [assisted, setAssisted] = useState(false);
   const [replayed, setReplayed] = useState(false);
   const [translationAsked, setTranslationAsked] = useState(false);
   const [micFailed, setMicFailed] = useState(false);
-  const [typing, setTyping] = useState(false);
-  const [text, setText] = useState("");
   /** The answer just given, and Sophie's reaction once it is known to be understood. */
   const [heard, setHeard] = useState<{ transcript: string; pronunciation?: PronunciationDiagnostics; phrase?: string } | undefined>(undefined);
   const [pickPhrase] = useState(() => createPhrasePicker());
@@ -201,7 +201,8 @@ function SpeakLine(props: LineProps) {
     const timer = window.setTimeout(() => setBeatPassed(true), silent ? SILENT_TRANSLATION_BEAT_MS : TRANSLATION_BEAT_MS);
     return () => window.clearTimeout(timer);
   }, [beatPassed, voice.status, props.paused, silent]);
-  const translationOnRequest = timing === "on-request" || policy.translation !== "visible";
+  // The English shows, except on a quiz, test or exercise, where it waits for a tap.
+  const translationOnRequest = Boolean(node.presentation?.exercise);
   const questionTranslationShown = Boolean(question?.translation) && (translationAsked || (!translationOnRequest && beatPassed));
 
   const assistance = (): AssistanceKind[] => {
@@ -247,10 +248,6 @@ function SpeakLine(props: LineProps) {
     if (alive.current) onInput(checked.input);
   };
 
-  const submitTyped = (event: FormEvent) => {
-    event.preventDefault();
-    if (text.trim() && !heard) void answer(text.trim(), "typed");
-  };
 
   return (
     <section className={`dialogue-card speak-card has-controls${props.arrival ? ` arrived-${props.arrival}` : ""}`} aria-label="Answer out loud">
@@ -307,31 +304,8 @@ function SpeakLine(props: LineProps) {
                 />
               )}
 
-              {!thinking && !canSpeak && !typing && (
-                <button className="text-button" onClick={() => setTyping(true)}>Can't speak right now? Type it instead</button>
-              )}
-              {!thinking && !canSpeak && typing && (
-                <form className="say-form" onSubmit={submitTyped}>
-                  <label className="visually-hidden" htmlFor={`say-${node.id}`}>Type your answer in French</label>
-                  <input
-                    id={`say-${node.id}`}
-                    className="text-field"
-                    type="text"
-                    lang={languageCode}
-                    value={text}
-                    onChange={(event) => setText(event.target.value)}
-                    placeholder="Type it in French…"
-                    maxLength={120}
-                    autoComplete="off"
-                    autoCapitalize="sentences"
-                    autoCorrect="off"
-                    spellCheck={false}
-                    enterKeyHint="send"
-                  />
-                  <button className="round-button send" type="submit" disabled={!text.trim()} aria-label="Say it">
-                    <img src={icons.next} alt="" />
-                  </button>
-                </form>
+              {!thinking && !canSpeak && (
+                <TypeInstead id={node.id} languageCode={languageCode} disabled={Boolean(heard)} onSubmit={(typed) => { if (!heard) void answer(typed, "typed"); }} />
               )}
             </>
           )}
@@ -349,11 +323,12 @@ function StandardLine(props: LineProps) {
   // A question met before keeps its English behind a tap, even where the level would show it.
   const levelPolicy = supportPolicy(supportLevel);
   const translationTiming = node.presentation?.translation;
-  const policy = translationTiming === "on-request" && levelPolicy.translation === "visible"
-    ? { ...levelPolicy, translation: "on-request" as const }
-    : levelPolicy;
+  // The English shows on every card, except a quiz, test or exercise, where it waits for a tap.
+  const policy = { ...levelPolicy, translation: node.presentation?.exercise ? "on-request" as const : "visible" as const };
 
   const [translationRevealed, setTranslationRevealed] = useState(false);
+  const [micFailed, setMicFailed] = useState(false);
+  const canSpeak = speech.available && Boolean(transcribe) && !micFailed;
   const [hintRevealed, setHintRevealed] = useState(false);
   const [answerRevealed, setAnswerRevealed] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
@@ -425,11 +400,6 @@ function StandardLine(props: LineProps) {
   const submitProfileText = (event: FormEvent) => {
     event.preventDefault();
     if (response?.kind === "text" && validProfileText(text)) onInput({ type: "ANSWER", value: text, assistance: assistance(), ...heardAs() });
-  };
-
-  const submitSaid = (event: FormEvent) => {
-    event.preventDefault();
-    if (text.trim()) onInput({ type: "SAY", text, mode: "typed", assistance: assistance() });
   };
 
   // Suggestions are support, so they appear with full support or once the player is clearly stuck.
@@ -586,9 +556,10 @@ function StandardLine(props: LineProps) {
 
         {isSay && !thinking && (
           <div className="say-response">
-            {speech.available && transcribe && (
+            {canSpeak && transcribe && (
               <SpeechControl
                 transcribe={transcribe}
+                onUnavailable={() => setMicFailed(true)}
                 onSaid={(transcript) => onInput({ type: "SAY", text: transcript, mode: "speech", assistance: assistance() })}
               />
             )}
@@ -609,27 +580,9 @@ function StandardLine(props: LineProps) {
                 ))}
               </div>
             )}
-            <form className="say-form" onSubmit={submitSaid}>
-              <label className="visually-hidden" htmlFor={`say-${node.id}`}>Type your answer in French</label>
-              <input
-                id={`say-${node.id}`}
-                className="text-field"
-                type="text"
-                lang={languageCode}
-                value={text}
-                onChange={(event) => setText(event.target.value)}
-                placeholder={speech.available ? "…or type it in French" : "Type it in French…"}
-                maxLength={120}
-                autoComplete="off"
-                autoCapitalize="sentences"
-                autoCorrect="off"
-                spellCheck={false}
-                enterKeyHint="send"
-              />
-              <button className="round-button send" type="submit" disabled={!text.trim()} aria-label="Say it">
-                <img src={icons.next} alt="" />
-              </button>
-            </form>
+            {!canSpeak && (
+              <TypeInstead id={node.id} languageCode={languageCode} onSubmit={(typed) => onInput({ type: "SAY", text: typed, mode: "typed", assistance: assistance() })} />
+            )}
           </div>
         )}
       </div>
@@ -645,38 +598,6 @@ function StandardLine(props: LineProps) {
       )}
       {props.controls}
     </section>
-  );
-}
-
-function History({ lines, speakers, languageCode, showTranslations, onClose }: {
-  lines: HistoryLine[];
-  speakers: Record<string, ConversationSpeaker>;
-  languageCode: string;
-  /** Looking back must not hand out translations the support level is withholding. */
-  showTranslations: boolean;
-  onClose: () => void;
-}) {
-  return (
-    <div className="sheet-backdrop" onClick={onClose}>
-      <div className="sheet" role="dialog" aria-modal="true" aria-label="Earlier in this conversation" onClick={(event) => event.stopPropagation()}>
-        <div className="sheet-handle" aria-hidden="true" />
-        <header className="sheet-header">
-          <h2>Earlier</h2>
-          <button className="sheet-close" onClick={onClose} aria-label="Close">×</button>
-        </header>
-        <ol className="sheet-body history-list">
-          {lines.filter((entry) => entry.text).map((entry, index) => (
-            <li key={index} className={entry.speakerId === PLAYER_SPEAKER_ID ? "mine" : undefined}>
-              <span className="history-speaker">{speakers[entry.speakerId]?.name ?? entry.speakerId}</span>
-              {entry.said ? <SaidText line={entry} languageCode={languageCode} /> : <span lang={languageCode}>{entry.text}</span>}
-              {showTranslations && entry.translation && <small>{entry.translation}</small>}
-              {entry.said && <small>{saidSummary(entry)}</small>}
-              {entry.rewording && <small>You could also say: <span lang={languageCode}>{entry.rewording}</span></small>}
-            </li>
-          ))}
-        </ol>
-      </div>
-    </div>
   );
 }
 
@@ -708,8 +629,7 @@ function AudioSheet({ settings, available, onChange, onClose }: {
  * partner's portrait stands above a bottom dialogue card, and every control is
  * thumb-sized. All progression comes from the dialogue engine.
  */
-export function Conversation({ dialogue, session, speakers, voiceLibrary, audioSettings, onAudioSettingsChange, onBack, onForward, replaying, onExit, interfaceLanguageCode, onInput, ...lineProps }: Props) {
-  const [historyOpen, setHistoryOpen] = useState(false);
+export function Conversation({ dialogue, session, speakers, voiceLibrary, audioSettings, onAudioSettingsChange, onBack, onForward, onOpenScenes, replaying, onExit, interfaceLanguageCode, onInput, ...lineProps }: Props) {
   const [audioOpen, setAudioOpen] = useState(false);
   const node = dialogue.nodes[session.nodeId];
   const speakerName = speakers[node.speakerId]?.name ?? node.speakerId;
@@ -815,6 +735,17 @@ export function Conversation({ dialogue, session, speakers, voiceLibrary, audioS
 
   const controls = (
     <>
+      {/* Back and forward sit at the bottom, by the thumb, on the card's lower edge. */}
+      <div className="card-nav" role="group" aria-label="Move through the conversation">
+        <button className="card-nav-button" onClick={back} disabled={!onBack} aria-label="Back to the previous line">
+          <img src={icons.back} alt="" />
+        </button>
+        {onForward && (
+          <button className="card-nav-button" onClick={forward} aria-label="Forward to the next line you've seen">
+            <img src={icons.back} className="mirrored" alt="" />
+          </button>
+        )}
+      </div>
       <button
         className={`round-button card-pause${paused ? " paused" : ""}`}
         onClick={paused ? resume : pause}
@@ -875,17 +806,9 @@ export function Conversation({ dialogue, session, speakers, voiceLibrary, audioS
 
   return (
     <div className="conversation" style={{ "--keyboard-inset": `${keyboardInset}px` } as CSSProperties}>
-      <nav className="conversation-nav" aria-label="Move through the conversation">
-        <button onClick={back} disabled={!onBack} aria-label="Back to the previous line">
-          <img src={icons.back} alt="" />
-        </button>
-        {onForward && (
-          <button onClick={forward} aria-label="Forward to the next line you've seen">
-            <img src={icons.back} className="mirrored" alt="" />
-          </button>
-        )}
-        {replaying && <span className="replay-tag" title="Answers here are practice and don't change your progress">Replay</span>}
-      </nav>
+      {replaying && (
+        <span className="replay-tag top" title="Answers here are practice and don't change your progress">Replay</span>
+      )}
       {onBack && (
         <div
           className="edge-swipe"
@@ -897,8 +820,8 @@ export function Conversation({ dialogue, session, speakers, voiceLibrary, audioS
         />
       )}
       <div className="conversation-tools">
-        {session.history.length > 0 && (
-          <button onClick={() => setHistoryOpen(true)} aria-label="Earlier in this conversation">
+        {onOpenScenes && (
+          <button onClick={onOpenScenes} aria-label="Scenes: play a part of the story again">
             <span aria-hidden="true">≡</span>
           </button>
         )}
@@ -970,15 +893,6 @@ export function Conversation({ dialogue, session, speakers, voiceLibrary, audioS
           {...lineProps}
         />
       </div>
-      )}
-      {historyOpen && (
-        <History
-          lines={session.history}
-          speakers={speakers}
-          languageCode={lineProps.languageCode}
-          showTranslations={supportPolicy(lineProps.supportLevel).translation === "visible"}
-          onClose={() => setHistoryOpen(false)}
-        />
       )}
       {audioOpen && (
         <AudioSheet

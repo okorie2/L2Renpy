@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Conversation, type ConversationSpeaker } from "./components/Conversation";
+import { SceneMenu } from "./components/SceneMenu";
+import type { StoryPart } from "../content/story";
 import { OpeningScene, type OpeningArt, type OpeningStage, type SceneLayer } from "./components/OpeningScene";
 import { sceneAt } from "../content/scenes";
 import { GameView } from "./components/GameView";
@@ -156,6 +158,10 @@ function Game({ initialSave, onSaveChange, onStartOver, saveNotice, onDismissSav
   // True while a second opinion on the learner's answer is on its way.
   const [thinking, setThinking] = useState(false);
   const judgedTurn = useRef(0);
+  // The scene menu, and a finished part being played again (it ends where it ends, without running on).
+  const [scenesOpen, setScenesOpen] = useState(false);
+  const [replay, setReplay] = useState<{ dialogueId: string } | null>(null);
+  const [run, setRun] = useState(0);
   const [save, setSave] = useState(initialSave);
   useEffect(() => onSaveChange(save), [save, onSaveChange]);
   // The phone holds everything that is not the world: messages, map, quests, progress, settings.
@@ -314,6 +320,34 @@ function Game({ initialSave, onSaveChange, onStartOver, saveNotice, onDismissSav
     setConversation(startDialogue(dialogue, OPENING.npcId));
   };
 
+  /**
+   * Play a part of the story from its start. A finished part is a replay: it counts,
+   * added to the record, and ends by going back to where the learner was. The part
+   * they're on simply starts again and carries on into the next, as it always would.
+   */
+  const playPart = (part: StoryPart) => {
+    const dialogue = part.dialogueId ? activeLanguagePack.dialogues[part.dialogueId] : undefined;
+    if (!dialogue) return;
+    judgedTurn.current++;
+    setThinking(false);
+    setScenesOpen(false);
+    setPhone(null);
+    unlockVoice();
+    refreshSpeech();
+    setReplay(save.completedDialogueIds.includes(dialogue.id) ? { dialogueId: dialogue.id } : null);
+    // The story is told over the park and its streets, not the world.
+    setOpening("talking");
+    setRun((current) => current + 1);
+    setConversation(startDialogue(dialogue, OPENING.npcId));
+  };
+  /** A replay is over: back to the world, or to the park if the story isn't finished yet. */
+  const endReplay = () => {
+    setReplay(null);
+    if (!save.completedDialogueIds.includes(OPENING_LAST)) return;
+    setOpening("leaving");
+    window.setTimeout(() => setOpening("done"), OPENING_FADE_MS);
+  };
+
   // The painted place behind the opening story's current line, once it leaves the park.
   const openingScene = useMemo<SceneLayer | undefined>(() => {
     if (!conversation || !dialogue || !OPENING.dialogueIds.includes(conversation.dialogueId)) return undefined;
@@ -438,6 +472,13 @@ function Game({ initialSave, onSaveChange, onStartOver, saveNotice, onDismissSav
       setTrail(afterLiveStep(trail, step));
       return;
     }
+    // A replay ends with its own part; everything it showed is already in the save.
+    if (replay && step.session.dialogueId === replay.dialogueId) {
+      setSave(step.save);
+      setTrail(null);
+      endReplay();
+      return;
+    }
     // The opening story runs on from one scene into the next without a break.
     const storyIndex = OPENING.dialogueIds.indexOf(step.session.dialogueId);
     const following = storyIndex >= 0 ? activeLanguagePack.dialogues[OPENING.dialogueIds[storyIndex + 1]] : undefined;
@@ -480,6 +521,7 @@ function Game({ initialSave, onSaveChange, onStartOver, saveNotice, onDismissSav
     judgedTurn.current++;
     setThinking(false);
     setConversation(null);
+    if (replay) endReplay();
   };
 
   return (
@@ -494,6 +536,9 @@ function Game({ initialSave, onSaveChange, onStartOver, saveNotice, onDismissSav
           <strong>{guidance?.text ?? "All quests complete. Keep exploring!"}</strong>
         </button>
 
+        <button className="phone-button scenes-button" onClick={() => setScenesOpen(true)} aria-label="Scenes: play a part of the story again">
+          <span aria-hidden="true">≡</span>
+        </button>
         <button
           className="phone-button"
           onClick={() => openPhone({})}
@@ -544,7 +589,7 @@ function Game({ initialSave, onSaveChange, onStartOver, saveNotice, onDismissSav
 
       {dialogue && conversation && (
         <Conversation
-          key={dialogue.id}
+          key={`${dialogue.id}:${run}`}
           dialogue={dialogue}
           session={conversation}
           languageCode={activeLanguagePack.code}
@@ -568,7 +613,12 @@ function Game({ initialSave, onSaveChange, onStartOver, saveNotice, onDismissSav
           onForward={trail && canGoForward(trail) ? () => moveInConversation(goForward) : undefined}
           replaying={Boolean(trail && isReplaying(trail))}
           onExit={leaveConversation}
+          onOpenScenes={() => setScenesOpen(true)}
         />
+      )}
+
+      {scenesOpen && (
+        <SceneMenu save={save} pack={activeLanguagePack} onReplay={playPart} onClose={() => setScenesOpen(false)} />
       )}
 
       {saveNotice && !conversation && (

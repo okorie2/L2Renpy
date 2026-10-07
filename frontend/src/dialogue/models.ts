@@ -122,11 +122,15 @@ export interface LinePresentation {
    */
   focus?: string;
   /**
-   * When the English appears, where the support level would show it outright:
-   * `delayed` lets the French be heard first (a question's first exposure);
-   * `on-request` keeps it behind a tap (a question the learner has met before).
+   * The English shows on every card. `delayed` lets the French be heard first, then
+   * shows it after a beat (a question's first exposure).
    */
-  translation?: "delayed" | "on-request";
+  translation?: "delayed";
+  /**
+   * A quiz, test or exercise: the learner is meant to manage alone, so the English is
+   * behind a "Show translation" button instead of shown.
+   */
+  exercise?: boolean;
   /**
    * On a street-staged dialogue: how Sophie stands while this line is said (she keeps
    * her place on the street), and who else is there.

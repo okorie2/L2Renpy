@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { PracticeRequestError, type PracticeClient } from "../../speech/httpPractice";
 import {
-  createPhrasePicker, practiceExpression, practiceSpeech, practiceTarget, recordAttempt, startPractice,
+  createPhrasePicker, practiceExpression, typedLineMatches, practiceSpeech, practiceTarget, recordAttempt, startPractice,
   type PracticeState, type PracticeUtterance, type PracticeWord
 } from "../../speech/practice";
 import type { CharacterExpression } from "../../characters/types";
@@ -10,6 +10,7 @@ import { icons } from "../icons";
 import { RecordingError, startRecording, type Recording } from "../recorder";
 import type { SpeakerState, SpokenItem } from "../voice";
 import { traceText } from "./TracedText";
+import { TypeInstead } from "./TypeInstead";
 
 export interface PracticeLine {
   text: string;
@@ -39,7 +40,8 @@ type Status =
   | { kind: "idle" }
   | { kind: "recording" }
   | { kind: "checking" }
-  | { kind: "error"; message: string; fatal: boolean };
+  | { kind: "error"; message: string; fatal: boolean; micUnavailable?: boolean };
+
 
 function WordMarks({ words, languageCode }: { words: PracticeWord[]; languageCode: string }) {
   return (
@@ -71,6 +73,9 @@ export function Practice({ lines, excluded, languageCode, interfaceLanguageCode,
   const texts = lines.map((line) => line.text);
   const target = practiceTarget(state, texts);
   const line = lines[state.lineIndex];
+  // When the microphone can't be used, each line is typed instead, from where practice had got to.
+  const [typedIndex, setTypedIndex] = useState<number | undefined>(undefined);
+  const [typedMiss, setTypedMiss] = useState(false);
 
   const say = (utterances: PracticeUtterance[], rate: SpeechRate = "normal") => speak(utterances.map((item) => ({
     text: item.text,
@@ -155,7 +160,7 @@ export function Practice({ lines, excluded, languageCode, interfaceLanguageCode,
       if (current !== turn.current) return;
       if (error instanceof RecordingError) {
         const blocked = error.kind === "permission-denied" || error.kind === "no-microphone" || error.kind === "unavailable";
-        setStatus({ kind: "error", fatal: blocked, message: blocked ? "The microphone can't be used, so practice is skipped." : "I didn't catch that. Try again, a little closer." });
+        setStatus({ kind: "error", fatal: blocked, micUnavailable: blocked, message: blocked ? "The microphone can't be used right now." : "I didn't catch that. Try again, a little closer." });
       } else if (error instanceof PracticeRequestError && error.status < 500 && error.status !== 422) {
         setStatus({ kind: "error", fatal: false, message: "That didn't work. Try again." });
       } else {
@@ -178,13 +183,42 @@ export function Practice({ lines, excluded, languageCode, interfaceLanguageCode,
       setStatus({ kind: "recording" });
     } catch (error) {
       if (current !== turn.current) return;
-      setStatus({ kind: "error", fatal: true, message: error instanceof RecordingError && error.kind === "permission-denied"
-        ? "The microphone is blocked, so practice is skipped. You can allow it in Settings."
-        : "The microphone can't be used here, so practice is skipped." });
+      setStatus({ kind: "error", fatal: true, micUnavailable: true, message: error instanceof RecordingError && error.kind === "permission-denied"
+        ? "The microphone is blocked. You can allow it in Settings."
+        : "The microphone can't be used here." });
     }
   };
 
+  /** Stop listening, or stop waiting for the check, and go back to the microphone. */
+  const cancel = () => {
+    turn.current++;
+    recording.current?.cancel();
+    recording.current = undefined;
+    request.current?.abort();
+    request.current = undefined;
+    setStatus({ kind: "idle" });
+  };
+
+  const typedAt = typedIndex ?? state.lineIndex;
+  const submitTyped = async (typed: string) => {
+    const current = lines[typedAt];
+    if (!current) return;
+    if (!typedLineMatches(typed, current.text, excluded)) {
+      setTypedMiss(true);
+      return;
+    }
+    setTypedMiss(false);
+    const nextIndex = typedAt + 1;
+    setTypedIndex(nextIndex);
+    const reply: PracticeUtterance[] = [{ kind: "prompt", text: pick("clear") }];
+    if (lines[nextIndex]) reply.push({ kind: "target", text: lines[nextIndex].text });
+    setCaption(captionOf(reply));
+    await say(reply);
+    if (!lines[nextIndex]) onDone();
+  };
+
   const recordingNow = status.kind === "recording";
+  const typing = status.kind === "error" && status.fatal && status.micUnavailable === true;
   const checking = status.kind === "checking";
   const targetPlaying = speaking?.item.text === target.text && speaking.item.languageCode === languageCode;
   const playingRate = targetPlaying ? speaking?.item.rate ?? "normal" : undefined;
@@ -193,26 +227,42 @@ export function Practice({ lines, excluded, languageCode, interfaceLanguageCode,
   return (
     <div className="practice">
       <div className="practice-head">
-        {target.mode === "phrase" && <span className="eyebrow">{`LINE ${state.lineIndex + 1} OF ${lines.length}`}</span>}
+        {target.mode === "phrase" && !typing && <span className="eyebrow">{`LINE ${state.lineIndex + 1} OF ${lines.length}`}</span>}
         {caption && <span className="practice-caption" role="status">{caption}</span>}
       </div>
-      {state.lastWords && state.lastWords.length > 0 && target.mode === "phrase" && state.feedback?.kind !== "clear" && (
+      {state.lastWords && state.lastWords.length > 0 && target.mode === "phrase" && state.feedback?.kind !== "clear" && !typing && (
         <WordMarks words={state.lastWords} languageCode={languageCode} />
       )}
-      <p className="target-language" lang={languageCode}>
-        {targetPlaying
-          ? traceText(target.text, speaking?.words, speaking?.activeWord)
-          : target.focus
-            ? <>{target.text.slice(0, target.focus.start)}<mark className="practice-focus">{target.text.slice(target.focus.start, target.focus.end)}</mark>{target.text.slice(target.focus.end)}</>
-            : target.text}
-      </p>
-      {target.mode === "phrase" && line?.translation && <p className="translation">{line.translation}</p>}
-      {target.guide && <p className="hint-text">Sounds like: <strong>{target.guide}</strong></p>}
+      {typing ? (
+        <>
+          {lines.length > 1 && <span className="eyebrow">{`LINE ${Math.min(typedAt + 1, lines.length)} OF ${lines.length}`}</span>}
+          <p className="target-language" lang={languageCode}>{lines[typedAt]?.text}</p>
+          {lines[typedAt]?.translation && <p className="translation">{lines[typedAt].translation}</p>}
+        </>
+      ) : (
+        <>
+          <p className="target-language" lang={languageCode}>
+            {targetPlaying
+              ? traceText(target.text, speaking?.words, speaking?.activeWord)
+              : target.focus
+                ? <>{target.text.slice(0, target.focus.start)}<mark className="practice-focus">{target.text.slice(target.focus.start, target.focus.end)}</mark>{target.text.slice(target.focus.end)}</>
+                : target.text}
+          </p>
+          {target.mode === "phrase" && line?.translation && <p className="translation">{line.translation}</p>}
+        </>
+      )}
+      {target.guide && !typing && <p className="hint-text">Sounds like: <strong>{target.guide}</strong></p>}
 
       {status.kind === "error" && status.fatal ? (
-        <div className="practice-controls">
+        <div className="practice-typed">
           <p className="speech-status" role="status">{status.message}</p>
-          <button className="primary-pill" onClick={onDone}>Continue</button>
+          {status.micUnavailable && lines[typedAt] && (
+            <>
+              {typedMiss && <p className="speech-status" role="status">Not quite. Check the line above and try again.</p>}
+              <TypeInstead key={typedAt} open={typedIndex !== undefined} id={`practice-${typedAt}`} languageCode={languageCode} onSubmit={(typed) => void submitTyped(typed)} />
+            </>
+          )}
+          <button className="text-button" onClick={onDone}>Skip practice</button>
         </div>
       ) : (
         <div className="practice-controls">
@@ -250,6 +300,9 @@ export function Practice({ lines, excluded, languageCode, interfaceLanguageCode,
             : sophieTalking ? "Sophie is speaking…"
             : "Tap the microphone and say it."}
         </p>
+      )}
+      {(recordingNow || checking) && (
+        <button className="text-button practice-cancel" onClick={cancel}>Cancel</button>
       )}
     </div>
   );

@@ -175,7 +175,7 @@ elsewhere 30% across.
 After the name, Sophie says "There are people on the street. Let's interact with
 them." (`peopleOnStreet`), and the walk on starts from there. The passer-by and the
 shopkeeper are in the shot from the moment the walk reaches the Lyon street
-(`walkIntoTown`), far off, and never fade or slide in:
+(`walkOut`), far off, and never fade or slide in:
 
 - They stand in the painting (inside the camera's zoom), so they come closer as the
   camera does. Their places are in `STREET_PEOPLE` (`far`, `near`, `passed`); a
@@ -185,10 +185,8 @@ shopkeeper are in the shot from the moment the walk reaches the Lyon street
   `near`, growing as someone coming closer does, bobbing in step), waves on
   "Bonjour !", and walks on past the camera on "Your turn next time." (`near` →
   `passed`).
-- A short walk (`walkToShopkeeper`, zoom 1.45 → 1.7) brings the shopkeeper closer
-  before the learner greets her; she waves on her "Bonjour !" and is passed during
-  `walkOn`. The later walks moved along to keep the camera continuous
-  (`walkOn` 1.7 → 1.85, `walkNearer` 1.85 → 2, café door 2 → 2.15).
+- The learner greets the shopkeeper from where the passer-by was met; she waves on
+  her "Bonjour !" and the camera walks past her on `walkOn`.
 - A line or walk says who is there (`street.people`, or `people` on a walk's
   stretch); lines that don't say keep whoever was there (`streetPeople()`).
 - Mouths move while they speak and hands go up for a wave when the art is there:
@@ -203,3 +201,33 @@ with his right foot, so four of them (ordered by how high the back foot is lifte
 make the right-foot step, and the same four with the legs mirrored below the hips make
 the left-foot step, as for Sophie. Every frame is lined up on his standing picture:
 head on the same centre line, planted foot on the same baseline.
+
+## Scenes menu and replays
+
+The ≡ button (top of a conversation, and in the HUD) opens **Scenes** (`SceneMenu`,
+parts listed in `content/story.ts`): Goal 1 Part 1 "Meeting Sophie" (`meetSophie`),
+Part 2 "The walk to the café" (`walkToCafe`), Part 3 "At the café" (coming soon).
+Finished parts can be replayed, the current one restarted; parts not reached are locked.
+A replay is a real redo: its answers are recorded as new evidence (nothing is
+overwritten), it ends with its own part and returns to where the learner was.
+Goal readiness (`learning/readiness.ts`) is worked out from all kept attempts, recent
+ones weighted more (half-life of 3 attempts), unaided first-try answers counting most;
+shown as a coarse label, never a percentage. It replaces the old "Earlier" history sheet.
+
+## Translations
+
+Every card shows its English. A card marked `presentation.exercise` (a quiz, test or
+exercise) keeps it behind "Show translation" instead. For now only the learner's
+"Bonjour !" to the shopkeeper (`greetShopkeeper`) is marked; more get marked as the
+beats are specified. `translation: "delayed"` still lets a new question's French be
+heard before its English appears. The shopkeeper stays where she stands; the camera
+walks past her (she's in every Lyon-street stretch after she first appears).
+
+## Short walks
+
+Walking isn't the point, so there are four walks, each about four steps (2.6–2.8 s):
+`walkOut` (park → Lyon street, 1 → 1.2), `walkToShops` (passer-by comes up, 1.2 → 1.45),
+`walkOn` (past the shopkeeper, 1.45 → 1.85) and `walkToCafeDoor` (Lyon street →
+café, 1.85 → 2.05, then 1 → 1.25). The park-exit stretch, `walkIntoTown`,
+`walkToShopkeeper` and `walkNearer` are gone; their lines happen where the walk before
+left off. About 11 s of walking in all, down from about 38 s.
