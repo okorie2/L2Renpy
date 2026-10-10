@@ -8,8 +8,10 @@ import { READINESS_LABELS, goalReadiness } from "../../learning/readiness";
  * The story so far, to go back to: each goal and its parts. Any part reached can be
  * played again from its start; how it goes counts, added to what came before.
  */
-export function SceneMenu({ save, pack, onReplay, onClose }: {
+export function SceneMenu({ save, pack, unlockAll = false, onReplay, onClose }: {
   save: GameSave;
+  /** Builder mode: any part can be opened, reached or not. */
+  unlockAll?: boolean;
   pack: Pick<LanguagePack, "dialogues" | "intents">;
   onReplay: (part: StoryPart) => void;
   onClose: () => void;
@@ -36,14 +38,14 @@ export function SceneMenu({ save, pack, onReplay, onClose }: {
                 <ol className="scene-parts">
                   {goal.parts.map((part, index) => {
                     const state = states[index];
-                    const open = state === "done" || state === "current";
+                    const open = state === "done" || state === "current" || (unlockAll && state === "locked");
                     return (
                       <li key={part.id} className={`scene-part ${state}`}>
                         <span className="scene-part-number">Part {index + 1}</span>
                         <span className="scene-part-title">{part.title}</span>
                         {open ? (
                           <button className="secondary-pill" onClick={() => setConfirming(part)}>
-                            {state === "done" ? "Replay" : "Restart"}
+                            {state === "done" ? "Replay" : state === "current" ? "Restart" : "Open"}
                           </button>
                         ) : (
                           <span className="scene-part-status">{state === "coming-soon" ? "Coming soon" : "🔒 Not reached yet"}</span>

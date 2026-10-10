@@ -539,7 +539,7 @@ export const french: LanguagePack = {
           translation: "My name is {playerName}.",
           nextNodeId: "peopleOnStreet",
           conceptIds: [CONCEPT_IDS.INTRODUCE_SELF],
-          presentation: { expression: "listening", framing: "wide", translation: "delayed" },
+          presentation: { expression: "listening", framing: "wide" },
           hint: "Je m'appelle ____.",
           assessment: { excludedSpans: ["playerName"] },
           response: {
@@ -577,20 +577,21 @@ export const french: LanguagePack = {
           speakerId: "sophie",
           language: "interface",
           targetText: "",
-          nextNodeId: "passerbyHello",
+          nextNodeId: "shopkeeperHello",
           conceptIds: [],
           presentation: { scene: "lyon-route" },
-          interlude: { kind: "walk", segments: [{ scene: "lyon-route", zoom: [1.2, 1.45], people: [{ id: "passerby", at: "far", to: "near" }, { id: "shopkeeper" }] }], durationMs: 2600 }
+          interlude: { kind: "walk", segments: [{ scene: "lyon-route", zoom: [1.2, 1.65], people: [{ id: "passerby", at: "far" }, { id: "shopkeeper" }] }], durationMs: 2600 }
         },
-        // Beat 3: a greeting in passing.
-        passerbyHello: {
-          id: "passerbyHello",
-          speakerId: "passerby",
+        // Beat 3: a greeting. The shopkeeper says bonjour and Sophie answers; the
+        // learner's turn comes with the passer-by, further on.
+        shopkeeperHello: {
+          id: "shopkeeperHello",
+          speakerId: "shopkeeper",
           targetText: "Bonjour !",
           translation: "Hello!",
           nextNodeId: "sophieHello",
           conceptIds: [CONCEPT_IDS.GREETING],
-          presentation: { expression: "neutral", framing: "wide", street: { with: "passerby", people: [{ id: "passerby", wave: true }, { id: "shopkeeper" }] } }
+          presentation: { expression: "neutral", framing: "wide", street: { with: "shopkeeper", people: [{ id: "shopkeeper", wave: true }, { id: "passerby", at: "far" }] } }
         },
         sophieHello: {
           id: "sophieHello",
@@ -599,57 +600,49 @@ export const french: LanguagePack = {
           translation: "Hello!",
           nextNodeId: "yourTurnNext",
           conceptIds: [CONCEPT_IDS.GREETING],
-          presentation: { expression: "greeting", framing: "wide", street: { pose: "greeting", with: "passerby" } }
+          // She turns to the shopkeeper, on her right, and waves as she answers.
+          presentation: { expression: "greeting", framing: "wide", street: { pose: "wave", with: "shopkeeper" } }
         },
         yourTurnNext: {
           id: "yourTurnNext",
           speakerId: "sophie",
           language: "interface",
           targetText: "Your turn next time.",
-          nextNodeId: "greetShopkeeper",
+          nextNodeId: "walkOn",
           conceptIds: [],
-          // The passer-by walks on, past the camera.
-          presentation: { expression: "glance", framing: "wide", street: { people: [{ id: "passerby", at: "near", to: "passed" }, { id: "shopkeeper" }] } }
+          presentation: { expression: "glance", framing: "wide" }
         },
-        greetShopkeeper: {
-          id: "greetShopkeeper",
+        // On past the shopkeeper; the passer-by comes up the street to meet them.
+        walkOn: {
+          id: "walkOn",
+          speakerId: "sophie",
+          language: "interface",
+          targetText: "",
+          nextNodeId: "greetPasserby",
+          conceptIds: [],
+          presentation: { scene: "lyon-route" },
+          interlude: { kind: "walk", segments: [{ scene: "lyon-route", zoom: [1.65, 1.95], people: [{ id: "passerby", at: "far", to: "near" }, { id: "shopkeeper" }] }], durationMs: 2600 }
+        },
+        greetPasserby: {
+          id: "greetPasserby",
           speakerId: PLAYER_SPEAKER_ID,
           targetText: "Bonjour !",
           translation: "Hello!",
-          nextNodeId: "parfait",
+          nextNodeId: "anotherQuestion",
           conceptIds: [CONCEPT_IDS.GREETING],
           // A test: the learner answers on their own, so the English is behind "Show translation".
-          presentation: { expression: "neutral", framing: "wide", focus: "shopkeeper", exercise: true, street: { with: "shopkeeper", people: [{ id: "shopkeeper", wave: true }] } },
+          presentation: { expression: "neutral", framing: "wide", focus: "passerby", exercise: true, street: { with: "passerby", people: [{ id: "passerby", wave: true }, { id: "shopkeeper" }] } },
           response: {
             kind: "say",
             exerciseId: "ch1-walk-greet-001",
             intentId: "greet",
             prompt: "Answer out loud.",
             speakOnly: true,
-            question: { text: "Bonjour !", translation: "Hello!", speakerId: "shopkeeper" },
+            question: { text: "Bonjour !", translation: "Hello!", speakerId: "passerby" },
             repairNodeId: "tryAgain"
           }
         },
-        parfait: {
-          id: "parfait",
-          speakerId: "sophie",
-          targetText: "Parfait.",
-          translation: "Perfect.",
-          nextNodeId: "walkOn",
-          conceptIds: [],
-          presentation: { expression: "pleased", framing: "wide" }
-        },
         // Beat 4: a new question, ça va.
-        walkOn: {
-          id: "walkOn",
-          speakerId: "sophie",
-          language: "interface",
-          targetText: "",
-          nextNodeId: "anotherQuestion",
-          conceptIds: [],
-          presentation: { scene: "lyon-route" },
-          interlude: { kind: "walk", segments: [{ scene: "lyon-route", zoom: [1.45, 1.85], people: [{ id: "shopkeeper" }] }], durationMs: 2600 }
-        },
         anotherQuestion: {
           id: "anotherQuestion",
           speakerId: "sophie",
@@ -657,7 +650,8 @@ export const french: LanguagePack = {
           targetText: "There's another question you'll hear all the time.",
           nextNodeId: "caVaIntro",
           conceptIds: [],
-          presentation: { expression: "explaining", framing: "wide" }
+          // The passer-by walks on, past the camera.
+          presentation: { expression: "explaining", framing: "wide", street: { people: [{ id: "passerby", at: "near", to: "passed" }, { id: "shopkeeper" }] } }
         },
         caVaIntro: {
           id: "caVaIntro",
@@ -666,7 +660,7 @@ export const french: LanguagePack = {
           translation: "How are you? / Are you okay?",
           nextNodeId: "notWordForWord",
           conceptIds: [CONCEPT_IDS.BASIC_QUESTION],
-          presentation: { expression: "question", framing: "wide", translation: "delayed" }
+          presentation: { expression: "question", framing: "wide" }
         },
         notWordForWord: {
           id: "notWordForWord",
@@ -712,7 +706,7 @@ export const french: LanguagePack = {
           translation: "I'm good.",
           nextNodeId: "yourTurnCaVa",
           conceptIds: [CONCEPT_IDS.BASIC_QUESTION],
-          presentation: { expression: "pleased", framing: "wide", translation: "delayed" }
+          presentation: { expression: "pleased", framing: "wide" }
         },
         yourTurnCaVa: {
           id: "yourTurnCaVa",
@@ -728,7 +722,7 @@ export const french: LanguagePack = {
           speakerId: PLAYER_SPEAKER_ID,
           targetText: "Ça va bien.",
           translation: "I'm good.",
-          nextNodeId: "tresBien",
+          nextNodeId: "oneMore",
           conceptIds: [CONCEPT_IDS.BASIC_QUESTION],
           presentation: { expression: "listening", framing: "wide" },
           hint: "Ça va ____.",
@@ -743,43 +737,6 @@ export const french: LanguagePack = {
           }
         },
         // Exposure only: "très bien" is not tested in this scene.
-        tresBien: {
-          id: "tresBien",
-          speakerId: "sophie",
-          targetText: "Très bien.",
-          translation: "Very good.",
-          nextNodeId: "caVaCheckAnswer",
-          conceptIds: [],
-          presentation: { expression: "pleased", framing: "wide" }
-        },
-        caVaCheckAnswer: {
-          id: "caVaCheckAnswer",
-          speakerId: PLAYER_SPEAKER_ID,
-          targetText: "Ça va bien.",
-          translation: "I'm good.",
-          nextNodeId: "bien",
-          conceptIds: [CONCEPT_IDS.BASIC_QUESTION],
-          presentation: { expression: "glance", framing: "wide" },
-          hint: "Ça va ____.",
-          response: {
-            kind: "say",
-            exerciseId: "ch1-walk-cava-002",
-            intentId: "answerCaVa",
-            prompt: "Answer out loud.",
-            speakOnly: true,
-            question: { text: "Ça va ?", translation: "How are you?" },
-            repairNodeId: "tryAgain"
-          }
-        },
-        bien: {
-          id: "bien",
-          speakerId: "sophie",
-          targetText: "Bien.",
-          translation: "Good.",
-          nextNodeId: "oneMore",
-          conceptIds: [],
-          presentation: { expression: "pleased", framing: "wide" }
-        },
         // Beat 6: the second major retrieval, the age.
         oneMore: {
           id: "oneMore",
@@ -797,7 +754,7 @@ export const french: LanguagePack = {
           translation: "I'm {playerAge} years old.",
           nextNodeId: "ageExactly",
           conceptIds: [CONCEPT_IDS.INTRODUCE_SELF],
-          presentation: { expression: "listening", framing: "wide", translation: "delayed" },
+          presentation: { expression: "listening", framing: "wide" },
           hint: "J'ai ____ ans.",
           assessment: { excludedSpans: ["playerAge"] },
           response: {
@@ -960,7 +917,7 @@ export const french: LanguagePack = {
           nextNodeId: "weAreHere",
           conceptIds: [],
           presentation: { scene: "cafe-exterior" },
-          interlude: { kind: "walk", segments: [{ scene: "lyon-route", zoom: [1.85, 2.05], people: [{ id: "shopkeeper" }] }, { scene: "cafe-exterior", zoom: [1, 1.25] }], durationMs: 2800 }
+          interlude: { kind: "walk", segments: [{ scene: "lyon-route", zoom: [1.95, 2.1], people: [{ id: "shopkeeper" }] }, { scene: "cafe-exterior", zoom: [1, 1.25] }], durationMs: 2800 }
         },
         // Beat 8: the café.
         weAreHere: {

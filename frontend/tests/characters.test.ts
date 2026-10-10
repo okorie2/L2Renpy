@@ -263,7 +263,7 @@ test("Sophie's street poses are on disk, on the walk cycle's canvas, so she stop
 
 test("Sophie's walk cycle is on disk: ten frames on one canvas, both steps the same length", async () => {
   const { SOPHIE_WALK } = await import("../src/content/scenes");
-  assert.equal(SOPHIE_WALK.frames.length, 10);
+  assert.equal(SOPHIE_WALK.frames.length, 6);
   assert.equal(SOPHIE_WALK.frameMs.length, SOPHIE_WALK.frames.length);
   const [right, left] = SOPHIE_WALK.stepStarts;
   const sum = (from: number, to: number) => SOPHIE_WALK.frameMs.slice(from, to).reduce((total, ms) => total + ms, 0);

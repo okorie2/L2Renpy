@@ -285,10 +285,12 @@ export function WalkInterlude({ walk, paused, onDone, controls }: {
  * where she was and looks back over her shoulder (or, at the café, has turned round);
  * her mouth moves while she speaks, when that pose has a talking version.
  */
-export function StreetStage({ scene, zoom, pose = "glance", people = [], speakingId }: {
+export function StreetStage({ scene, zoom, pose = "glance", flip = false, people = [], speakingId }: {
   scene: SceneBackdrop;
   zoom: number;
   pose?: StreetPose;
+  /** Mirror her pose, to face the other way. */
+  flip?: boolean;
   people?: StreetPresence[];
   /** Who is speaking, while the voice is sounding (their mouth moves, when drawn). */
   speakingId?: string;
@@ -305,7 +307,7 @@ export function StreetStage({ scene, zoom, pose = "glance", people = [], speakin
     <StreetShot
       layers={[{ key: scene.id, scene, zoom, opacity: 1, people: placed }]}
       speakingId={speakingId}
-      figure={<Figure x={scene.walkX ?? DEFAULT_WALK_X} source={assetUrl(art.image)} overlay={talking ? { src: talking, visible: speakingId === "sophie" } : undefined} />}
+      figure={<Figure x={scene.walkX ?? DEFAULT_WALK_X} transform={flip ? "translateX(-50%) scaleX(-1)" : undefined} source={assetUrl(art.image)} overlay={talking ? { src: talking, visible: speakingId === "sophie" } : undefined} />}
     >
       <div className="street-scrim" aria-hidden="true" />
     </StreetShot>

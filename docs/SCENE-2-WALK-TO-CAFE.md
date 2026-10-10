@@ -218,7 +218,7 @@ shown as a coarse label, never a percentage. It replaces the old "Earlier" histo
 
 Every card shows its English. A card marked `presentation.exercise` (a quiz, test or
 exercise) keeps it behind "Show translation" instead. For now only the learner's
-"Bonjour !" to the shopkeeper (`greetShopkeeper`) is marked; more get marked as the
+"Bonjour !" to the passer-by (`greetPasserby`) is marked; more get marked as the
 beats are specified. `translation: "delayed"` still lets a new question's French be
 heard before its English appears. The shopkeeper stays where she stands; the camera
 walks past her (she's in every Lyon-street stretch after she first appears).
@@ -231,3 +231,30 @@ Walking isn't the point, so there are four walks, each about four steps (2.6–2
 café, 1.85 → 2.05, then 1 → 1.25). The park-exit stretch, `walkIntoTown`,
 `walkToShopkeeper` and `walkNearer` are gone; their lines happen where the walk before
 left off. About 11 s of walking in all, down from about 38 s.
+
+## Sophie's walk frames
+
+Six frames (`sophie_walk_back_1..6`, 215 ms each, about 650 ms a step), all drawn, none
+mirrored: left foot pushing off, lifted, landed; then the right foot the same. From
+the sprite sheet of 7 Oct (its frames 1, 5, 2, 3, 4) plus one extra frame for the
+right foot's push-off, background removed and lined up on her standing street poses.
+
+## Greeting order (changed)
+
+The shopkeeper greets first: after `walkToShops` she waves and says "Bonjour !"
+(`shopkeeperHello`), Sophie answers, "Your turn next time." Then `walkOn` takes them on
+past her while the passer-by comes up the street (far → near), and the learner answers
+his "Bonjour !" (`greetPasserby`, the test). On "Parfait." he walks on past the camera.
+His meeting spot is set further up the street (height 0.22) so he isn't oversized at
+that zoom. The quest step is now "Say bonjour to a passer-by" (`greetPasserby`).
+
+## Feedback, retries and instant translations (changed)
+
+- No « Parfait. », « Très bien. » or « Bien. » cards: they showed whatever the answer.
+  Praise comes with the answer instead, sometimes in French with its English
+  (`FRENCH_PRAISE`: Parfait ! / Très bien ! / Bien !), for clear answers only.
+- An answer understood but not yet clear ("Nearly!", "Good try") is always followed
+  by another go: Sophie says the line again and the mic comes back, up to two retries
+  (`MAX_SOUND_RETRIES`). After that: "That's good enough for now. We'll practise it
+  more later." Scene 1's practice does the same: never "Nearly!" with nothing after it.
+- Translations appear with the French at once; the delayed English is gone.

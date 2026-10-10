@@ -1090,3 +1090,5 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--blue); outl
 .scene-confirm .button-row > * { flex: 1; }
 .scenes-button { width: 48px; height: 48px; padding: 0; font-size: 22px; line-height: 1; pointer-events: auto; }
 .hud .scenes-button { margin-left: auto; }
+/* Builder mode: forward that skips ahead is marked, so it isn't mistaken for the learner's. */
+.card-nav-button.skip { border-color: #f0a500; background: #fff4d6; }

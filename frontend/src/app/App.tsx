@@ -17,7 +17,9 @@ import type { WorldPosition } from "../core/models";
 import { chapterOneItems, chapterOneLocations, chapterOneMessages, chapterOneNpcs, chapterOneQuests, chapterOneSceneSpeakers, createStartingPlayer } from "../content/chapter1";
 import { mapPlaces, metCharacters } from "../phone/directory";
 import { deliverMessages, markThreadRead, saveThreadSession, unreadThreadIds } from "../phone/messages";
-import { resolveSayOptions, startDialogue, stepDialogue, type DialogueInput, type DialogueSession } from "../dialogue/engine";
+import { resolveSayOptions, startDialogue, stepDialogue, type DialogueInput, type DialogueSession, type DialogueStep } from "../dialogue/engine";
+import { skipLine } from "../dialogue/skip";
+import { BUILDER_MODE } from "./flags";
 import { afterLiveStep, afterReplayStep, canGoBack, canGoForward, currentCard, goBack, goForward, isReplaying, startTrail, type Trail } from "../dialogue/trail";
 import { PLAYER_SPEAKER_ID } from "../dialogue/models";
 import { buildSlotValues } from "../dialogue/template";
@@ -467,6 +469,18 @@ function Game({ initialSave, onSaveChange, onStartOver, saveNotice, onDismissSav
       setTrail(afterReplayStep(trail, step));
       return;
     }
+    applyStep(trail, step);
+  };
+  /** Builder mode: past the current card without answering it, recording nothing as learning. */
+  const skipCard = () => {
+    if (!trail || !conversation || !dialogue) return;
+    judgedTurn.current++;
+    setThinking(false);
+    applyStep(trail, skipLine(conversation, dialogue, save, dialogueContext()));
+  };
+  /** Take a step of the conversation: on to the next card, or on from a finished dialogue. */
+  const applyStep = (trail: Trail, step: DialogueStep) => {
+    if (step.result === "ignored") return;
     if (step.session.status !== "completed") {
       setSave(step.save);
       setTrail(afterLiveStep(trail, step));
@@ -610,7 +624,8 @@ function Game({ initialSave, onSaveChange, onStartOver, saveNotice, onDismissSav
           onInput={(input) => void sendDialogueInput(input)}
           checkSaid={checkSaid}
           onBack={trail && canGoBack(trail) ? () => moveInConversation(goBack) : undefined}
-          onForward={trail && canGoForward(trail) ? () => moveInConversation(goForward) : undefined}
+          onForward={trail && canGoForward(trail) ? () => moveInConversation(goForward) : BUILDER_MODE ? skipCard : undefined}
+          skipping={Boolean(trail && !canGoForward(trail) && BUILDER_MODE)}
           replaying={Boolean(trail && isReplaying(trail))}
           onExit={leaveConversation}
           onOpenScenes={() => setScenesOpen(true)}
@@ -618,7 +633,7 @@ function Game({ initialSave, onSaveChange, onStartOver, saveNotice, onDismissSav
       )}
 
       {scenesOpen && (
-        <SceneMenu save={save} pack={activeLanguagePack} onReplay={playPart} onClose={() => setScenesOpen(false)} />
+        <SceneMenu save={save} pack={activeLanguagePack} unlockAll={BUILDER_MODE} onReplay={playPart} onClose={() => setScenesOpen(false)} />
       )}
 
       {saveNotice && !conversation && (

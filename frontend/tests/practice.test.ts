@@ -3,7 +3,7 @@ import test from "node:test";
 import { wordAt } from "../src/app/voice";
 import { readWordTimings } from "../src/speech/httpTts";
 import {
-  ALL_PRACTICE_PHRASES, MAX_WORD_ATTEMPTS, PRACTICE_PHRASES, createPhrasePicker, feedbackKind, practiceSpeech, practiceTarget, typedLineMatches,
+  ALL_PRACTICE_PHRASES, FEEDBACK_GROUPS, MAX_WORD_ATTEMPTS, PRACTICE_PHRASES, chooseFeedback, createPhrasePicker, feedbackKind, practiceSpeech, practiceTarget, typedLineMatches,
   recordAttempt, startPractice, wordContext, type PhraseKind, type PracticeResult
 } from "../src/speech/practice";
 import { findRecording, RECORDED_LINES, withRecordings } from "../src/speech/recordings";
@@ -52,7 +52,7 @@ test("a missed line: feedback, the part to practise in its sentence, then the wh
   // The last go at the whole line moves on however it goes: the practice always ends.
   state = recordAttempt(state, result(0.5, "m'appelle"), lines.length, lines);
   assert.equal(state.lineIndex, 1);
-  assert.deepEqual(said(practiceSpeech(state, lines, kinds)), ["<goodTry>", "<movingOn>", lines[1]]);
+  assert.deepEqual(said(practiceSpeech(state, lines, kinds)), ["<goodEnough>", lines[1]], "never « Nearly! » without another go: good enough for now");
   state = recordAttempt(state, result(0.9), lines.length, lines);
   assert.equal(state.done, true);
   assert.deepEqual(said(practiceSpeech(state, lines, kinds)), ["<clear>"]);
@@ -129,6 +129,7 @@ test("the voice pack holds every line that is the same for everyone, and nothing
   assert.ok(has("sophie", "fr", "Mon niveau actuel en français est débutant.", "slow"), "and their slower versions");
   assert.ok(has("sophie", "fr", "m'appelle"), "practice words, even from a line with a name in it");
   for (const phrase of ALL_PRACTICE_PHRASES) assert.ok(has("sophie", "en", phrase), `Sophie's phrase: ${phrase}`);
+  for (const phrase of ["Très bien !", "Bien !", "Parfait !"]) assert.ok(has("sophie", "fr", phrase), `Sophie's French praise: ${phrase}`);
   assert.ok(!has("sophie", "en", PRACTICE_PHRASES.goodTry[0], "slow"), "no slower English");
   const word = lines.find((line) => line.text === "m'appelle" && line.rate === "normal");
   assert.deepEqual(word?.context, { before: "Je", after: "Marie." }, "a packed word is said within a sentence");
@@ -248,4 +249,24 @@ test("without a microphone, a typed line counts when it has the line's words, ac
   assert.ok(typedLineMatches("Mon niveau actuel en francais est debutant", "Mon niveau actuel en français est débutant.", []));
   assert.ok(!typedLineMatches("bonjour", "Je m'appelle Ella.", ["Ella"]));
   assert.ok(typedLineMatches("je m'appelle Sam", "Je m'appelle Ella.", ["Ella"]), "the name isn't graded");
+});
+
+test("not quite, with no one word to practise: the whole line once more, then good enough for now", () => {
+  let state = recordAttempt(startPractice(), result(0.78), lines.length, lines);
+  assert.equal(state.lineIndex, 0, "the same line again");
+  assert.deepEqual(said(practiceSpeech(state, lines, kinds)), ["<close>", "<sayAgain>", lines[0]]);
+  state = recordAttempt(state, result(0.78), lines.length, lines);
+  assert.equal(state.lineIndex, 1);
+  assert.deepEqual(said(practiceSpeech(state, lines, kinds)), ["<goodEnough>", lines[1]]);
+});
+
+test("feedback that says « not there yet » is only used when another go follows", () => {
+  assert.deepEqual(Object.entries(FEEDBACK_GROUPS).filter(([, group]) => group.retry).map(([kind]) => kind).sort(), ["close", "goodTry", "tricky"]);
+  assert.deepEqual(chooseFeedback(0.97), { kind: "excellent", retry: false });
+  assert.deepEqual(chooseFeedback(0.88), { kind: "clear", retry: false });
+  assert.deepEqual(chooseFeedback(0.78, { retriesDone: 0 }), { kind: "close", retry: true });
+  assert.deepEqual(chooseFeedback(0.6, { retriesDone: 1 }), { kind: "goodTry", retry: true });
+  assert.deepEqual(chooseFeedback(0.78, { retriesDone: 2 }), { kind: "goodEnough", retry: false }, "tries used up: good enough for now");
+  assert.deepEqual(chooseFeedback(null), { kind: "clear", retry: false }, "no score: taken as clear");
+  for (const kind of ["goodEnough"] as const) assert.ok(PRACTICE_PHRASES[kind].length > 0);
 });

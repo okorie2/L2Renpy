@@ -122,11 +122,6 @@ export interface LinePresentation {
    */
   focus?: string;
   /**
-   * The English shows on every card. `delayed` lets the French be heard first, then
-   * shows it after a beat (a question's first exposure).
-   */
-  translation?: "delayed";
-  /**
    * A quiz, test or exercise: the learner is meant to manage alone, so the English is
    * behind a "Show translation" button instead of shown.
    */
@@ -137,6 +132,8 @@ export interface LinePresentation {
    */
   street?: {
     pose?: StreetPose;
+    /** Sophie's pose mirrored, so she faces the other way (toward someone on her right). */
+    flip?: boolean;
     /** Who Sophie and the learner are talking with: there, close by. */
     with?: string;
     /**
@@ -169,7 +166,7 @@ export interface StreetPresence {
  * looking back over her shoulder; `greeting` is waving to someone passing; the rest
  * face the camera, for when she has stopped and turned round.
  */
-export type StreetPose = "glance" | "greeting" | "playful" | "explaining" | "pleased";
+export type StreetPose = "glance" | "greeting" | "wave" | "playful" | "explaining" | "pleased";
 
 /**
  * A moment with no words: the camera pulls back and follows Sophie from behind as she

@@ -52,6 +52,7 @@ export type PracticeFeedback =
   | { kind: "word-clear"; word: string }
   | { kind: "word-again"; word: string }
   | { kind: "word-done"; word: string }
+  | { kind: "phrase-again" }
   | { kind: "moving-on" };
 
 export interface PracticeState {
@@ -209,7 +210,8 @@ export function recordAttempt(state: PracticeState, result: PracticeResult, line
   if (passes(result.similarity, PHRASE_PASS)) return nextLine(state, lineCount, state.finalPhrase ? "practised" : "clear", { kind: "clear" }, result);
   if (state.finalPhrase) return nextLine(state, lineCount, "practised", { kind: "moving-on" }, result);
   const weakest = result.weakestWord;
-  if (!weakest?.word) return nextLine(state, lineCount, "practised", { kind: "moving-on" }, result);
+  // Not quite, and no one word to blame: the whole line once more before moving on.
+  if (!weakest?.word) return { ...state, ...heard, finalPhrase: true, feedback: { kind: "phrase-again" } };
   const line = lines[state.lineIndex];
   const chunk = line ? practiceChunk(line, weakest.word, weakest.index) : practiceChunk(weakest.word, weakest.word, 0);
   return {
@@ -249,19 +251,57 @@ export const PRACTICE_PHRASES = {
   sayAgain: ["Say this again.", "Once more.", "Try it again.", "One more time."],
   wholeAgain: ["Now the whole sentence again.", "Now let's put it all together.", "Now try the full sentence.", "Let's try the whole thing again."],
   movingOn: ["Let's keep going.", "We'll come back to it later.", "Let's move on."],
+  // After the retries: not perfect, and that's fine. It's practised again later.
+  goodEnough: [
+    "That's good enough for now. We'll practise it more later.",
+    "Good enough for now. We'll come back to it.",
+    "That'll do for now. We'll keep working on it later."
+  ],
   listenFirst: ["Listen, then say it after me.", "Listen first, then repeat after me."]
 } as const;
 
 export type PhraseKind = keyof typeof PRACTICE_PHRASES;
 
 /**
- * Feedback on an answer that was understood. It moves the conversation on, so it
- * is never discouraging: an unscored answer counts as clear, and a hard one as a good try.
+ * Praise Sophie sometimes gives in French, with its English. For an answer that was
+ * clear or better; never for one she'll ask to hear again.
  */
-export function answerFeedbackKind(similarity: number | null | undefined): PhraseKind {
-  if (similarity === null || similarity === undefined) return "clear";
-  const kind = feedbackKind(similarity, PHRASE_PASS);
-  return kind === "tricky" ? "goodTry" : kind;
+export const FRENCH_PRAISE: Record<"excellent" | "clear", Array<{ text: string; translation: string }>> = {
+  excellent: [{ text: "Parfait !", translation: "Perfect!" }, { text: "Très bien !", translation: "Very good!" }],
+  clear: [{ text: "Très bien !", translation: "Very good!" }, { text: "Bien !", translation: "Good!" }]
+};
+export const ALL_FRENCH_PRAISE: string[] = [...new Set(Object.values(FRENCH_PRAISE).flat().map((item) => item.text))];
+
+/**
+ * How each kind of feedback may be used. A kind with `retry` says the attempt isn't
+ * there yet ("Nearly!", "Good try"), so it is only ever said when another go follows.
+ * Once the retries are used up, those attempts get `goodEnough` instead.
+ */
+export const FEEDBACK_GROUPS: Record<"excellent" | "clear" | "close" | "goodTry" | "tricky" | "goodEnough", { retry: boolean }> = {
+  excellent: { retry: false },
+  clear: { retry: false },
+  close: { retry: true },
+  goodTry: { retry: true },
+  tricky: { retry: true },
+  goodEnough: { retry: false }
+};
+
+export type FeedbackKind = keyof typeof FEEDBACK_GROUPS;
+
+/**
+ * What to say about an attempt, from its score and the tries already had. `retry`
+ * means: ask for it again. A score that isn't clear yet is met with a retry while
+ * there are tries left, and with "good enough for now" after that. No score (the
+ * check wasn't available) counts as clear.
+ */
+export function chooseFeedback(
+  similarity: number | null | undefined,
+  { pass = PHRASE_PASS, retriesDone = 0, maxRetries = 2 }: { pass?: number; retriesDone?: number; maxRetries?: number } = {}
+): { kind: FeedbackKind; retry: boolean } {
+  if (similarity === null || similarity === undefined) return { kind: "clear", retry: false };
+  const kind = feedbackKind(similarity, pass);
+  if (!FEEDBACK_GROUPS[kind].retry) return { kind, retry: false };
+  return retriesDone < maxRetries ? { kind, retry: true } : { kind: "goodEnough", retry: false };
 }
 
 /** Every phrase Sophie may say, for the voice pack. */
@@ -278,6 +318,7 @@ const PHRASE_EXPRESSION: Record<PhraseKind, CharacterExpression> = {
   sayAgain: "beckoning",
   wholeAgain: "beckoning",
   movingOn: "presenting",
+  goodEnough: "well-done",
   listenFirst: "presenting"
 };
 const PHRASE_KINDS = new Map<string, PhraseKind>(
@@ -346,7 +387,9 @@ export function practiceSpeech(next: PracticeState, lines: string[], pick: Phras
     case "word-again": return [prompt(pick(word())), prompt(pick("sayAgain")), ...then];
     case "word-clear": return [prompt(pick(word())), prompt(pick("wholeAgain")), ...then];
     case "word-done": return [prompt(pick(word())), prompt(pick("wholeAgain")), ...then];
-    case "moving-on": return [prompt(pick(phrase())), prompt(pick("movingOn")), ...then];
+    case "phrase-again": return [prompt(pick(phrase())), prompt(pick("sayAgain")), ...then];
+    // The tries are used up: never "Nearly!" with nothing after it, but good enough for now.
+    case "moving-on": return [prompt(pick("goodEnough")), ...then];
     default: return then;
   }
 }

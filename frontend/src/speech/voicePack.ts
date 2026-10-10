@@ -1,7 +1,7 @@
 import { PLAYER_SPEAKER_ID } from "../dialogue/models";
 import { resolveTemplate, templateSlots, type SlotDefinition } from "../dialogue/template";
 import type { LanguagePack } from "../languages/types";
-import { ALL_PRACTICE_PHRASES, practiceChunk, splitWords } from "./practice";
+import { ALL_FRENCH_PRAISE, ALL_PRACTICE_PHRASES, practiceChunk, splitWords } from "./practice";
 import type { RecordedLine } from "./recordings";
 import type { SpeechRate, WordTiming } from "./types";
 
@@ -110,6 +110,7 @@ export function voicePackLines(
   }
   for (const speakerId of practiceSpeakers) {
     for (const text of ALL_PRACTICE_PHRASES) add({ speakerId, languageCode: options.interfaceLanguageCode, text, rate: "normal" });
+    for (const text of ALL_FRENCH_PRAISE) add({ speakerId, languageCode: pack.code, text, rate: "normal" });
   }
   for (const item of pack.vocabulary) add({ languageCode: pack.code, text: item.lemma, rate: "normal" });
   return [...lines.values()];

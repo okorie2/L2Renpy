@@ -231,7 +231,7 @@ export const chapterOneQuests: Quest[] = [
     summary: "Walk to the café with Sophie and answer her questions in French.",
     prerequisites: ["meetSophie"],
     objectives: [
-      { id: "greetShopkeeper", description: "Say bonjour to the shopkeeper", trigger: { type: "DIALOGUE_LINE_COMPLETED", dialogueId: "walkToCafe", nodeId: "greetShopkeeper" } },
+      { id: "greetPasserby", description: "Say bonjour to a passer-by", trigger: { type: "DIALOGUE_LINE_COMPLETED", dialogueId: "walkToCafe", nodeId: "greetPasserby" } },
       { id: "answerCaVa", description: "Answer « Ça va ? »", trigger: { type: "DIALOGUE_LINE_COMPLETED", dialogueId: "walkToCafe", nodeId: "caVaAnswer" } },
       { id: "answerAge", description: "Answer « Tu as quel âge ? »", trigger: { type: "INTENT_COMMUNICATED", intentId: "tellAge" } },
       { id: "answerName", description: "Answer « Comment tu t'appelles ? »", trigger: { type: "DIALOGUE_LINE_COMPLETED", dialogueId: "walkToCafe", nodeId: "miniNameAnswer" } },

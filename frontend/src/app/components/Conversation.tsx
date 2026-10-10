@@ -3,13 +3,13 @@ import { resolveConversationVisual } from "../../characters/resolve";
 import type { CharacterExpression } from "../../characters/types";
 import type { PlayerProfile } from "../../core/models";
 import { DISPLAY_NAME_MAX_LENGTH, sanitizeAge, sanitizeDisplayName } from "../../core/player";
-import { sessionLine, suggestionsUnlocked, type DialogueInput, type DialogueSession, type HistoryLine } from "../../dialogue/engine";
+import { sessionLine, suggestionsUnlocked, type DialogueInput, type DialogueSession } from "../../dialogue/engine";
 import { PLAYER_SPEAKER_ID, type Dialogue, type DialogueNode } from "../../dialogue/models";
 import { resolveDialogueLine, resolveTemplate, type ResolvedLine, type ResolvedText, type SlotValues } from "../../dialogue/template";
 import type { AssistanceKind, PronunciationDiagnostics, SupportLevel } from "../../learning/models";
 import { supportPolicy } from "../../learning/support";
 import type { PracticeClient } from "../../speech/httpPractice";
-import { answerFeedbackKind, createPhrasePicker, type PracticeResult } from "../../speech/practice";
+import { FRENCH_PRAISE, chooseFeedback, createPhrasePicker, type PracticeResult } from "../../speech/practice";
 import type { AudioClip, SpeechCapability } from "../../speech/types";
 import type { VoiceLibrary } from "../../speech/voiceLibrary";
 import { SHOW_NEXT_BUTTON } from "../flags";
@@ -21,7 +21,6 @@ import { CharacterPortrait } from "./CharacterPortrait";
 import { Practice } from "./Practice";
 import { StreetStage, WalkInterlude } from "./WalkInterlude";
 import { streetCamera, streetPeople } from "../../content/scenes";
-import { SAID_LABEL, SaidText, saidSummary } from "./Said";
 import { SoundSettings } from "./SoundSettings";
 import { pronunciationNote, SpeechControl } from "./SpeechControl";
 import { TypeInstead } from "./TypeInstead";
@@ -72,6 +71,8 @@ type Props = {
   onBack?: () => void;
   /** Open the scene menu, to play a part of the story again. */
   onOpenScenes?: () => void;
+  /** Builder mode: forward skips the current card, unanswered, instead of returning to one seen. */
+  skipping?: boolean;
   /** Forward again through cards already seen. Absent at the furthest card reached. */
   onForward?: () => void;
   /** Behind the furthest card: answers here are practice and are not recorded. */
@@ -79,18 +80,6 @@ type Props = {
   onExit: () => void;
 };
 
-/** Shown on the line that follows the player's answer: what was taken in, and how it went. */
-function SaidFeedback({ line, languageCode }: { line: HistoryLine; languageCode: string }) {
-  const summary = saidSummary(line);
-  return (
-    <div className={`said-feedback${line.said?.communicated === false ? " missed" : ""}`}>
-      <p className="heard-note">{SAID_LABEL[line.said?.mode ?? "typed"]}: “<SaidText line={line} languageCode={languageCode} />”</p>
-      {summary && <p className="said-summary">{summary}</p>}
-      {pronunciationNote(line.said?.pronunciation) && <p className="said-summary">{pronunciationNote(line.said?.pronunciation)}</p>}
-      {line.rewording && <p className="said-summary">You could also say: <span lang={languageCode}>“{line.rewording}”</span></p>}
-    </div>
-  );
-}
 
 /** Render resolved text, underlining spans that assessment will not grade. */
 function renderText(resolved: ResolvedText, markUnscored: boolean) {
@@ -131,7 +120,6 @@ type LineProps = Pick<Props, "languageCode" | "profile" | "supportLevel" | "spee
   /** The words of this line: scripted, or the speaker's reaction to what was said. */
   line: ResolvedLine;
   /** The player's answer just before this line, shown back with how it went. */
-  lastSaid?: HistoryLine;
   /** Who the player is talking to, for the moment their answer is being considered. */
   partnerName?: string;
   voice: LineVoice;
@@ -149,6 +137,8 @@ function DialogueLine(props: LineProps) {
   return response?.kind === "say" && response.speakOnly ? <SpeakLine {...props} /> : <StandardLine {...props} />;
 }
 
+/** Times an understood answer may be asked for again because it didn't sound clear yet. */
+const MAX_SOUND_RETRIES = 2;
 /** Sophie's reaction to an understood answer stays readable at least this long. */
 const FEEDBACK_MIN_MS = 1600;
 /** A short pause after she finishes, before the card goes. */
@@ -157,9 +147,6 @@ const FEEDBACK_AFTER_MS = 500;
 const MISSED_HOLD_MS = 1200;
 const wait = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms));
 
-/** How long the English waits after the French, when it follows "after a beat". */
-const TRANSLATION_BEAT_MS = 500;
-const SILENT_TRANSLATION_BEAT_MS = 1600;
 
 /** What the pronunciation check found, in the form kept with the learner's progress. */
 function diagnosticsOf(result: PracticeResult): PronunciationDiagnostics {
@@ -177,33 +164,28 @@ function diagnosticsOf(result: PracticeResult): PronunciationDiagnostics {
  * microphone can't be used.
  */
 function SpeakLine(props: LineProps) {
-  const { node, line, languageCode, speech, transcribe, voice, lastSaid, thinking, onInput, retrying, partnerId, partnerName } = props;
+  const { node, line, languageCode, speech, transcribe, voice, thinking, onInput, retrying, partnerId, partnerName } = props;
   const response = node.response as Extract<NonNullable<DialogueNode["response"]>, { kind: "say" }>;
   const question = response.question;
-  const timing = node.presentation?.translation;
 
   const [assisted, setAssisted] = useState(false);
   const [replayed, setReplayed] = useState(false);
   const [translationAsked, setTranslationAsked] = useState(false);
   const [micFailed, setMicFailed] = useState(false);
   /** The answer just given, and Sophie's reaction once it is known to be understood. */
-  const [heard, setHeard] = useState<{ transcript: string; pronunciation?: PronunciationDiagnostics; phrase?: string } | undefined>(undefined);
+  const [heard, setHeard] = useState<{ transcript: string; pronunciation?: PronunciationDiagnostics; phrase?: string; translation?: string; phraseLang?: string } | undefined>(undefined);
+  // Understood, but not yet clear: Sophie asks for it again, a couple of times at most.
+  const [soundRetries, setSoundRetries] = useState(0);
+  const [retryNote, setRetryNote] = useState<string | undefined>(undefined);
+  const lastFrench = useRef<string | undefined>(undefined);
   const [pickPhrase] = useState(() => createPhrasePicker());
   const alive = useRef(true);
   useEffect(() => () => { alive.current = false; }, []);
 
-  // The question's English: after a beat on first hearing, behind a tap once it is known.
-  const silent = voice.status === "off" || voice.status === "unavailable";
-  const [beatPassed, setBeatPassed] = useState(timing !== "delayed");
-  useEffect(() => {
-    if (beatPassed || props.paused) return;
-    if (voice.status !== "finished" && !silent) return;
-    const timer = window.setTimeout(() => setBeatPassed(true), silent ? SILENT_TRANSLATION_BEAT_MS : TRANSLATION_BEAT_MS);
-    return () => window.clearTimeout(timer);
-  }, [beatPassed, voice.status, props.paused, silent]);
-  // The English shows, except on a quiz, test or exercise, where it waits for a tap.
+  // The English shows with the French, at once, except on a quiz, test or exercise,
+  // where it waits for a tap.
   const translationOnRequest = Boolean(node.presentation?.exercise);
-  const questionTranslationShown = Boolean(question?.translation) && (translationAsked || (!translationOnRequest && beatPassed));
+  const questionTranslationShown = Boolean(question?.translation) && (translationAsked || !translationOnRequest);
 
   const assistance = (): AssistanceKind[] => {
     const used: AssistanceKind[] = [];
@@ -239,10 +221,35 @@ function SpeakLine(props: LineProps) {
       if (alive.current) onInput(checked.input);
       return;
     }
-    const phrase = pickPhrase(answerFeedbackKind(pronunciation?.phraseRelativeSimilarity));
-    setHeard({ transcript: said, pronunciation, phrase });
+    const { kind, retry } = chooseFeedback(pronunciation?.phraseRelativeSimilarity, { retriesDone: soundRetries, maxRetries: MAX_SOUND_RETRIES });
+    const english = (text: string) => ({ text, languageCode: props.interfaceLanguageCode, speakerId: partnerId });
+    // Feedback that says it isn't there yet always comes with another go: hear it again, then say it again.
+    if (retry) {
+      const reaction = pickPhrase(kind);
+      const again = pickPhrase("sayAgain");
+      setHeard({ transcript: said, pronunciation, phrase: `${reaction} ${again}` });
+      const started = Date.now();
+      await props.speak([english(reaction), english(again), { text: line.target.text, languageCode, speakerId: partnerId }]);
+      await wait(Math.max(FEEDBACK_AFTER_MS, FEEDBACK_MIN_MS - (Date.now() - started)));
+      if (!alive.current) return;
+      setSoundRetries((count) => count + 1);
+      setRetryNote(pronunciationNote(pronunciation));
+      setHeard(undefined);
+      return;
+    }
+    // Clear: praise, sometimes in French. After the retries: good enough for now.
+    let spoken = english(pickPhrase(kind));
+    let translation: string | undefined;
+    if ((kind === "excellent" || kind === "clear") && Math.random() < 0.5) {
+      const options = FRENCH_PRAISE[kind].filter((item) => item.text !== lastFrench.current);
+      const choice = options[Math.floor(Math.random() * options.length)];
+      lastFrench.current = choice.text;
+      spoken = { text: choice.text, languageCode, speakerId: partnerId };
+      translation = choice.translation;
+    }
+    setHeard({ transcript: said, pronunciation, phrase: spoken.text, translation, phraseLang: spoken.languageCode });
     const started = Date.now();
-    await props.speak([{ text: phrase, languageCode: props.interfaceLanguageCode, speakerId: partnerId }]);
+    await props.speak([spoken]);
     // Silent, or very quick: still long enough to read.
     await wait(Math.max(FEEDBACK_AFTER_MS, FEEDBACK_MIN_MS - (Date.now() - started)));
     if (alive.current) onInput(checked.input);
@@ -258,7 +265,6 @@ function SpeakLine(props: LineProps) {
         </button>
       )}
       <div className="dialogue-scroll speak-layout">
-        {lastSaid && <SaidFeedback line={lastSaid} languageCode={languageCode} />}
 
         {question && (
           <div className="qa-group">
@@ -284,14 +290,16 @@ function SpeakLine(props: LineProps) {
         <div className="speak-action">
           {heard ? (
             <div className="answer-feedback" role="status">
-              {heard.phrase && <p className="feedback-phrase">{heard.phrase}</p>}
+              {heard.phrase && <p className="feedback-phrase" lang={heard.phraseLang}>{heard.phrase}</p>}
+              {heard.translation && <p className="translation">{heard.translation}</p>}
               <p className="heard-note">You said: “<span lang={languageCode}>{heard.transcript}</span>”</p>
               {heard.phrase && pronunciationNote(heard.pronunciation) && <p className="said-summary">{pronunciationNote(heard.pronunciation)}</p>}
               {!heard.phrase && <p className="speech-status">{thinking ? `${partnerName ?? "They"} is thinking…` : "Just a moment…"}</p>}
             </div>
           ) : (
             <>
-              <p className="speak-prompt">{retrying ? "Try again. " : ""}{response.prompt}</p>
+              {retryNote && <p className="said-summary">{retryNote}</p>}
+              <p className="speak-prompt">{retrying || soundRetries > 0 ? "Try again. " : ""}{response.prompt}</p>
 
               {thinking && <p className="speech-status thinking" role="status">{partnerName ?? "They"} is thinking…</p>}
 
@@ -317,12 +325,11 @@ function SpeakLine(props: LineProps) {
 }
 
 function StandardLine(props: LineProps) {
-  const { node, line, speakerName, partnerName, languageCode, lineLanguage, profile, supportLevel, speech, transcribe, sayChoices, offerAnswers, retrying, voice, subtitles, lastSaid, thinking, onInput } = props;
+  const { node, line, speakerName, partnerName, languageCode, lineLanguage, profile, supportLevel, speech, transcribe, sayChoices, offerAnswers, retrying, voice, subtitles, thinking, onInput } = props;
   const response = node.response;
   const isSay = response?.kind === "say";
   // A question met before keeps its English behind a tap, even where the level would show it.
   const levelPolicy = supportPolicy(supportLevel);
-  const translationTiming = node.presentation?.translation;
   // The English shows on every card, except a quiz, test or exercise, where it waits for a tap.
   const policy = { ...levelPolicy, translation: node.presentation?.exercise ? "on-request" as const : "visible" as const };
 
@@ -345,16 +352,8 @@ function StandardLine(props: LineProps) {
   // Listening first: a spoken line keeps its text back until asked. Silence always shows the text.
   const voiced = !isSay && (voice.status === "loading" || voice.status === "playing" || voice.status === "finished");
   const textHidden = voiced && !subtitles && !textRevealed;
-  // A question heard for the first time: the French first, then after a beat its meaning.
-  const delayTranslation = translationTiming === "delayed" && policy.translation === "visible" && !isSay;
-  const [beatPassed, setBeatPassed] = useState(!delayTranslation);
-  useEffect(() => {
-    if (beatPassed || props.paused) return;
-    const silent = voice.status === "off" || voice.status === "unavailable";
-    if (voice.status !== "finished" && !silent) return;
-    const timer = window.setTimeout(() => setBeatPassed(true), silent ? 1600 : 500);
-    return () => window.clearTimeout(timer);
-  }, [beatPassed, voice.status, props.paused]);
+  // The English appears with the French, never after a delay.
+  const beatPassed = true;
   const translationVisible = modelVisible && !textHidden && Boolean(line.translation)
     && ((policy.translation === "visible" && beatPassed) || translationRevealed);
   const canRevealTranslation = modelVisible && !textHidden && Boolean(line.translation) && !translationVisible
@@ -387,8 +386,7 @@ function StandardLine(props: LineProps) {
     if (!props.autoAdvance || response || thinking || props.paused) return;
     const silent = voice.status === "off" || voice.status === "unavailable";
     if (voice.status !== "finished" && !silent) return;
-    // A delayed translation gets time to be read once it appears.
-    const readingTime = (silent ? Math.max(1800, line.target.text.length * 55) : 700) + (delayTranslation ? 2200 : 0);
+    const readingTime = silent ? Math.max(1800, line.target.text.length * 55) : 700;
     const timer = window.setTimeout(() => onInput({ type: "CONTINUE", assistance: assistance(), ...heardAs() }), readingTime);
     return () => window.clearTimeout(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -453,7 +451,6 @@ function StandardLine(props: LineProps) {
       )}
 
       <div className="dialogue-scroll">
-        {lastSaid && <SaidFeedback line={lastSaid} languageCode={languageCode} />}
         {isSay && <p className="turn-prompt">{retrying ? "Try again. " : ""}{response.prompt}</p>}
         {textHidden && <p className="listen-placeholder" role="status">Listen…</p>}
         {modelVisible && !textHidden && (
@@ -629,7 +626,7 @@ function AudioSheet({ settings, available, onChange, onClose }: {
  * partner's portrait stands above a bottom dialogue card, and every control is
  * thumb-sized. All progression comes from the dialogue engine.
  */
-export function Conversation({ dialogue, session, speakers, voiceLibrary, audioSettings, onAudioSettingsChange, onBack, onForward, onOpenScenes, replaying, onExit, interfaceLanguageCode, onInput, ...lineProps }: Props) {
+export function Conversation({ dialogue, session, speakers, voiceLibrary, audioSettings, onAudioSettingsChange, onBack, onForward, onOpenScenes, skipping, replaying, onExit, interfaceLanguageCode, onInput, ...lineProps }: Props) {
   const [audioOpen, setAudioOpen] = useState(false);
   const node = dialogue.nodes[session.nodeId];
   const speakerName = speakers[node.speakerId]?.name ?? node.speakerId;
@@ -741,7 +738,7 @@ export function Conversation({ dialogue, session, speakers, voiceLibrary, audioS
           <img src={icons.back} alt="" />
         </button>
         {onForward && (
-          <button className="card-nav-button" onClick={forward} aria-label="Forward to the next line you've seen">
+          <button className={`card-nav-button${skipping ? " skip" : ""}`} onClick={forward} aria-label={skipping ? "Skip this card (builder mode)" : "Forward to the next line you've seen"}>
             <img src={icons.back} className="mirrored" alt="" />
           </button>
         )}
@@ -787,9 +784,6 @@ export function Conversation({ dialogue, session, speakers, voiceLibrary, audioS
     ? streetCamera(dialogue, [...session.history.map((entry) => entry.nodeId), node.id])
     : undefined;
   const failures = session.failedAttempts[node.id] ?? 0;
-  // On the line that follows the player's answer, show what was taken in and how it went.
-  const lastLine = session.history.at(-1);
-  const lastSaid = lastLine?.said ? lastLine : undefined;
 
   // Have the next character line ready before it is reached. Lines that depend on
   // the answer being given now are left until their words are known.
@@ -846,6 +840,7 @@ export function Conversation({ dialogue, session, speakers, voiceLibrary, audioS
           scene={street.scene}
           zoom={street.zoom}
           pose={node.presentation?.street?.pose}
+          flip={node.presentation?.street?.flip}
           people={streetPeople(dialogue, [...session.history.map((entry) => entry.nodeId), node.id])}
           speakingId={speaking ? (speaker.speaking ? speaker.speaking.item.speakerId : voicedBy) : undefined}
         />
@@ -877,7 +872,6 @@ export function Conversation({ dialogue, session, speakers, voiceLibrary, audioS
           retrying={failures > 0}
           voice={lineVoice}
           subtitles={audioSettings.subtitles}
-          lastSaid={lastSaid}
           lineLanguage={lineLanguage}
           partnerId={session.npcId}
           askerName={askedBy ? speakers[askedBy]?.name ?? askedBy : undefined}

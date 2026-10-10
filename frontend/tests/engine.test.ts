@@ -214,7 +214,6 @@ test("the walk to the café: Sophie's questions, a greeting in passing, and any 
   continueTo("nameAnswer");
   const card = walk.nodes.nameAnswer.response!;
   assert.ok(card.kind === "say" && card.speakOnly && card.question?.text === "Comment tu t'appelles ?");
-  assert.equal(walk.nodes.nameAnswer.presentation?.translation, "delayed", "a new question is heard before it is translated");
   // Nothing moves on until the answer is understood: a miss gets encouragement and the same card again.
   state = go(state, walk, say("euh…"));
   assert.equal(state.session.nodeId, "tryAgain");
@@ -227,24 +226,24 @@ test("the walk to the café: Sophie's questions, a greeting in passing, and any 
   assert.deepEqual(state.session.history.at(-1)?.said?.pronunciation, pronunciation);
   assert.deepEqual(state.save.evidenceLog.at(-1)?.pronunciation, pronunciation);
 
-  // A passer-by and a shopkeeper say bonjour; the learner answers the shopkeeper.
+  // The shopkeeper says bonjour and Sophie answers; further on, the learner answers a passer-by.
   // They are on the street from afar, before anyone speaks, and come closer as Sophie walks.
   const onStreet = () => streetPeople(walk, [...state.session.history.map((entry) => entry.nodeId), state.session.nodeId]);
   assert.deepEqual(onStreet(), [{ id: "passerby", at: "far" }, { id: "shopkeeper", at: undefined }]);
-  continueTo("yourTurnNext");
-  assert.deepEqual(onStreet().find((person) => person.id === "passerby"), { id: "passerby", at: "near", to: "passed" }, "the passer-by walks on past");
-  continueTo("greetShopkeeper");
-  assert.deepEqual(onStreet().map((person) => person.id), ["shopkeeper"], "and has gone");
-  assert.equal(walk.nodes.greetShopkeeper.presentation?.focus, "shopkeeper");
-  assert.equal(walk.nodes.passerbyHello.translation, "Hello!", "every card shows its English");
-  assert.ok(walk.nodes.greetShopkeeper.presentation?.exercise, "answering the shopkeeper is a test: the English waits for a tap");
+  continueTo("shopkeeperHello");
+  assert.equal(walk.nodes.shopkeeperHello.speakerId, "shopkeeper");
+  assert.equal(walk.nodes.shopkeeperHello.translation, "Hello!", "every card shows its English");
+  continueTo("greetPasserby");
+  assert.deepEqual(onStreet().find((person) => person.id === "passerby"), { id: "passerby", wave: true }, "the passer-by has come up to them, waving");
+  assert.equal(walk.nodes.greetPasserby.presentation?.focus, "passerby");
+  assert.ok(walk.nodes.greetPasserby.presentation?.exercise, "answering the passer-by is a test: the English waits for a tap");
   state = go(state, walk, say("bonjour"));
+  assert.equal(state.session.nodeId, "anotherQuestion", "no separate « Parfait. » card: the praise comes with the answer");
+  assert.deepEqual(onStreet().find((person) => person.id === "passerby"), { id: "passerby", at: "near", to: "passed" }, "then walks on past");
 
   continueTo("caVaAnswer");
   state = go(state, walk, say("ça va bien"));
-  continueTo("caVaCheckAnswer");
-  assert.ok(!walk.nodes.caVaCheckAnswer.presentation?.exercise, "not marked as a test, so its English shows");
-  state = go(state, walk, say("ça va"));
+  assert.equal(walk.nodes.caVaCheckAnswer, undefined, "« Ça va ? » is answered once");
 
   // The number is the learner's own: any age in « J'ai … ans » communicates.
   continueTo("ageAnswer");

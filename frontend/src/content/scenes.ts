@@ -46,20 +46,19 @@ export const SCENES: Record<string, SceneBackdrop> = {
 };
 
 /**
- * Sophie walking away from the camera, for the walks between beats: ten frames on one
- * canvas (tools/build_walk_cycle.py builds them). Frames 1–5 are her left foot's step:
- * heel lifts, pushes off, passes and reaches ahead while the right foot is planted.
- * Frames 6–10 are the same five with the legs flipped below the hips, for her right
- * foot's step, so both steps match. If they are missing, her single walking-away pose
- * is moved in step instead.
+ * Sophie walking away from the camera, for the walks between beats: six frames on one
+ * canvas, each step drawn (none mirrored). Left foot: pushing off (1), lifted behind
+ * (2), landed ahead (3). Right foot: the same, frames 4–6. Lined up on her standing
+ * street poses, head on the same line, so she stops exactly where she walked. If the
+ * frames are missing, her single walking-away pose is moved in step instead.
  */
 export const SOPHIE_WALK = {
-  frames: Array.from({ length: 10 }, (_, index) => walk(`sophie_walk_back_${index + 1}.webp`)),
+  frames: Array.from({ length: 6 }, (_, index) => walk(`sophie_walk_back_${index + 1}.webp`)),
   standIn: walk("sophie_walk_away.webp"),
-  /** Milliseconds per frame: 650 ms a step, an unhurried stroll of about one and a half steps a second. */
-  frameMs: Array.from({ length: 10 }, () => 130),
+  /** Milliseconds per frame: three frames a step, about 650 ms a step, an unhurried stroll. */
+  frameMs: Array.from({ length: 6 }, () => 215),
   /** Where each step starts, as frame indices. */
-  stepStarts: [0, 5]
+  stepStarts: [0, 3]
 };
 
 /**
@@ -70,6 +69,8 @@ export const SOPHIE_WALK = {
 export const STREET_POSES: Record<StreetPose, { image: string; talking?: string }> = {
   glance: { image: walk("sophie_street_glance.webp"), talking: walk("sophie_street_glance_talking.webp") },
   greeting: { image: walk("sophie_street_greeting.webp") },
+  // Back to the camera, turned to her right, waving to someone ahead on that side.
+  wave: { image: walk("sophie_street_wave.webp"), talking: walk("sophie_street_wave_talking.webp") },
   playful: { image: walk("sophie_street_playful.webp") },
   explaining: { image: walk("sophie_street_explaining.webp") },
   pleased: { image: walk("sophie_street_pleased.webp") }
@@ -103,8 +104,8 @@ const onGround = (height: number, left: number): StreetPlace => ({ left, bottom:
 
 /** People met on the street. Further off than Sophie, so smaller. */
 export const STREET_PEOPLE: Record<string, StreetPerson> = {
-  // Coming up the middle of the street toward the camera, past Sophie on her right,
-  // and on past the camera.
+  // Far up the street at first; he comes up the middle toward the camera as Sophie
+  // walks on past the shop, says bonjour, then walks on past the camera.
   passerby: {
     image: walk("npc_passerby.webp"),
     wave: walk("npc_passerby_wave.webp"),
@@ -113,7 +114,8 @@ export const STREET_PEOPLE: Record<string, StreetPerson> = {
     walk: { frames: Array.from({ length: 8 }, (_, index) => walk(`npc_passerby_walk_${index + 1}.webp`)), frameMs: 130 },
     spots: {
       far: onGround(0.075, 0.5),
-      near: onGround(0.29, 0.55),
+      // Where he meets Sophie, a little ahead of her (the camera is well in by then).
+      near: onGround(0.22, 0.55),
       passed: { left: 1.08, bottom: -0.05, height: 0.5 }
     }
   },

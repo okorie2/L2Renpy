@@ -196,7 +196,7 @@ test("Chapter 1 can be played from start to finish through game events alone", (
   assert.equal(save.player.profile.age, 34);
   // Scene 2: the walk to the café, answering Sophie's questions on the way.
   assert.equal(status(save, "cafe"), "locked");
-  assert.equal(questGuidance(save, quests)?.text, "Say bonjour to the shopkeeper");
+  assert.equal(questGuidance(save, quests)?.text, "Say bonjour to a passer-by");
   save = converse(save, sophie, "walkToCafe");
   assert.equal(status(save, "walkToCafe"), "completed");
   assert.equal(questGuidance(save, quests)?.text, "Go into the café");
