@@ -190,7 +190,11 @@ function SpeakLine(props: LineProps) {
   const [heard, setHeard] = useState<{ transcript: string; pronunciation?: PronunciationDiagnostics; phrase?: string } | undefined>(undefined);
   const [pickPhrase] = useState(() => createPhrasePicker());
   const alive = useRef(true);
-  useEffect(() => () => { alive.current = false; }, []);
+  useEffect(() => {
+    // StrictMode runs setup again after its development cleanup.
+    alive.current = true;
+    return () => { alive.current = false; };
+  }, []);
 
   // The question's English: after a beat on first hearing, behind a tap once it is known.
   const silent = voice.status === "off" || voice.status === "unavailable";
