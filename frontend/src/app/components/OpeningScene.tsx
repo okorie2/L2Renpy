@@ -1,3 +1,4 @@
+import { StoryDirector } from "../../world3d/StoryWorld";
 import { useEffect, useState, type CSSProperties } from "react";
 
 /** A painted place shown behind a scene's conversation, with URLs ready to load. */
@@ -129,6 +130,7 @@ export function OpeningScene({ stage, art, onStart, onArrived, onTalk, talkLabel
 
   return (
     <div className={`opening-scene${stage === "leaving" ? " leaving" : ""}`}>
+      <StoryDirector channel="opening" shot={{ key: `opening-${stage}`, scene: scene?.id ?? "park", mode: stage === "title" ? "title" : stage === "walking" ? "arrival" : "conversation" }} />
       <img className="opening-backdrop" src={art.backdrop} alt="" />
       {/* Her shadow on the path keeps her feet on the ground as she comes closer. */}
       <div

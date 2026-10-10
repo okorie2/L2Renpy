@@ -1,6 +1,8 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./app/App";
+import { StoryPreview } from "./world3d/StoryPreview";
+import { StoryWorldProvider } from "./world3d/StoryWorld";
 import { describeError, logError } from "./diagnostics/log";
 import "./styles.css";
 
@@ -10,6 +12,6 @@ window.addEventListener("unhandledrejection", (event) => logError("app", "Unhand
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <App />
+    <StoryWorldProvider>{new URLSearchParams(window.location.search).has("preview3d") ? <StoryPreview /> : <App />}</StoryWorldProvider>
   </React.StrictMode>
 );

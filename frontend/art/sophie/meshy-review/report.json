@@ -1,0 +1,23 @@
+{
+  "walkMaxFootError": 3.2186508178155826e-07,
+  "stanceSoleZRange": [
+    0.00014484960411209613,
+    0.0010647450108081102
+  ],
+  "source": "/Users/psami/Downloads/Meshy_AI_SophieCharacterModel_1010133947_image-to-3d-texture.glb",
+  "vertices": 56120,
+  "triangles": 112392,
+  "glbBytes": 8922324,
+  "bones": 22,
+  "clips": [
+    "Idle",
+    "Idle_Neutral",
+    "Walk",
+    "Wave"
+  ],
+  "limitations": [
+    "First-pass procedural body motion and analytic skin weights; inspect sleeve, trouser and strap deformation.",
+    "No finger articulation or facial shape keys.",
+    "No physical-device performance validation."
+  ]
+}

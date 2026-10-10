@@ -1,0 +1,27 @@
+{
+  "source": "/Users/psami/Downloads/Meshy_AI_SophieRigged_biped.zip",
+  "sourceTriangles": 220097,
+  "runtimeTriangles": 107847,
+  "runtimeBytes": 9133940,
+  "joints": 23,
+  "sourceTextures": [
+    [
+      4096,
+      4096
+    ]
+  ],
+  "runtimeTextureLimit": 2048,
+  "sourceRootDriftRemoved": {
+    "0": 6.67572021484375e-06,
+    "1": 3.3676624298095703e-06
+  },
+  "clips": [
+    "Walk",
+    "Idle_Neutral"
+  ],
+  "limitations": [
+    "Idle is a local neutral breathing fallback; no supplied idle or greeting.",
+    "Running is retained in the original ZIP, not used in story walking.",
+    "No facial blendshapes; no physical-phone performance validation."
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "appearanceSource": "public/assets/3d/characters/sophie-meshy.glb",
+  "rigSource": "Meshy_AI_SophieRigged_biped.zip",
+  "vertices": 70939,
+  "triangles": 112392,
+  "bytes": 8918988,
+  "joints": 23,
+  "clips": [
+    "Walk",
+    "Idle_Neutral"
+  ],
+  "method": "Original mesh, UVs and colour atlas; closest-surface interpolation of Meshy skin weights",
+  "limitations": [
+    "Inspect cloth and bag deformation after weight transfer.",
+    "No physical-phone performance validation."
+  ]
+}

@@ -1,3 +1,4 @@
+import { StoryWorldViewport, useStoryWorld } from "../world3d/StoryWorld";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Conversation, type ConversationSpeaker } from "./components/Conversation";
 import { SceneMenu } from "./components/SceneMenu";
@@ -147,6 +148,7 @@ type GameProps = {
 };
 
 function Game({ initialSave, onSaveChange, onStartOver, saveNotice, onDismissSaveNotice }: GameProps) {
+  const story3d = useStoryWorld();
   const [nearNpcIds, setNearNpcIds] = useState<Set<string>>(() => new Set());
   const [nearPortalIds, setNearPortalIds] = useState<Set<string>>(() => new Set());
   const [moving, setMoving] = useState(false);
@@ -525,7 +527,7 @@ function Game({ initialSave, onSaveChange, onStartOver, saveNotice, onDismissSav
   };
 
   return (
-    <main className={`app${conversation ? " in-conversation" : ""}${opening !== "done" ? " in-opening" : ""}`}>
+    <main className={`app${story3d.ready && story3d.shot ? " has-3d-story" : ""}${conversation ? " in-conversation" : ""}${opening !== "done" ? " in-opening" : ""}`}>
       <header className="hud">
         <button className="quest-summary" onClick={() => openPhone({ app: "quests" })} aria-label="Open quests">
           <span className="eyebrow">
@@ -550,6 +552,7 @@ function Game({ initialSave, onSaveChange, onStartOver, saveNotice, onDismissSav
       </header>
 
       <GameView key={`${location.id}:${worldEpoch}`} world={world} />
+      <StoryWorldViewport />
 
       {opening === "done" && (
         <div className="hint">

@@ -1,3 +1,4 @@
+import { StoryDirector } from "../../world3d/StoryWorld";
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { resolveConversationVisual } from "../../characters/resolve";
 import type { CharacterExpression } from "../../characters/types";
@@ -810,6 +811,13 @@ export function Conversation({ dialogue, session, speakers, voiceLibrary, audioS
 
   return (
     <div className="conversation" style={{ "--keyboard-inset": `${keyboardInset}px` } as CSSProperties}>
+      <StoryDirector channel="conversation" shot={dialogue.id === "meetSophie" || dialogue.id === "walkToCafe" ? {
+        key: lineKey, scene: street?.scene.id ?? node.interlude?.segments[0]?.scene ?? node.presentation?.scene ?? "park",
+        mode: node.interlude ? "walk" : "conversation", zoom: street?.zoom, walk: node.interlude, paused,
+        speakingId: speaking ? (speaker.speaking ? speaker.speaking.item.speakerId : voicedBy) : undefined,
+        focus: node.presentation?.street?.with ?? node.presentation?.focus, wave: node.presentation?.street?.pose === "greeting",
+        people: streetPeople(dialogue, [...session.history.map(entry => entry.nodeId), node.id])
+      } : null} />
       {replaying && (
         <span className="replay-tag top" title="Answers here are practice and don't change your progress">Replay</span>
       )}
